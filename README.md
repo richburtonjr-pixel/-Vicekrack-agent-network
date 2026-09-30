@@ -1,51 +1,102 @@
 # Vicekrack Agent Network
 
-A simple, modular foundation for agents that coordinate through a shared task contract.
-Agent roles are independent of AI providers, models, SDKs, and transport mechanisms.
-Future adapters may connect OpenAI, Anthropic Claude, or other services.
+A small, provider-neutral agent network. Step 2 runs a structured task through a local
+orchestrator, delegates it to a researcher, and returns a validated result. The only
+provider is a deterministic mock: no AI API calls, browsing, credentials, or paid services.
 
-## Step 1: foundation
+## Setup
 
-This repository currently contains definitions and documentation, not an executable
-agent system. No installation, API keys, or dependencies are required.
+Use Python 3.11 or newer. Run these commands from the repository root.
 
-```text
-agents/
-  orchestrator.md             Coordination responsibilities and boundaries
-  researcher.md              Research responsibilities and boundaries
-config/
-  agents.json                Agent registry and unbound execution settings
-docs/
-  architecture.md            Components, task lifecycle, and extension guide
-examples/
-  research-task.json         Example task sent to the researcher
-schemas/
-  task.schema.json           Shared JSON Schema (Draft 2020-12)
-.gitignore
-README.md
+Windows PowerShell (activation is not required):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Start with [the architecture](docs/architecture.md), then inspect
-[the registry](config/agents.json) and [the task example](examples/research-task.json).
-Both agents exchange task objects conforming to [the task schema](schemas/task.schema.json).
+macOS / Linux:
 
-## Step 2: local execution without API access
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m vicekrack examples/research-task.json
+.venv/bin/python -m unittest discover -s tests -v
+```
 
-Choose a runtime and implement a small command-line runner that loads the registry,
-validates tasks, and routes a task from the orchestrator to a deterministic mock
-researcher. Have the mock return a completed task with a result, and demonstrate a
-failed task with an error. Validate both incoming and outgoing objects, reject unknown
-agents, and enforce the lifecycle described in the architecture.
+`jsonschema` is the only direct dependency (its own dependencies are installed by pip).
+Installation needs package-index access; the runner and tests work locally afterward.
+No `.env` setup is required. `.env.example` reserves empty credential names for future
+integrations; Step 2 does not load environment files. Never commit real credentials.
 
-Step 2 is complete when one local command runs the example end to end without network
-access or credentials, with tests for successful routing, invalid input, unknown
-agents, and failed execution. Add real provider adapters only after that contract works.
+## Demo and behavior
 
-## Extending the network
+The example addresses `orchestrator` and requests `context.capability: "research"`.
+The orchestrator selects the enabled researcher from the registry, creates a child task,
+and returns a completed parent task. Inspect `result.data.delegated_task` to see the
+child's ID, `parent_task_id`, recipient, status, supplied-note references, and mock output.
+The mock performs an extractive summary of `context.design_notes`; it does not reason
+about arbitrary instructions, search the web, or claim independent verification.
 
-Add a role definition under `agents/` and register its stable ID and capabilities in
-`config/agents.json`. Keep provider-specific execution code in future adapters rather
-than embedding SDK details into role definitions or the shared task format.
+To demonstrate a clear unsupported-capability failure on Windows:
 
-Never commit credentials. Future integrations should read secrets from environment
-variables or a secret manager; registry values must not contain secrets.
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack examples/unsupported-task.json
+```
+
+On macOS/Linux use `.venv/bin/python` instead. This returns a schema-valid failed task
+with `error.code: "unsupported_capability"` and exit code 1. Success exits 0.
+
+The CLI also accepts `-` to read JSON from standard input. It prints one JSON object to
+stdout. Invalid JSON, invalid schema data, bad configuration, duplicate submissions, or
+non-queued input return `{"error": {"code": "...", "message": "..."}}`; that rejection
+object is not a task because the submitted envelope was not accepted. Accepted tasks
+return a terminal task (`completed` or `failed`) matching the shared schema.
+
+For a direct dispatch, set `recipient` to `researcher`. For capability-based selection,
+set it to `orchestrator`. `context.capability` is mandatory at runtime. Supported local
+worker capabilities are `research` and `summarization`; both summarize supplied notes.
+A missing capability, disabled/unknown agent, ambiguous match, missing notes, or unavailable
+adapter produces an explicit error. There is no fallback to a different provider.
+
+## Files
+
+```text
+agents/orchestrator.md          Coordination role and implementation scope
+agents/researcher.md            Research role and local limitations
+config/agents.json             Registry, capabilities, and provider bindings
+docs/architecture.md           Contracts, routing, lifecycle, and extension points
+schemas/task.schema.json       Unchanged Step 1 JSON Schema (Draft 2020-12)
+examples/research-task.json     Successful orchestrator-to-researcher demo
+examples/unsupported-task.json  Unsupported capability demo
+vicekrack/__init__.py           Public Orchestrator import
+vicekrack/__main__.py           JSON command-line interface
+vicekrack/errors.py             Structured error type
+vicekrack/orchestrator.py       Registry loading, validation, routing, lifecycle
+vicekrack/researcher.py         Research input requirements and provider invocation
+vicekrack/providers.py          Provider protocol and deterministic local mock
+tests/test_orchestrator.py      Unit and CLI integration tests
+requirements.txt               Required JSON Schema validator
+.env.example                   Empty future credential placeholders
+.gitignore                     Credentials and local artifact exclusions
+```
+
+## Architecture and boundaries
+
+Read [the architecture](docs/architecture.md). The task schema stays at version 1.0;
+`context.capability` uses its existing extensible context object. Agent definitions are
+role documentation, not automatically interpreted programs. The registry describes
+routing; Python implements the local orchestrator and researcher. New executable roles
+need an explicitly registered handler as well as a registry entry.
+
+Provider adapters implement `ResearchProvider.research(...)` and return a result object.
+The orchestrator accepts an injectable provider map, so another adapter can be added
+without replacing routing or the task envelope. Only the mock is shipped.
+
+Task ID deduplication is in memory for one `Orchestrator` instance. Each CLI invocation
+starts fresh; this is not a persistent queue or exactly-once processing service. Step 2
+is sequential and performs no automatic retries, parallel work, or recursive delegation.
+Future steps can add provider adapters after their scope and credentials are explicitly
+configured. Step 3 and external AI integration are not implemented here.
