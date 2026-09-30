@@ -30,3 +30,12 @@ the provider protocol in `vicekrack/providers.py`. The local mock returns an ext
 summary with supplied-note references, not independently verified research. Both active
 capabilities use that behavior. Source evaluation is deferred and not advertised in the
 registry. The runtime wraps the provider result in a validated task outcome.
+
+
+## Step 3 provider integration
+
+The same implementation can use OpenAI when the selected registry binds the researcher
+adapter to `openai` and supplies a model. The adapter interprets instructions over the
+supplied notes through Responses, normalizes a structured summary, and reports failures.
+The mock remains the default. No browsing or independent source verification is added.
+Credentials and SDK code stay outside this role and its implementation.

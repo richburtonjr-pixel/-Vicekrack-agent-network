@@ -1,8 +1,15 @@
-"""Provider boundary: no SDKs, environment access, or network calls."""
+"""Provider-neutral interface, mock implementation, and adapter registration."""
 
 from typing import Protocol
 
 from .errors import NetworkError
+
+
+def default_providers():
+    """Register adapters without creating clients or accessing credentials."""
+    from .openai_provider import OpenAIResearchProvider
+
+    return {"mock": MockResearchProvider(), "openai": OpenAIResearchProvider()}
 
 
 class ResearchProvider(Protocol):
