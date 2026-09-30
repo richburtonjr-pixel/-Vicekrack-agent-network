@@ -6,6 +6,47 @@
   "additionalProperties": false,
   "required": ["schema_version", "task_id", "sender", "recipient", "instructions", "status", "created_at", "updated_at"],
   "properties": {
+    "execution_trace": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "agent",
+          "provider",
+          "status"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "agent": {
+            "enum": [
+              "researcher",
+              "analyst",
+              "reviewer"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "mock",
+              "openai",
+              "anthropic"
+            ]
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "failed"
+            ]
+          }
+        }
+      }
+    },
     "schema_version": { "const": "1.0" },
     "task_id": { "$ref": "#/$defs/identifier" },
     "parent_task_id": { "$ref": "#/$defs/identifier" },

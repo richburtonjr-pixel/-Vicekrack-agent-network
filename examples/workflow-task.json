@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "task_id": "workflow-001",
+  "sender": "user",
+  "recipient": "orchestrator",
+  "instructions": "Summarize the supplied design notes using only the supplied context.",
+  "context": {
+    "capability": "research",
+    "design_notes": [
+      "Agent definitions describe responsibilities independently of providers.",
+      "The registry maps stable agent IDs to their definitions and capabilities.",
+      "Future adapters translate shared tasks into provider-specific requests."
+    ],
+    "workflow": "research_review"
+  },
+  "status": "queued",
+  "created_at": "2026-09-30T12:00:00Z",
+  "updated_at": "2026-09-30T12:00:00Z"
+}

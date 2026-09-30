@@ -1,0 +1,70 @@
+{
+  "registry_version": "1.0",
+  "task_schema": "schemas/task.schema.json",
+  "default_agent": "orchestrator",
+  "agents": [
+    {
+      "id": "orchestrator",
+      "name": "Orchestrator",
+      "definition": "agents/orchestrator.md",
+      "enabled": true,
+      "capabilities": [
+        "task_planning",
+        "task_routing",
+        "result_aggregation"
+      ],
+      "execution": {
+        "adapter": null,
+        "model": null
+      }
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "definition": "agents/researcher.md",
+      "enabled": true,
+      "capabilities": [
+        "research",
+        "summarization"
+      ],
+      "execution": {
+        "adapter": "mock",
+        "model": null
+      }
+    },
+    {
+      "id": "analyst",
+      "name": "Analyst",
+      "definition": "agents/analyst.md",
+      "enabled": true,
+      "capabilities": [
+        "analysis"
+      ],
+      "execution": {
+        "adapter": "mock",
+        "model": null
+      }
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "definition": "agents/reviewer.md",
+      "enabled": true,
+      "capabilities": [
+        "review"
+      ],
+      "execution": {
+        "adapter": "mock",
+        "model": null
+      }
+    }
+  ],
+  "workflow": {
+    "agents": [
+      "researcher",
+      "analyst",
+      "reviewer"
+    ],
+    "max_steps": 3
+  }
+}

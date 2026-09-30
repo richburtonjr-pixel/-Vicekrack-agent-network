@@ -28,3 +28,12 @@ Automatic retries, concurrent execution, and recursive delegation are outside St
 delegation, and result propagation. A task must specify `context.capability` and may
 address either `orchestrator` for selection or an explicit worker for direct dispatch.
 Broader natural-language planning and multi-result aggregation are not implemented.
+
+
+## Step 5 implementation
+
+Workflow tasks select research_review. The runtime validates a fixed three-stage plan,
+creates bounded child tasks, validates handoffs, and collects a metadata-only execution
+trace. Researcher, Analyst, and Reviewer run at most once, in order. Any stage failure
+stops the parent workflow. Provider/model selection belongs to each registry entry.
+No agent output is interpreted as a command to schedule work or override the step budget.

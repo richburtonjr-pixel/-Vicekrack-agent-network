@@ -26,6 +26,12 @@ class MockResearchProvider:
     def research(self, *, instructions: str, notes: list[str], model: str | None) -> dict:
         if model is not None:
             raise NetworkError("unsupported_model", "The mock provider requires a null model.")
+        if instructions.startswith(("Role: analyst.", "Role: reviewer.")):
+            role = "analyst" if instructions.startswith("Role: analyst.") else "reviewer"
+            return {"summary": f"Local mock {role}: received the structured prior work. "
+                               "This deterministic fixture does not assess truth or approve claims; "
+                               "evidence quality and unresolved gaps require real analysis.",
+                    "data": {"provider": "mock", "role": role}}
         findings = [
             {"text": note.strip(), "source": f"context.design_notes[{index}]"}
             for index, note in enumerate(notes)
