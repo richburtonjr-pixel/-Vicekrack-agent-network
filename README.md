@@ -1,7 +1,7 @@
 # Vicekrack Agent Network
 
 A small, provider-neutral agent network. The orchestrator validates and routes tasks
-to a researcher and returns structured results. Step 3 adds an OpenAI Responses adapter
+to a researcher and returns structured results. Step 4 supports OpenAI Responses and Anthropic Claude Messages
 alongside the deterministic local mock. The default configuration remains offline.
 
 ## Setup
@@ -26,7 +26,7 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-`jsonschema` and the official `openai` SDK are the only direct dependencies; pip installs
+`jsonschema` and the official `openai` and `anthropic` SDKs are the direct dependencies; pip installs
 their dependencies. Tests use unittest and the SDK's HTTP transport dependency. Setup
 needs package-index access. The mock demo and automated tests make no AI API calls.
 No credentials are needed for either. Never commit real credentials.
@@ -109,7 +109,7 @@ at `result.data.delegated_task.result`, including `data.provider: "openai"`.
 ## Offline provider tests and failures
 
 Run the same unittest command from Setup. It includes the original orchestrator tests
-and new OpenAI tests that exercise the actual SDK through an in-memory mock HTTP
+and provider tests that exercise both actual SDKs through in-memory mock HTTP
 transport. They use a fake test credential, block socket connections in provider tests,
 and never require an API key or spend credits. A live request is not part of validation.
 
@@ -132,13 +132,79 @@ error bodies, credentials, and exception text are not included. Provider selecti
 entirely configuration-based; adding another provider requires a protocol implementation
 and registration in `default_providers()`, with no changes to routing or the researcher.
 
+## Select OpenAI or Claude with the same task
+
+| Registry | Adapter | Configured model |
+| --- | --- | --- |
+| `config/agents.json` (default) | `mock` | None; no API access |
+| `config/agents.openai.json` | `openai` | `gpt-4.1-mini` |
+| `config/agents.anthropic.json` | `anthropic` | `claude-sonnet-4-6` |
+
+The agent's `execution.adapter` and `execution.model` control provider selection.
+The same `examples/research-task.json` works for all three configurations. No task,
+researcher, or orchestrator changes are needed. Use a model available to your account
+with the provider's structured JSON support. Unknown adapters return `adapter_unavailable`;
+there is no silent fallback or automatic retry.
+
+After running Setup, set only the credential for the provider you intend to call.
+`.env.example` contains exactly two blank key entries. It is a reference, not a file
+loaded by the application. Never enter keys in task JSON or configuration files.
+
+PowerShell, Claude:
+
+```powershell
+$env:ANTHROPIC_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Anthropic API key' -AsSecureString)).Password
+.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json --registry config/agents.anthropic.json
+Remove-Item Env:ANTHROPIC_API_KEY
+```
+
+Bash, Claude:
+
+```bash
+read -r -s -p 'Anthropic API key: ' ANTHROPIC_API_KEY
+export ANTHROPIC_API_KEY
+.venv/bin/python -m vicekrack examples/research-task.json --registry config/agents.anthropic.json
+unset ANTHROPIC_API_KEY
+```
+
+The OpenAI commands above use the identical task with the OpenAI registry instead.
+Explicit live commands send instructions and notes to the selected provider and consume
+API credits. Neither credentials nor raw provider errors are printed by the application.
+The Claude adapter uses the Messages API with
+[structured JSON output](https://platform.claude.com/docs/en/build-with-claude/structured-outputs),
+a 1200-token output cap, no tools, and zero retries. Only completed text JSON summaries
+are accepted. Refusals, truncation, malformed blocks, and invalid JSON produce clear errors.
+Both providers return `summary` and `data` containing provider/model metadata.
+
+Optional `ANTHROPIC_TIMEOUT_SECONDS` and `OPENAI_TIMEOUT_SECONDS` environment variables
+set each SDK's network-operation timeout (default 30, greater than 0 and at most 300).
+They are not total wall-clock deadlines and are deliberately omitted from `.env.example`.
+The error codes in the preceding table apply to both providers; credential/model messages
+identify the relevant provider. Claude overload responses map to `provider_api_error`.
+
+Offline validation (no API keys or credits):
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m compileall -q vicekrack tests
+```
+
+On macOS/Linux replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`.
+Provider tests use the actual SDKs with in-memory HTTP transports and socket blocking.
+The selection test runs the same task against both registry files and checks that each
+request reaches the corresponding mocked endpoint with identical instructions and notes.
+Credential tests use synthetic values or empty environments, never local credentials.
+Live API access and generation quality are not asserted by these mocked tests.
+
 ## Files
 
 ```text
 agents/orchestrator.md          Coordination role and implementation scope
 agents/researcher.md            Research role and local limitations
 config/agents.json             Default mock registry (unchanged)
-config/agents.openai.json      Explicit OpenAI provider/model registry
+config/agents.openai.json       Explicit OpenAI provider/model registry
+config/agents.anthropic.json    Explicit Claude provider/model registry
 docs/architecture.md           Contracts, routing, lifecycle, and extension points
 schemas/task.schema.json       Unchanged Step 1 JSON Schema (Draft 2020-12)
 examples/research-task.json     Successful orchestrator-to-researcher demo
@@ -150,10 +216,13 @@ vicekrack/orchestrator.py       Registry loading, validation, routing, lifecycle
 vicekrack/researcher.py         Research input requirements and provider invocation
 vicekrack/providers.py          Protocol, mock, and adapter registration
 vicekrack/openai_provider.py    Responses adapter and safe error normalization
+vicekrack/anthropic_provider.py Claude Messages adapter and safe error normalization
 tests/test_orchestrator.py      Existing unit and CLI integration tests
-tests/test_openai_provider.py   Offline SDK, error, and end-to-end tests
-requirements.txt               JSON Schema validator and official OpenAI SDK
-.env.example                   Empty key and optional timeout reference
+tests/test_openai_provider.py   Offline OpenAI SDK and error tests
+tests/test_anthropic_provider.py Offline Claude SDK and error tests
+tests/test_provider_selection.py Same-task provider switching and CLI credential tests
+requirements.txt               JSON Schema validator and official provider SDKs
+.env.example                   Only blank OpenAI and Anthropic key entries
 .gitignore                     Credentials and local artifact exclusions
 ```
 
@@ -167,10 +236,10 @@ need an explicitly registered handler as well as a registry entry.
 
 Provider adapters implement `ResearchProvider.research(...)` and return a result object.
 The orchestrator accepts an injectable provider map, so another adapter can be added
-without replacing routing or the task envelope. Mock and OpenAI adapters are shipped.
+without replacing routing or the task envelope. Mock, OpenAI, and Anthropic adapters are shipped.
 
 Task ID deduplication is in memory for one `Orchestrator` instance. Each CLI invocation
 starts fresh; this is not a persistent queue or exactly-once processing service. Execution
 is sequential and performs no automatic retries, parallel work, or recursive delegation.
-Claude and Step 4 are not implemented. The shared task schema, researcher interface,
+Step 5, autonomous loops, additional agent conversations, tools, and databases are not implemented. The shared task schema, researcher interface,
 capability routing, and lifecycle from Steps 1 and 2 are preserved.

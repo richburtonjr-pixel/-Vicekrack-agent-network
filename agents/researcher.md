@@ -39,3 +39,10 @@ adapter to `openai` and supplies a model. The adapter interprets instructions ov
 supplied notes through Responses, normalizes a structured summary, and reports failures.
 The mock remains the default. No browsing or independent source verification is added.
 Credentials and SDK code stay outside this role and its implementation.
+
+
+## Step 4 provider selection
+
+The unchanged researcher implementation also accepts the Anthropic adapter selected by
+`config/agents.anthropic.json`. OpenAI and Claude use the same instructions, notes, and
+result contract. No provider-specific routing, tools, or additional delegation is added.

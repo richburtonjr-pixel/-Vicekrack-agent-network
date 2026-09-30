@@ -8,8 +8,10 @@ from .errors import NetworkError
 def default_providers():
     """Register adapters without creating clients or accessing credentials."""
     from .openai_provider import OpenAIResearchProvider
+    from .anthropic_provider import AnthropicResearchProvider
 
-    return {"mock": MockResearchProvider(), "openai": OpenAIResearchProvider()}
+    return {"mock": MockResearchProvider(), "openai": OpenAIResearchProvider(),
+            "anthropic": AnthropicResearchProvider()}
 
 
 class ResearchProvider(Protocol):

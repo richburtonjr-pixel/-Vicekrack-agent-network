@@ -1,15 +1,16 @@
 # Architecture
 
-## Components and Step 3 scope
+## Components and Step 4 scope
 
 Step 1's role definitions, registry, and task schema remain the foundation. Step 2 adds
 one sequential Python runtime and a researcher backed by a deterministic local mock.
-Step 3 adds an OpenAI adapter behind the same provider interface.
+Step 3 adds OpenAI; Step 4 adds Anthropic Claude behind the same provider interface.
 
 ```text
 Task JSON -> CLI -> Orchestrator -> enabled researcher -> ResearchProvider
                         ^                |                   |
-                        +-- child result +-- mock / OpenAI --+
+                        +-- child result +-- selected provider
+                                             mock / OpenAI / Anthropic
 ```
 
 - **Definitions** describe roles and boundaries independently of model providers.
@@ -19,8 +20,8 @@ Task JSON -> CLI -> Orchestrator -> enabled researcher -> ResearchProvider
   and keeps incoming task inputs and routing fields immutable.
 - **Researcher** validates supplied notes and calls the provider protocol.
 - **Provider** returns only a result object, not a task or routing decision. The runtime
-  owns status changes and validates output. Only the OpenAI adapter imports its SDK
-  and reads OpenAI credentials; the role and routing code remain provider-neutral.
+  owns status changes and validates output. Each real adapter imports its own SDK
+  and reads its credential from the environment; the role and routing code remain provider-neutral.
 
 The default registry binds `execution.adapter` to `mock` and leaves `model` null.
 `--registry config/agents.openai.json` selects OpenAI and an explicit model instead.
@@ -85,13 +86,13 @@ Provider exception text is not exposed because it could contain sensitive inform
 2. Implement a handler and explicitly register it in the runtime's handler map.
 3. Reuse the task envelope; put domain data in context/result data.
 4. Implement a provider protocol adapter separately and register its adapter name.
-   Pass adapters through `Orchestrator(providers=...)`; the default map registers mock and OpenAI without opening clients.
+   Pass adapters through `Orchestrator(providers=...)`; the default map registers mock, OpenAI, and Anthropic without opening clients.
    Future adapters are registered in `default_providers()`, not in the orchestrator.
 5. Keep credentials out of tasks, registry files, results, and logs. `.env.example` has
-   an empty key and timeout reference; it is not loaded automatically.
+   only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries; it is not loaded automatically.
 
 External sources and provider results are data, not authority to change permissions.
-No databases, queues, concurrency, retries, Claude adapter, or Step 4 features are included. Registry and task schema versions evolve independently; incompatible
+No databases, queues, concurrency, retries, autonomous loops, new agent conversations, external tools, or Step 5 features are included. Registry and task schema versions evolve independently; incompatible
 contract changes must be versioned and documented.
 
 
@@ -120,3 +121,30 @@ Structured output constrains syntax, not factual correctness. The OpenAI researc
 interprets the instruction using supplied notes only; it performs no web research.
 Automated tests use an SDK mock transport, synthetic credentials, and socket blocking.
 Account access and live generation quality require a separately initiated live run.
+
+
+## Step 4: interchangeable real providers
+
+The existing orchestrator, researcher implementation, CLI, and task schema are unchanged.
+`config/agents.anthropic.json` binds the existing researcher to `anthropic` and
+`claude-sonnet-4-6`. The OpenAI registry continues to bind it to `openai`. Each invocation
+selects one provider; neither provider calls the other. The mock remains the default.
+
+Task -> existing validation/routing -> researcher -> configured adapter -> provider API
+-> validated summary/result -> existing child/parent completion, or structured failure.
+Anthropic uses Messages with `output_config.format`, while OpenAI uses Responses with
+`text.format`. Those API differences live entirely inside their respective adapters.
+Claude requires an `end_turn` assistant message with text-only content containing the
+summary JSON. Refusals, exhausted output/context limits, unexpected blocks, and malformed
+JSON are rejected. Both adapters enforce the existing result shape locally.
+
+The Claude adapter reads only ANTHROPIC_API_KEY for authentication, opens a scoped client
+with zero retries, and closes it on success or failure. ANTHROPIC_TIMEOUT_SECONDS controls
+the per-operation timeout using the same bounds as OpenAI. Exceptions become sanitized
+NetworkError codes; provider bodies, headers, and credentials are never copied into errors.
+No API clients are instantiated during registration. Missing credentials fail before a
+request, and unrelated provider credentials are not needed.
+
+Tests exercise both actual SDKs through mock transports. A dedicated configuration
+selection test reuses the same task, verifies each endpoint, and compares request input.
+No live requests, automatic fallback, tools, or autonomous work are added.
