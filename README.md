@@ -1,245 +1,171 @@
 # Vicekrack Agent Network
 
-A small, provider-neutral agent network. The orchestrator validates and routes tasks
-to a researcher and returns structured results. Step 4 supports OpenAI Responses and Anthropic Claude Messages
-alongside the deterministic local mock. The default configuration remains offline.
+A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
+workflow. The orchestrator owns the sequence. Each role independently selects mock,
+OpenAI, or Anthropic through its registry entry. The default demos stay offline.
 
-## Setup
+## Architecture
 
-Use Python 3.11 or newer. Run these commands from the repository root.
+```mermaid
+flowchart LR
+    T[Structured task] --> O[Orchestrator: validate and enforce step budget]
+    O --> R[Researcher]
+    R --> H1[Validated research handoff]
+    H1 --> A[Analyst]
+    A --> H2[Research and analysis handoff]
+    H2 --> V[Reviewer]
+    V --> F[Validated final result and execution trace]
+    R -. configured provider .-> P[Mock / OpenAI / Anthropic]
+    A -. configured provider .-> P
+    V -. configured provider .-> P
+```
 
-Windows PowerShell (activation is not required):
+All arrows represent orchestrator-controlled calls and explicit JSON data. Agent outputs
+cannot choose another agent, alter the sequence, or trigger a retry. There are exactly
+three possible stages, no background workers, autonomous loops, tools, or databases.
+
+Researcher uses supplied notes. Analyst examines research for important findings,
+inconsistencies, missing information, and conclusions. Reviewer inspects both for
+completeness, unsupported claims, contradictions, and errors. A completed review means
+execution succeeded, not that the work is factually approved. The final summary includes
+review findings and limitations; all three stage results are retained for inspection.
+
+## Setup and offline run
+
+Python 3.11 or newer, from the repository root. No activation is needed.
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json
+.\.venv\Scripts\python.exe -m vicekrack examples/workflow-task.json --registry config/agents.workflow.json
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pip check
 ```
 
-macOS / Linux:
+macOS/Linux:
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m vicekrack examples/research-task.json
+.venv/bin/python -m vicekrack examples/workflow-task.json --registry config/agents.workflow.json
 .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
 ```
 
-`jsonschema` and the official `openai` and `anthropic` SDKs are the direct dependencies; pip installs
-their dependencies. Tests use unittest and the SDK's HTTP transport dependency. Setup
-needs package-index access. The mock demo and automated tests make no AI API calls.
-No credentials are needed for either. Never commit real credentials.
+Dependencies remain jsonschema and the two official provider SDKs. Tests mock external
+requests and require no credentials or API credits. The mock workflow demonstrates
+handoffs and lifecycle only; its analyst/reviewer summaries explicitly disclaim real
+reasoning or factual approval.
 
-## Demo and behavior
-
-The example addresses `orchestrator` and requests `context.capability: "research"`.
-The orchestrator selects the enabled researcher from the registry, creates a child task,
-and returns a completed parent task. Inspect `result.data.delegated_task` to see the
-child's ID, `parent_task_id`, recipient, status, supplied-note references, and mock output.
-The mock performs an extractive summary of `context.design_notes`; it does not reason
-about arbitrary instructions, search the web, or claim independent verification.
-
-To demonstrate a clear unsupported-capability failure on Windows:
+The existing single-agent demo still works:
 
 ```powershell
+.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json
 .\.venv\Scripts\python.exe -m vicekrack examples/unsupported-task.json
 ```
 
-On macOS/Linux use `.venv/bin/python` instead. This returns a schema-valid failed task
-with `error.code: "unsupported_capability"` and exit code 1. Success exits 0.
+The second command intentionally exits 1 with unsupported_capability. Success exits 0.
+The CLI accepts `-` for stdin and prints one JSON object. Rejected input uses an error
+envelope; accepted tasks return completed or failed task envelopes.
 
-The CLI also accepts `-` to read JSON from standard input. It prints one JSON object to
-stdout. Invalid JSON, invalid schema data, bad configuration, duplicate submissions, or
-non-queued input return `{"error": {"code": "...", "message": "..."}}`; that rejection
-object is not a task because the submitted envelope was not accepted. Accepted tasks
-return a terminal task (`completed` or `failed`) matching the shared schema.
+## Provider selection and live runs
 
-For a direct dispatch, set `recipient` to `researcher`. For capability-based selection,
-set it to `orchestrator`. `context.capability` is mandatory at runtime. Supported local
-worker capabilities are `research` and `summarization`; both summarize supplied notes.
-A missing capability, disabled/unknown agent, ambiguous match, missing notes, or unavailable
-adapter produces an explicit error. There is no fallback to a different provider.
+| Registry | Behavior |
+| --- | --- |
+| config/agents.json | Existing single-agent mock default |
+| config/agents.openai.json | Existing single-agent OpenAI |
+| config/agents.anthropic.json | Existing single-agent Claude |
+| config/agents.workflow.json | Three-stage offline mock |
+| config/agents.workflow-mixed.json | OpenAI researcher; Claude analyst and reviewer |
 
-## Run with OpenAI (explicit opt-in)
+Each agent has its own `execution.adapter` and `execution.model`. Edit those entries to
+choose another combination, without changing the task or orchestrator. Keep model null
+for mock. Real providers require a model supporting structured JSON and account access.
+The included models are gpt-4.1-mini and claude-sonnet-4-6.
 
-Use `config/agents.openai.json` through `--registry`. It sets the researcher's
-`execution.adapter` to `openai` and `execution.model` to `gpt-4.1-mini`. Change that
-model in the configuration if needed; it must support Responses and Structured Outputs
-and be available to your API account. The model name is never selected by task content.
-The [model documentation](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
-lists these capabilities. This is an API integration, not ChatGPT app automation.
+`.env.example` contains only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries. The
+application reads process environment variables; it does not load .env files. Never put
+credentials into task JSON, registry entries, prompts, or source control.
 
-Set `OPENAI_API_KEY` in the process environment. `.env.example` documents the variable
-names but the application does **not** automatically load `.env` files. An optional
-`OPENAI_TIMEOUT_SECONDS` sets the SDK network-operation timeout (default 30 seconds;
-greater than zero, at most 300). This is not a total wall-clock deadline.
-
-Windows PowerShell (prompt avoids putting the key in shell history):
+PowerShell, explicit live mixed-provider run:
 
 ```powershell
 $env:OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'OpenAI API key' -AsSecureString)).Password
-$env:OPENAI_TIMEOUT_SECONDS = '30'
-.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json --registry config/agents.openai.json
-Remove-Item Env:OPENAI_API_KEY
+$env:ANTHROPIC_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Anthropic API key' -AsSecureString)).Password
+.\.venv\Scripts\python.exe -m vicekrack examples/workflow-task.json --registry config/agents.workflow-mixed.json
+Remove-Item Env:OPENAI_API_KEY, Env:ANTHROPIC_API_KEY
 ```
 
-macOS / Linux, Bash:
+Bash:
 
 ```bash
 read -r -s -p 'OpenAI API key: ' OPENAI_API_KEY
 export OPENAI_API_KEY
-export OPENAI_TIMEOUT_SECONDS=30
-.venv/bin/python -m vicekrack examples/research-task.json --registry config/agents.openai.json
-unset OPENAI_API_KEY
-```
-
-This explicit command sends the task instructions and supplied notes to OpenAI and
-uses API credits. The adapter reads only the environment key, uses the official endpoint,
-disables automatic retries, sets a 1200-token output limit, and sends `store=false`.
-It does not enable browsing, tools, or conversation history. AI output can still be
-incorrect; research remains limited to supplied notes.
-
-The adapter requests a strict JSON summary using
-[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs),
-validates the returned summary locally, then adds provider/model metadata. The unchanged
-task schema validates the final child and parent envelopes. Successful responses appear
-at `result.data.delegated_task.result`, including `data.provider: "openai"`.
-
-## Offline provider tests and failures
-
-Run the same unittest command from Setup. It includes the original orchestrator tests
-and provider tests that exercise both actual SDKs through in-memory mock HTTP
-transport. They use a fake test credential, block socket connections in provider tests,
-and never require an API key or spend credits. A live request is not part of validation.
-
-| Error code | Meaning |
-| --- | --- |
-| `missing_credentials` | `OPENAI_API_KEY` is missing or blank |
-| `missing_model` | OpenAI selected without an execution model |
-| `invalid_provider_configuration` | Invalid timeout setting |
-| `adapter_unavailable` | Unknown or unbound provider; no silent fallback |
-| `provider_timeout` / `provider_connection_error` | Network timeout or connection failure |
-| `provider_authentication_error` / `provider_permission_error` | API rejected credentials or access |
-| `provider_rate_limit` | Rate/quota limit; no automatic retry |
-| `provider_api_error` | Other API failure, including invalid/inaccessible model |
-| `provider_refusal` / `incomplete_provider_response` | Refused or unfinished generation |
-| `invalid_provider_response` | Missing, malformed, or schema-invalid output |
-| `provider_error` | Unexpected provider failure |
-
-Accepted tasks receive a schema-valid failed outcome, and the CLI exits 1. Raw API
-error bodies, credentials, and exception text are not included. Provider selection is
-entirely configuration-based; adding another provider requires a protocol implementation
-and registration in `default_providers()`, with no changes to routing or the researcher.
-
-## Select OpenAI or Claude with the same task
-
-| Registry | Adapter | Configured model |
-| --- | --- | --- |
-| `config/agents.json` (default) | `mock` | None; no API access |
-| `config/agents.openai.json` | `openai` | `gpt-4.1-mini` |
-| `config/agents.anthropic.json` | `anthropic` | `claude-sonnet-4-6` |
-
-The agent's `execution.adapter` and `execution.model` control provider selection.
-The same `examples/research-task.json` works for all three configurations. No task,
-researcher, or orchestrator changes are needed. Use a model available to your account
-with the provider's structured JSON support. Unknown adapters return `adapter_unavailable`;
-there is no silent fallback or automatic retry.
-
-After running Setup, set only the credential for the provider you intend to call.
-`.env.example` contains exactly two blank key entries. It is a reference, not a file
-loaded by the application. Never enter keys in task JSON or configuration files.
-
-PowerShell, Claude:
-
-```powershell
-$env:ANTHROPIC_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Anthropic API key' -AsSecureString)).Password
-.\.venv\Scripts\python.exe -m vicekrack examples/research-task.json --registry config/agents.anthropic.json
-Remove-Item Env:ANTHROPIC_API_KEY
-```
-
-Bash, Claude:
-
-```bash
 read -r -s -p 'Anthropic API key: ' ANTHROPIC_API_KEY
 export ANTHROPIC_API_KEY
-.venv/bin/python -m vicekrack examples/research-task.json --registry config/agents.anthropic.json
-unset ANTHROPIC_API_KEY
+.venv/bin/python -m vicekrack examples/workflow-task.json --registry config/agents.workflow-mixed.json
+unset OPENAI_API_KEY ANTHROPIC_API_KEY
 ```
 
-The OpenAI commands above use the identical task with the OpenAI registry instead.
-Explicit live commands send instructions and notes to the selected provider and consume
-API credits. Neither credentials nor raw provider errors are printed by the application.
-The Claude adapter uses the Messages API with
-[structured JSON output](https://platform.claude.com/docs/en/build-with-claude/structured-outputs),
-a 1200-token output cap, no tools, and zero retries. Only completed text JSON summaries
-are accepted. Refusals, truncation, malformed blocks, and invalid JSON produce clear errors.
-Both providers return `summary` and `data` containing provider/model metadata.
+This run makes up to three paid requests. The selected providers receive the original
+request and notes plus prior stage results. No browsing or independent source verification
+is performed. For single-agent live runs use the corresponding registry and research-task.
+OPENAI_TIMEOUT_SECONDS and ANTHROPIC_TIMEOUT_SECONDS optionally set SDK operation
+timeouts (default 30 seconds, greater than 0 and at most 300). These are not overall
+workflow deadlines. Automatic retries are disabled; a timeout stops the workflow.
 
-Optional `ANTHROPIC_TIMEOUT_SECONDS` and `OPENAI_TIMEOUT_SECONDS` environment variables
-set each SDK's network-operation timeout (default 30, greater than 0 and at most 300).
-They are not total wall-clock deadlines and are deliberately omitted from `.env.example`.
-The error codes in the preceding table apply to both providers; credential/model messages
-identify the relevant provider. Claude overload responses map to `provider_api_error`.
+## Handoffs, safeguards, and trace
 
-Offline validation (no API keys or credits):
+The task selects `context.workflow: "research_review"` and addresses `orchestrator`.
+The registry declares `workflow.agents` and `workflow.max_steps`. Step 5 permits only
+researcher, analyst, reviewer, in that order exactly once, with a hard ceiling of three.
+A lower budget rejects the run before execution. Unknown/disabled agents, unsupported
+adapters, reordered stages, duplicate stages, and recursive orchestrator stages are rejected.
+Provider text is never interpreted as a routing instruction.
 
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m compileall -q vicekrack tests
+`schemas/handoff.schema.json` describes the handoff: parent task ID, stage task ID,
+original instructions and notes, recipient, previous output, completion status, provider
+used, step metadata, and prior stage results. Analyst and Reviewer validate IDs, order,
+and consistency before calling their providers. Reviewer sees both prior results.
+
+The task schema gains only an optional runtime-owned `execution_trace` field. Existing
+input tasks remain valid. Older strict validators must use the updated schema to accept
+workflow output. Caller-supplied traces are rejected. The input task is never mutated.
+
+Example trace from a successful mock run:
+
+```json
+[
+  {"step": 1, "agent": "researcher", "provider": "mock", "status": "completed"},
+  {"step": 2, "agent": "analyst", "provider": "mock", "status": "completed"},
+  {"step": 3, "agent": "reviewer", "provider": "mock", "status": "completed"}
+]
 ```
 
-On macOS/Linux replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`.
-Provider tests use the actual SDKs with in-memory HTTP transports and socket blocking.
-The selection test runs the same task against both registry files and checks that each
-request reaches the corresponding mocked endpoint with identical instructions and notes.
-Credential tests use synthetic values or empty environments, never local credentials.
-Live API access and generation quality are not asserted by these mocked tests.
+Find the final review in `result.summary`, all stage outputs in `result.data.stages`,
+and the trace at `execution_trace`. The trace is returned, not persisted or logged, and
+contains only controlled metadata, never prompts, response bodies, credentials, or env.
+Actual task results and handoffs contain user data and should be handled accordingly.
 
-## Files
+On failure, the parent is failed, the trace ends at the failed stage, and no subsequent
+stage runs. Missing credentials, timeouts, provider errors, invalid responses, and malformed
+handoffs propagate clear error codes. Raw provider error messages are excluded. Failed
+runs have no success result. A new attempt needs a new task ID within the same runner;
+there is no cross-process persistence or resume facility.
 
-```text
-agents/orchestrator.md          Coordination role and implementation scope
-agents/researcher.md            Research role and local limitations
-config/agents.json             Default mock registry (unchanged)
-config/agents.openai.json       Explicit OpenAI provider/model registry
-config/agents.anthropic.json    Explicit Claude provider/model registry
-docs/architecture.md           Contracts, routing, lifecycle, and extension points
-schemas/task.schema.json       Unchanged Step 1 JSON Schema (Draft 2020-12)
-examples/research-task.json     Successful orchestrator-to-researcher demo
-examples/unsupported-task.json  Unsupported capability demo
-vicekrack/__init__.py           Public Orchestrator import
-vicekrack/__main__.py           JSON command-line interface
-vicekrack/errors.py             Structured error type
-vicekrack/orchestrator.py       Registry loading, validation, routing, lifecycle
-vicekrack/researcher.py         Research input requirements and provider invocation
-vicekrack/providers.py          Protocol, mock, and adapter registration
-vicekrack/openai_provider.py    Responses adapter and safe error normalization
-vicekrack/anthropic_provider.py Claude Messages adapter and safe error normalization
-tests/test_orchestrator.py      Existing unit and CLI integration tests
-tests/test_openai_provider.py   Offline OpenAI SDK and error tests
-tests/test_anthropic_provider.py Offline Claude SDK and error tests
-tests/test_provider_selection.py Same-task provider switching and CLI credential tests
-requirements.txt               JSON Schema validator and official provider SDKs
-.env.example                   Only blank OpenAI and Anthropic key entries
-.gitignore                     Credentials and local artifact exclusions
-```
+## Implementation map
 
-## Architecture and boundaries
+- `vicekrack/orchestrator.py`: existing routing, task validation, and workflow dispatch.
+- `vicekrack/workflow.py`: bounded sequence, handoffs, trace, failure handling.
+- `vicekrack/researcher.py`, `analyst.py`, `reviewer.py`: specialized role handlers.
+- `vicekrack/handoff.py`: schema and semantic handoff checks.
+- `vicekrack/providers.py`: protocol, mock, and provider registration.
+- `vicekrack/openai_provider.py`, `anthropic_provider.py`: unchanged real adapters.
+- `agents/`: role definitions; `config/`: independent provider selections.
+- `schemas/`: task and handoff contracts; `examples/`: runnable tasks.
+- `tests/test_workflow.py`: sequence, mixed providers, errors, budgets, and trace tests.
 
-Read [the architecture](docs/architecture.md). The task schema stays at version 1.0;
-`context.capability` uses its existing extensible context object. Agent definitions are
-role documentation, not automatically interpreted programs. The registry describes
-routing; Python implements the local orchestrator and researcher. New executable roles
-need an explicitly registered handler as well as a registry entry.
-
-Provider adapters implement `ResearchProvider.research(...)` and return a result object.
-The orchestrator accepts an injectable provider map, so another adapter can be added
-without replacing routing or the task envelope. Mock, OpenAI, and Anthropic adapters are shipped.
-
-Task ID deduplication is in memory for one `Orchestrator` instance. Each CLI invocation
-starts fresh; this is not a persistent queue or exactly-once processing service. Execution
-is sequential and performs no automatic retries, parallel work, or recursive delegation.
-Step 5, autonomous loops, additional agent conversations, tools, and databases are not implemented. The shared task schema, researcher interface,
-capability routing, and lifecycle from Steps 1 and 2 are preserved.
+The original provider and orchestration tests remain part of the complete suite.
+See [architecture details](docs/architecture.md). Step 6 is not implemented.

@@ -11,6 +11,9 @@ from jsonschema import Draft202012Validator, FormatChecker
 from .errors import NetworkError
 from .providers import default_providers
 from .researcher import run_research
+from .analyst import run_analysis
+from .reviewer import run_review
+from .workflow import run_workflow
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,10 +35,11 @@ class Orchestrator:
         self.root = Path(root).resolve()
         self.seen_ids = set()
         self.providers = default_providers() if providers is None else dict(providers)
-        self.handlers = {"researcher": run_research}
+        self.handlers = {"researcher": run_research, "analyst": run_analysis, "reviewer": run_review}
         try:
             registry = read_json(self._path(registry_path))
             self._load_registry(registry)
+            self.workflow = registry.get("workflow")
             schema = read_json(self._path(registry["task_schema"]))
             Draft202012Validator.check_schema(schema)
             self.validator = Draft202012Validator(schema, format_checker=FormatChecker())
@@ -110,6 +114,8 @@ class Orchestrator:
             raise NetworkError("invalid_status", "Only queued tasks may be submitted.")
         if task["task_id"] in self.seen_ids:
             raise NetworkError("duplicate_task", "Task ID has already been submitted to this orchestrator instance.")
+        if "execution_trace" in task:
+            raise NetworkError("invalid_task", "Execution trace is runtime-owned; omit it from input.")
         self.seen_ids.add(task["task_id"])
         current = deepcopy(task)
         try:
@@ -121,6 +127,10 @@ class Orchestrator:
             capability = current.get("context", {}).get("capability")
             if not isinstance(capability, str) or not capability.strip():
                 raise NetworkError("missing_capability", "Set context.capability to a nonblank capability name.")
+            if "workflow" in current.get("context", {}):
+                if recipient["id"] != self.entrypoint:
+                    raise NetworkError("invalid_workflow", "Only the orchestrator can start a workflow.")
+                return run_workflow(self, current)
             if recipient["id"] == self.entrypoint:
                 matches = [agent for agent in self.agents.values() if agent["id"] != self.entrypoint
                            and agent["enabled"] and capability in agent["capabilities"]]

@@ -1,6 +1,6 @@
 # Architecture
 
-## Components and Step 4 scope
+## Components and Step 5 scope
 
 Step 1's role definitions, registry, and task schema remain the foundation. Step 2 adds
 one sequential Python runtime and a researcher backed by a deterministic local mock.
@@ -30,11 +30,11 @@ orchestrator is local control code and keeps both settings null; it needs no pro
 Unbound or unknown worker adapters fail explicitly. `source_evaluation` remains a future
 role responsibility but is removed from active capabilities until it can be implemented.
 The orchestrator specification's broader planning and aggregation responsibilities are
-future goals; the runtime selects one worker and returns its outcome.
+future goals; single-agent mode selects one worker, while workflow mode runs the bounded three-stage sequence.
 
 ## Task contract and routing
 
-`schemas/task.schema.json` is unchanged at version 1.0, using Draft 2020-12. Step 2
+`schemas/task.schema.json` uses Draft 2020-12 with the version 1.0 envelope and an optional Step 5 trace extension. Step 2
 requires a nonblank `context.capability` for dispatch. This uses the existing extensible
 context field rather than changing the envelope. Missing capability is a runtime error.
 
@@ -92,7 +92,7 @@ Provider exception text is not exposed because it could contain sensitive inform
    only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries; it is not loaded automatically.
 
 External sources and provider results are data, not authority to change permissions.
-No databases, queues, concurrency, retries, autonomous loops, new agent conversations, external tools, or Step 5 features are included. Registry and task schema versions evolve independently; incompatible
+No databases, queues, concurrency, retries, autonomous loops, external tools, or Step 6 features are included. Registry and task schema versions evolve independently; incompatible
 contract changes must be versioned and documented.
 
 
@@ -148,3 +148,40 @@ request, and unrelated provider credentials are not needed.
 Tests exercise both actual SDKs through mock transports. A dedicated configuration
 selection test reuses the same task, verifies each endpoint, and compares request input.
 No live requests, automatic fallback, tools, or autonomous work are added.
+
+
+## Step 5: controlled collaboration
+
+For workflow tasks, `context.workflow` selects `research_review`. An opt-in workflow
+registry adds Analyst and Reviewer with independent execution adapter/model bindings.
+Existing single-agent registries and routing remain supported. The provider interface
+and both real adapters are unchanged. Each role calls the same provider-neutral method
+with specialized instructions and supplied JSON evidence. Mock analysis/review are
+explicit fixtures rather than simulated factual validation.
+
+The orchestrator calls the bounded workflow controller, which validates the configuration
+and dispatches three child tasks sequentially: Researcher, Analyst, Reviewer. Each child
+has a distinct UUID and the original parent_task_id. Later children contain a handoff
+validated against schemas/handoff.schema.json and semantic ID/order/previous-output checks.
+Original request, evidence notes, previous result, provider, status, and stage history
+travel as explicit JSON. Reviewer receives both research and analysis, not just a summary
+of the last stage. Prior model output is data, not control flow.
+
+Only this fixed three-stage order is supported. Registry max_steps is an integer 1–3;
+a budget below the required three fails before provider execution. The hard ceiling
+and exact-order checks reject repetition, reordering, and recursive orchestrator stages.
+Stage outputs cannot affect the next recipient, provider, or step count. Agents never
+create tasks themselves. No retry, repair loop, background work, or automatic resume exists.
+
+The task schema gains an optional execution_trace field, retained on successful and
+failed workflow outcomes. This is an additive extension to version 1.0 for existing
+input producers; consumers with an old strict schema must update before reading workflow
+outputs. The trace is runtime-owned and callers cannot submit it. Rows allow only step,
+agent, provider, and terminal stage status. No user content or environment values enter
+the trace. On failure the failing child code becomes the parent code with a controlled
+stage message; later agents do not run and no success result is returned.
+
+Successful result.summary is the Reviewer's final summary, and result.data.stages holds
+all stage outcomes. Successful execution is not certification of correctness. Timeouts
+retain the SDK operation limits from Steps 3–4 and propagate as failures; the pipeline
+has no total wall-clock deadline and does not forcibly interrupt arbitrary custom code.

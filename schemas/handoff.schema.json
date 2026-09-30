@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workflow handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "task_id",
+    "stage_task_id",
+    "original_request",
+    "recipient",
+    "previous_output",
+    "status",
+    "provider_used",
+    "metadata",
+    "history"
+  ],
+  "properties": {
+    "version": {
+      "const": "1.0"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage_task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "original_request": {
+      "type": "object",
+      "required": [
+        "instructions",
+        "design_notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "instructions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "design_notes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "recipient": {
+      "enum": [
+        "analyst",
+        "reviewer"
+      ]
+    },
+    "previous_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "status": {
+      "const": "completed"
+    },
+    "provider_used": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "workflow"
+      ],
+      "properties": {
+        "step": {
+          "enum": [
+            2,
+            3
+          ]
+        },
+        "workflow": {
+          "const": "research_review"
+        }
+      }
+    },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "task_id",
+          "status",
+          "provider",
+          "result"
+        ],
+        "properties": {
+          "agent": {
+            "enum": [
+              "researcher",
+              "analyst"
+            ]
+          },
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "completed"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "summary"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
