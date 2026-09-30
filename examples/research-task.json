@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "task_id": "research-001",
+  "sender": "orchestrator",
+  "recipient": "researcher",
+  "instructions": "Summarize the supplied design notes and identify one benefit of separating agent roles from provider adapters. Use only the supplied context.",
+  "context": {
+    "design_notes": [
+      "Agent definitions describe responsibilities independently of providers.",
+      "The registry maps stable agent IDs to their definitions and capabilities.",
+      "Future adapters translate shared tasks into provider-specific requests."
+    ]
+  },
+  "status": "queued",
+  "created_at": "2026-09-30T12:00:00Z",
+  "updated_at": "2026-09-30T12:00:00Z"
+}

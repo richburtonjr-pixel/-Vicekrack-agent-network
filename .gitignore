@@ -1,0 +1,30 @@
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Local task state and logs
+runtime/
+logs/
+*.log
+
+# Common runtime artifacts (no runtime chosen yet)
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+coverage/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
