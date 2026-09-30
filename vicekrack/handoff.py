@@ -16,6 +16,9 @@ def validate_handoff(task, recipient):
     expected = {"analyst": ["researcher"], "reviewer": ["researcher", "analyst"]}[recipient]
     if (handoff["stage_task_id"] != task["task_id"]
             or handoff["task_id"] != task.get("parent_task_id")
+            or handoff["original_request"] != {
+                "instructions": task.get("instructions"),
+                "design_notes": task.get("context", {}).get("design_notes")}
             or handoff["recipient"] != recipient
             or handoff["metadata"]["step"] != len(expected) + 1
             or [entry["agent"] for entry in handoff["history"]] != expected

@@ -11,7 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
 from .errors import NetworkError
+from .manager import WorkflowState
 from .handoff import validate_handoff
 from .orchestrator import ROOT, Orchestrator, read_json, timestamp
 from .workflow import CheckpointError, STAGES, make_child, run_workflow
@@ -52,7 +55,7 @@ def snapshot(runner):
         agent["execution"] = {key: agent["execution"][key] for key in ("adapter", "model")}
     paths = ["schemas/task.schema.json", "schemas/handoff.schema.json"] + [a["definition"] for a in agents]
     hashes = {path: hashlib.sha256(runner._path(path).read_bytes()).hexdigest() for path in paths}
-    result = {"agents": agents, "workflow": deepcopy(runner.workflow), "contract_hashes": hashes}
+    result = {"agents": agents, "workflow": ({key: deepcopy(runner.workflow[key]) for key in ("agents", "max_steps", "max_retries") if key in runner.workflow} if isinstance(runner.workflow, dict) else None), "contract_hashes": hashes}
     reject_secrets(result)
     return result
 
@@ -154,12 +157,21 @@ class RunStore:
         return results
 
 
+def validate_saved_task(task):
+    schema = read_json(ROOT / "schemas/task.schema.json")
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(task)
+    if timestamp(task["updated_at"]) < timestamp(task["created_at"]):
+        raise ValueError("Task timestamps are reversed")
+
+
 def validate_state(state, run_id):
     """Reject malformed snapshots before they can influence routing or skip stages."""
     try:
+        shape = read_json(ROOT / "schemas/saved-run.schema.json")
+        Draft202012Validator(shape, format_checker=FormatChecker()).validate(state)
         expected = {"version", "run_id", "registry_path", "task", "config", "history", "trace", "status",
                     "pending_stage", "created_at", "updated_at", "outcome"}
-        if not isinstance(state, dict) or set(state) != expected or state["version"] != 1 or state["run_id"] != run_id:
+        if not isinstance(state, dict) or set(state) not in (expected, expected | {"workflow_state"}) or state["version"] != 1 or state["run_id"] != run_id:
             raise ValueError
         if state["status"] not in {"ready", "running", "uncertain", "failed", "completed"}:
             raise ValueError
@@ -168,9 +180,8 @@ def validate_state(state, run_id):
         if (not state["created_at"].endswith("Z") or not state["updated_at"].endswith("Z")
                 or timestamp(state["updated_at"]) < timestamp(state["created_at"])):
             raise ValueError
-        runner = Orchestrator(providers={})
         task = state["task"]
-        runner.validate(task)
+        validate_saved_task(task)
         if (task["status"] != "queued" or task["recipient"] != "orchestrator" or "execution_trace" in task
                 or task.get("context", {}).get("workflow") != "research_review"
                 or not isinstance(task.get("context", {}).get("capability"), str)
@@ -194,7 +205,7 @@ def validate_state(state, run_id):
             if index > 1:
                 validate_handoff(child, agent)
             child.update(status="completed", result=row["result"])
-            runner.validate(child)
+            validate_saved_task(child)
             trace.append({"step": index, "agent": agent, "provider": row["provider"], "status": "completed"})
         pending = state["pending_stage"]
         if pending is not None and (type(pending) is not int or pending != len(history) + 1 or pending > 3):
@@ -205,7 +216,7 @@ def validate_state(state, run_id):
             raise ValueError
         outcome = state["outcome"]
         if outcome is not None:
-            runner.validate(outcome)
+            validate_saved_task(outcome)
             for key, value in task.items():
                 if key not in {"status", "updated_at"} and outcome.get(key) != value:
                     raise ValueError
@@ -230,8 +241,24 @@ def validate_state(state, run_id):
             provider = next(a for a in state["config"]["agents"] if a["id"] == agent)["execution"]["adapter"]
             if extra != [{"step": len(history)+1, "agent": agent, "provider": provider, "status": "failed"}]:
                 raise ValueError
+        if "workflow_state" in state:
+            workflow = state["workflow_state"]
+            WorkflowState.validate(workflow)
+            if (workflow["task_id"] != task["task_id"]
+                    or workflow["completed_stages"] != [row["agent"] for row in history]
+                    or workflow["max_retries"] != (state["config"]["workflow"] or {}).get("max_retries", 1)):
+                raise ValueError
+            if ((state["status"] == "completed" and workflow["status"] != "completed")
+                    or (state["status"] == "running" and workflow["status"] != "running")
+                    or (state["status"] == "ready" and workflow["status"] not in {"ready", "completed"})
+                    or (state["status"] in {"failed", "uncertain"} and workflow["status"] not in {"failed", "exhausted", "ready"})):
+                raise ValueError
+            for event in workflow["audit_trace"]:
+                configured = next(a for a in state["config"]["agents"] if a["id"] == event["agent"])
+                if event["provider"] != configured["execution"]["adapter"]:
+                    raise ValueError
         reject_secrets(state)
-    except (ValueError, TypeError, KeyError, IndexError, AttributeError, StopIteration, NetworkError):
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError, StopIteration, NetworkError, ValidationError):
         raise NetworkError("invalid_state", "Saved run failed schema, history, handoff, or consistency validation.") from None
 
 
@@ -253,7 +280,11 @@ class SavedRuns:
         state = {"version": 1, "run_id": run_id, "registry_path": registry_path, "task": deepcopy(task),
                  "config": snapshot(runner), "history": [], "trace": [], "status": "ready",
                  "pending_stage": None, "created_at": now(), "updated_at": now(), "outcome": None}
-        with self.store.lock(run_id):
+        task_lock = hashlib.sha256(task["task_id"].encode()).hexdigest()[:32]
+        with self.store.lock(task_lock), self.store.lock(run_id):
+            for path in self.store.directory.glob("*.json"):
+                if self.store.read(path.stem)["task"]["task_id"] == task["task_id"]:
+                    raise NetworkError("duplicate_task", "A saved run already owns this task ID; inspect or resume it.")
             self.store.write(state)
             return self._execute(runner, state)
 
@@ -270,6 +301,34 @@ class SavedRuns:
             return self._execute(runner, state)
 
     def _execute(self, runner, state):
+        workflow = WorkflowState(state["task"]["task_id"], (runner.workflow or {}).get("max_retries", 1), state.get("workflow_state"))
+        if "workflow_state" not in state:
+            # Legacy v1 runs did not retain attempts. Import the known completed prefix.
+            for row in state["history"]:
+                workflow.begin(row["agent"], row["provider"], state["updated_at"])
+                workflow.finish(True, at=state["updated_at"])
+            if state["status"] in {"failed", "running", "uncertain"} and len(state["history"]) < 3:
+                agent = STAGES[len(state["history"])][0]
+                workflow.begin(agent, runner.agents[agent]["execution"]["adapter"], state["updated_at"])
+                workflow.finish(False, "interrupted", state["updated_at"])
+        abandoned = workflow.data["status"] == "running"
+        if abandoned:
+            workflow.finish(False, "interrupted")
+        if workflow.data["status"] == "exhausted":
+            if abandoned:
+                trace = deepcopy(state["trace"])
+                agent = STAGES[len(state["history"])][0]
+                trace.append({"step": len(state["history"])+1, "agent": agent,
+                              "provider": runner.agents[agent]["execution"]["adapter"], "status": "failed"})
+                task = deepcopy(state["task"])
+                task["execution_trace"] = trace
+                outcome = runner._transition(task, "failed", error={"code": "retry_exhausted",
+                    "message": "An interrupted attempt exhausted the recovery budget; its remote outcome remains unknown."})
+                state.update(workflow_state=workflow.data, status="failed", pending_stage=None,
+                             trace=trace, outcome=outcome, updated_at=now())
+                self.store.write(state)
+            raise NetworkError("retry_exhausted", "Stage recovery budget is exhausted; no provider was called.")
+        state["workflow_state"] = workflow.data
         def checkpoint(event, history, trace, step):
             state.update(history=deepcopy(history), trace=deepcopy(trace), updated_at=now(), outcome=None,
                          status="running" if event == "before" else "ready",
@@ -279,13 +338,15 @@ class SavedRuns:
             except NetworkError:
                 raise CheckpointError from None
         try:
-            outcome = run_workflow(runner, state["task"], history=state["history"], checkpoint=checkpoint)
+            outcome = run_workflow(runner, state["task"], history=state["history"], checkpoint=checkpoint, workflow_state=workflow)
             status = outcome["status"]
             # Only failures known to occur before calling a provider are safe to retry normally.
             safe = {"missing_credentials", "missing_model", "invalid_provider_configuration", "missing_research_context",
                     "invalid_handoff", "unsupported_model", "adapter_unavailable", "workflow_agent_unavailable",
                     "invalid_workflow", "unsupported_workflow", "maximum_steps_exceeded"}
             uncertain = status == "failed" and state["pending_stage"] is not None and outcome["error"]["code"] not in safe
+            if workflow.data["status"] == "exhausted":
+                uncertain = False
             state.update(outcome=outcome, trace=deepcopy(outcome["execution_trace"]), updated_at=now(),
                          status="uncertain" if uncertain else status,
                          pending_stage=state["pending_stage"] if uncertain else None)

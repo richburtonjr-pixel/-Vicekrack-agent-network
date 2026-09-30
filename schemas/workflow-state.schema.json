@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "max_retries",
+    "completed_stages",
+    "current_agent",
+    "next_agent",
+    "status",
+    "retry_count",
+    "attempts",
+    "failures",
+    "audit_trace",
+    "blocked_error"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "completed_stages": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "researcher",
+          "analyst",
+          "reviewer"
+        ]
+      }
+    },
+    "current_agent": {
+      "enum": [
+        "researcher",
+        "analyst",
+        "reviewer",
+        null
+      ]
+    },
+    "next_agent": {
+      "enum": [
+        "researcher",
+        "analyst",
+        "reviewer",
+        null
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "running",
+        "failed",
+        "exhausted",
+        "completed"
+      ]
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9
+    },
+    "attempts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "researcher",
+        "analyst",
+        "reviewer"
+      ],
+      "properties": {
+        "researcher": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "analyst": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "reviewer": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      }
+    },
+    "failures": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "provider",
+          "stage",
+          "attempt",
+          "timestamp",
+          "status",
+          "error"
+        ],
+        "properties": {
+          "agent": {
+            "enum": [
+              "researcher",
+              "analyst",
+              "reviewer"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "mock",
+              "openai",
+              "anthropic"
+            ]
+          },
+          "stage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "audit_trace": {
+      "type": "array",
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "provider",
+          "stage",
+          "attempt",
+          "timestamp",
+          "status",
+          "error"
+        ],
+        "properties": {
+          "agent": {
+            "enum": [
+              "researcher",
+              "analyst",
+              "reviewer"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "mock",
+              "openai",
+              "anthropic"
+            ]
+          },
+          "stage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "blocked_error": {
+      "enum": [
+        null,
+        "unsupported_workflow",
+        "invalid_workflow",
+        "maximum_steps_exceeded",
+        "workflow_agent_unavailable",
+        "adapter_unavailable",
+        "invalid_state"
+      ]
+    }
+  }
+}
