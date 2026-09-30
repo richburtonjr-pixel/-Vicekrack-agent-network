@@ -9,7 +9,7 @@ from uuid import uuid4
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .errors import NetworkError
-from .providers import MockResearchProvider
+from .providers import default_providers
 from .researcher import run_research
 
 
@@ -28,13 +28,13 @@ def timestamp(value: str) -> datetime:
 
 
 class Orchestrator:
-    def __init__(self, root: Path = ROOT, *, providers=None):
+    def __init__(self, root: Path = ROOT, *, providers=None, registry_path="config/agents.json"):
         self.root = Path(root).resolve()
         self.seen_ids = set()
-        self.providers = {"mock": MockResearchProvider()} if providers is None else dict(providers)
+        self.providers = default_providers() if providers is None else dict(providers)
         self.handlers = {"researcher": run_research}
         try:
-            registry = read_json(self.root / "config/agents.json")
+            registry = read_json(self._path(registry_path))
             self._load_registry(registry)
             schema = read_json(self._path(registry["task_schema"]))
             Draft202012Validator.check_schema(schema)

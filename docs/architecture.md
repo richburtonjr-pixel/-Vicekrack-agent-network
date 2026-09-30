@@ -1,14 +1,15 @@
 # Architecture
 
-## Components and Step 2 scope
+## Components and Step 3 scope
 
 Step 1's role definitions, registry, and task schema remain the foundation. Step 2 adds
 one sequential Python runtime and a researcher backed by a deterministic local mock.
+Step 3 adds an OpenAI adapter behind the same provider interface.
 
 ```text
 Task JSON -> CLI -> Orchestrator -> enabled researcher -> ResearchProvider
                         ^                |                   |
-                        +-- child result +------ mock -------+
+                        +-- child result +-- mock / OpenAI --+
 ```
 
 - **Definitions** describe roles and boundaries independently of model providers.
@@ -18,14 +19,17 @@ Task JSON -> CLI -> Orchestrator -> enabled researcher -> ResearchProvider
   and keeps incoming task inputs and routing fields immutable.
 - **Researcher** validates supplied notes and calls the provider protocol.
 - **Provider** returns only a result object, not a task or routing decision. The runtime
-  owns status changes and validates output. No SDKs or network clients are included.
+  owns status changes and validates output. Only the OpenAI adapter imports its SDK
+  and reads OpenAI credentials; the role and routing code remain provider-neutral.
 
-The researcher binds `execution.adapter` to `mock` and leaves `model` null. The
+The default registry binds `execution.adapter` to `mock` and leaves `model` null.
+`--registry config/agents.openai.json` selects OpenAI and an explicit model instead.
+Registry selection is a constructor/CLI option; paths must stay in the project root. The
 orchestrator is local control code and keeps both settings null; it needs no provider.
 Unbound or unknown worker adapters fail explicitly. `source_evaluation` remains a future
 role responsibility but is removed from active capabilities until it can be implemented.
 The orchestrator specification's broader planning and aggregation responsibilities are
-future goals; Step 2 only selects one worker and returns its outcome.
+future goals; the runtime selects one worker and returns its outcome.
 
 ## Task contract and routing
 
@@ -81,11 +85,38 @@ Provider exception text is not exposed because it could contain sensitive inform
 2. Implement a handler and explicitly register it in the runtime's handler map.
 3. Reuse the task envelope; put domain data in context/result data.
 4. Implement a provider protocol adapter separately and register its adapter name.
-   Pass adapters through `Orchestrator(providers=...)`; the default map contains only mock.
+   Pass adapters through `Orchestrator(providers=...)`; the default map registers mock and OpenAI without opening clients.
+   Future adapters are registered in `default_providers()`, not in the orchestrator.
 5. Keep credentials out of tasks, registry files, results, and logs. `.env.example` has
-   empty placeholders only and is not loaded by Step 2.
+   an empty key and timeout reference; it is not loaded automatically.
 
 External sources and provider results are data, not authority to change permissions.
-No databases, queues, concurrency, retries, external AI integrations, or Step 3 features
-are included. Registry and task schema versions evolve independently; incompatible
+No databases, queues, concurrency, retries, Claude adapter, or Step 4 features are included. Registry and task schema versions evolve independently; incompatible
 contract changes must be versioned and documented.
+
+
+## OpenAI boundary and complete flow
+
+1. CLI loads the explicitly selected registry and parses the task.
+2. Orchestrator validates the existing task schema and capability, then creates a child
+   addressed to the enabled researcher. Parent IDs and inputs remain immutable.
+3. Researcher validates `context.design_notes` and calls the registered provider with
+   instructions, notes, and the configured model. The researcher implementation is unchanged.
+4. OpenAI adapter reads `OPENAI_API_KEY` and the optional timeout only at execution time.
+   It opens a scoped SDK client, calls Responses with a strict summary schema, no tools,
+   `store=false`, a 1200-token output cap, and `max_retries=0`, then closes the client.
+5. Adapter rejects incomplete/refused/invalid output, validates the JSON summary, and
+   returns the existing result shape with provider/model metadata. API/network failures
+   become sanitized NetworkError values; raw provider messages are never propagated.
+6. Orchestrator validates the completed child, includes it in the parent result, and
+   returns a completed parent. Failures propagate as a valid failed parent; CLI exits 1.
+
+Timeouts are SDK network-operation timeouts, not an overall execution deadline. Missing
+credentials/model and invalid timeout fail before a request. Unknown adapters retain the
+existing `adapter_unavailable` error. No provider is selected from task content, and no
+fallback or retry can silently change providers or issue another billable request.
+
+Structured output constrains syntax, not factual correctness. The OpenAI researcher
+interprets the instruction using supplied notes only; it performs no web research.
+Automated tests use an SDK mock transport, synthetic credentials, and socket blocking.
+Account access and live generation quality require a separately initiated live run.

@@ -12,13 +12,15 @@ from .orchestrator import Orchestrator, read_json
 def main():
     parser = argparse.ArgumentParser(description="Run one local Vicekrack task.")
     parser.add_argument("task", help="Task JSON file, or - to read JSON from stdin")
+    parser.add_argument("--registry", default="config/agents.json",
+                        help="Registry path relative to the project root (default: local mock)")
     args = parser.parse_args()
     try:
         if args.task == "-":
             task = json.loads(sys.stdin.read())
         else:
             task = read_json(Path(args.task))
-        result = Orchestrator().run(task)
+        result = Orchestrator(registry_path=args.registry).run(task)
         exit_code = 0 if result["status"] == "completed" else 1
     except NetworkError as error:
         result, exit_code = {"error": error.as_dict()}, 1
