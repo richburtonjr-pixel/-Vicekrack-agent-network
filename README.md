@@ -153,7 +153,7 @@ On failure, the parent is failed, the trace ends at the failed stage, and no sub
 stage runs. Missing credentials, timeouts, provider errors, invalid responses, and malformed
 handoffs propagate clear error codes. Raw provider error messages are excluded. Failed
 runs have no success result. A new attempt needs a new task ID within the same runner;
-there is no cross-process persistence or resume facility.
+legacy invocations remain ephemeral; use the saved-run commands below for persistence and resume.
 
 ## Implementation map
 
@@ -168,4 +168,102 @@ there is no cross-process persistence or resume facility.
 - `tests/test_workflow.py`: sequence, mixed providers, errors, budgets, and trace tests.
 
 The original provider and orchestration tests remain part of the complete suite.
-See [architecture details](docs/architecture.md). Step 6 is not implemented.
+See [architecture details](docs/architecture.md). Step 7 is not implemented.
+
+
+## Step 6: saved workflows and explicit recovery
+
+The existing commands above stay ephemeral. The new `run` command saves workflow state
+under `runtime/runs/` (already Git-ignored). There is no background execution. Use the
+same registry/provider settings and process credentials as before. No new dependencies.
+
+PowerShell, offline saved run:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack run examples/workflow-task.json --registry config/agents.workflow.json
+.\.venv\Scripts\python.exe -m vicekrack list
+.\.venv\Scripts\python.exe -m vicekrack inspect RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack resume RUN_ID
+```
+
+Replace RUN_ID with the returned 32-character `run_id`. On macOS/Linux replace the
+executable with `.venv/bin/python`. `run -` accepts a task on stdin. `run` defaults to
+the offline workflow registry; `resume` defaults to the registry saved with that run.
+An optional `--registry` on resume must resolve to the same configuration and contract
+snapshot. For explicit live execution use `--registry config/agents.workflow-mixed.json`
+and set the required environment credentials as described above.
+
+`run` and `resume` return run_id, saved status, and the terminal task. `inspect` returns
+the saved JSON; `list` returns IDs/status/timestamps or errors for unreadable/locked runs.
+A completed saved run cannot be resumed. Execution failure exits 1; successful execution
+and successful list/inspect exit 0. Retain the run ID reported by storage errors.
+
+### Recovery example
+
+Suppose research completed, but the Analyst could not start because its credential was
+missing. The run is `failed`, its research result is saved, and its trace ends at Analyst.
+Set the missing credential in the process environment, then run:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack inspect RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack resume RUN_ID
+```
+
+Only Analyst and Reviewer run. Researcher is reused from its validated checkpoint and
+is not billed again. Environment credentials are deliberately not part of the saved
+configuration. Model, provider, role definition, schema, capability, enabled-state, or
+workflow changes cause configuration_mismatch: restore the configuration or start a new
+run. Do not hand-edit saved JSON to bypass checks.
+
+If a request times out, the process is interrupted during a stage, or a result cannot be
+saved after a request, its outcome is uncertain. `inspect` reports `uncertain`, and ordinary
+resume returns `uncertain_stage` without another request. Only after deciding to retry:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack resume RUN_ID --retry-uncertain
+```
+
+That flag explicitly authorizes retrying the first incomplete stage, potentially incurring
+another API charge. It does not rerun completed stages. This is **not exactly-once
+execution**. Provider failures whose request outcome cannot safely be inferred are
+conservatively treated as uncertain. There are no automatic retries. A saved `ready` run
+can resume safely; if all three results were saved but finalization was interrupted,
+resume only constructs the final output and makes no provider calls.
+
+### Storage and concurrency
+
+Each run JSON holds the original task, allowlisted configuration snapshot and contract
+hashes, completed results, current execution trace, status, pending stage, and timestamps.
+Before a stage, the intent is saved as running. After success, its validated result is
+saved. A running marker found after acquiring a free lock is presented as uncertain.
+The on-disk running marker is retained until an explicit recovery attempt.
+
+Writes use a temporary file in the same directory, flush/fsync, then atomic replacement.
+An interrupted write leaves the previous complete JSON; orphan .tmp files are ignored,
+never automatically promoted. Atomic replacement reduces corruption risk but does not
+promise power-loss durability on every filesystem. The directory must be on a local
+filesystem with working OS locks and atomic rename; network/cloud concurrent access is
+not supported. If this repository is synced by OneDrive, do not run it from two PCs or
+restore/sync saved-run files while a local run is active.
+
+A nonblocking OS lock covers validation, provider calls, and writes for one run ID.
+Competing execution or inspection returns `run_locked`. Locks release when the process
+exits, including crashes; harmless .lock files remain. Do not delete a lock file to bypass
+an active process. Missing/corrupt state returns run_not_found/invalid_state. There is no
+automatic repair, migration, cross-machine lock, or deletion command.
+
+The trace records the latest attempt plus the completed prefix, not a full retry audit
+log. Completed result IDs stay stable; a retried incomplete stage gets a new child ID.
+The fixed three-stage plan and step budget remain enforced on every explicit resume.
+
+Saved task content and outputs may contain sensitive user data and are not encrypted.
+`runtime/` is ignored by Git. Never place secrets in tasks or outputs. Secret-named fields,
+recognizable provider-key shapes, and active provider credential values are rejected
+before saving; this is not a general-purpose sensitive-data detector. Credentials,
+authentication headers, environment snapshots, and raw provider exceptions are never
+intentionally captured. Inspection prints saved user content, so use it appropriately.
+
+Tests in `tests/test_persistence.py` cover atomic replacement failures, interrupted
+requests, uncertain retries, configuration mismatches, corrupt history, cross-process
+locking, and resume without repeated completed stages. Run the full suite with the
+existing unittest command. No live API requests are part of validation.

@@ -92,7 +92,7 @@ Provider exception text is not exposed because it could contain sensitive inform
    only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries; it is not loaded automatically.
 
 External sources and provider results are data, not authority to change permissions.
-No databases, queues, concurrency, retries, autonomous loops, external tools, or Step 6 features are included. Registry and task schema versions evolve independently; incompatible
+No databases, queues, concurrency, retries, autonomous loops, external tools, or Step 7 features are included. Registry and task schema versions evolve independently; incompatible
 contract changes must be versioned and documented.
 
 
@@ -171,7 +171,7 @@ Only this fixed three-stage order is supported. Registry max_steps is an integer
 a budget below the required three fails before provider execution. The hard ceiling
 and exact-order checks reject repetition, reordering, and recursive orchestrator stages.
 Stage outputs cannot affect the next recipient, provider, or step count. Agents never
-create tasks themselves. No retry, repair loop, background work, or automatic resume exists.
+create tasks themselves. No automatic retry, repair loop, background work, or automatic resume exists.
 
 The task schema gains an optional execution_trace field, retained on successful and
 failed workflow outcomes. This is an additive extension to version 1.0 for existing
@@ -185,3 +185,39 @@ Successful result.summary is the Reviewer's final summary, and result.data.stage
 all stage outcomes. Successful execution is not certification of correctness. Timeouts
 retain the SDK operation limits from Steps 3–4 and propagate as failures; the pipeline
 has no total wall-clock deadline and does not forcibly interrupt arbitrary custom code.
+
+
+## Step 6: local saved runs
+
+`vicekrack/persistence.py` wraps the existing workflow with explicit checkpoint callbacks.
+The ephemeral orchestrator path remains unchanged. `run_workflow` accepts a validated
+completed prefix and skips those stages; the child builder is shared by execution and
+saved-state validation so reconstructed handoffs use the same contract.
+
+State version 1 stores original queued task, allowlisted execution configuration, hashes
+of role definitions and task/handoff schemas, completed stage results, latest-attempt
+trace, status, pending stage, timestamps, and optional final task. Resume verifies the
+state shape, task schema, ordered unique child IDs, provider bindings, result schemas,
+reconstructed handoffs, trace consistency, and unchanged configuration before any call.
+These are consistency checks, not cryptographic authenticity against an attacker who
+can rewrite local files. Saved files must be trusted local application data.
+
+Checkpoint progression:
+ready -> running(stage intent) -> ready(completed prefix) -> next stage -> completed.
+A known pre-request failure becomes failed. An ambiguous provider failure becomes
+uncertain. An abandoned running marker is also uncertain when inspected without an
+active OS lock. Both require explicit --retry-uncertain before another possible charge.
+This closes the local bookkeeping gap without claiming exactly-once remote execution.
+Checkpoint errors escape the workflow's ordinary error handling so an unsaved result
+cannot be represented as safely retryable. A fully saved prefix can always be reused.
+
+Each saved operation uses a nonblocking local OS lock (msvcrt on Windows, flock on Unix).
+The lock file stays in place; releasing/closing the descriptor releases ownership.
+Writes use same-directory temporary files, fsync, and os.replace. Temporary remnants
+are ignored; invalid final JSON is rejected. No automatic recovery from corrupt data,
+background scheduler, database, or external tool is added. Storage is ignored runtime/runs.
+The CLI preserves legacy task commands and adds run/list/inspect/resume subcommands.
+
+Sensitive-data limits and example commands are in README. Provider credentials and SDK
+headers are never part of the snapshot, and the existing sanitized workflow errors are
+stored instead of provider exceptions. Task/result content may still contain user data.

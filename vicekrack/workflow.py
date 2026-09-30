@@ -10,10 +10,35 @@ STAGES = [("researcher", "research"), ("analyst", "analysis"), ("reviewer", "rev
 HARD_MAX_STEPS = 3
 
 
-def run_workflow(runner, task):
+class CheckpointError(Exception):
+    """Storage failure must escape without pretending the request outcome is known."""
+
+
+def make_child(task, history, agent_id, capability, index, updated_at, child_id=None):
+    child_id = child_id or str(uuid4())
+    context = {"capability": capability, "design_notes": deepcopy(task["context"].get("design_notes"))}
+    if history:
+        context["handoff"] = {
+            "version": "1.0", "task_id": task["task_id"], "stage_task_id": child_id,
+            "original_request": {"instructions": task["instructions"],
+                                 "design_notes": deepcopy(task["context"].get("design_notes"))},
+            "recipient": agent_id, "previous_output": deepcopy(history[-1]["result"]),
+            "status": "completed", "provider_used": history[-1]["provider"],
+            "metadata": {"step": index, "workflow": "research_review"},
+            "history": deepcopy(history),
+        }
+    child = {"schema_version": "1.0", "task_id": child_id, "parent_task_id": task["task_id"],
+             "sender": "orchestrator", "recipient": agent_id, "instructions": task["instructions"],
+             "context": context, "status": "queued", "created_at": updated_at,
+             "updated_at": updated_at}
+    return child
+
+
+def run_workflow(runner, task, *, history=None, checkpoint=None):
     current = deepcopy(task)
-    current["execution_trace"] = []
-    history = []
+    history = deepcopy(history or [])
+    current["execution_trace"] = [{"step": i, "agent": row["agent"], "provider": row["provider"],
+                                    "status": "completed"} for i, row in enumerate(history, 1)]
     try:
         settings = runner.workflow
         if task["context"]["workflow"] != "research_review" or not isinstance(settings, dict):
@@ -35,24 +60,13 @@ def run_workflow(runner, task):
                 raise NetworkError("adapter_unavailable", "A workflow provider adapter is unavailable.")
         current = runner._transition(current, "running")
         for index, (agent_id, capability) in enumerate(STAGES, 1):
+            if index <= len(history):
+                continue
             if index > min(limit, HARD_MAX_STEPS):
                 raise NetworkError("maximum_steps_exceeded", "Workflow step budget exhausted.")
-            child_id = str(uuid4())
-            context = {"capability": capability, "design_notes": deepcopy(task["context"].get("design_notes"))}
-            if history:
-                context["handoff"] = {
-                    "version": "1.0", "task_id": task["task_id"], "stage_task_id": child_id,
-                    "original_request": {"instructions": task["instructions"],
-                                         "design_notes": deepcopy(task["context"].get("design_notes"))},
-                    "recipient": agent_id, "previous_output": deepcopy(history[-1]["result"]),
-                    "status": "completed", "provider_used": history[-1]["provider"],
-                    "metadata": {"step": index, "workflow": "research_review"},
-                    "history": deepcopy(history),
-                }
-            child = {"schema_version": "1.0", "task_id": child_id, "parent_task_id": task["task_id"],
-                     "sender": runner.entrypoint, "recipient": agent_id, "instructions": task["instructions"],
-                     "context": context, "status": "queued", "created_at": current["updated_at"],
-                     "updated_at": current["updated_at"]}
+            child = make_child(task, history, agent_id, capability, index, current["updated_at"])
+            if checkpoint:
+                checkpoint("before", history, current["execution_trace"], index)
             child = runner.run(child)
             provider = runner.agents[agent_id]["execution"]["adapter"]
             # Only controlled routing metadata, never prompts, outputs, env, or raw errors.
@@ -62,11 +76,15 @@ def run_workflow(runner, task):
                 return runner._transition(current, "failed", error={
                     "code": child["error"]["code"],
                     "message": f"Workflow stopped at {agent_id}; the stage failed. No later stages ran."})
-            history.append({"agent": agent_id, "task_id": child_id, "status": "completed",
+            history.append({"agent": agent_id, "task_id": child["task_id"], "status": "completed",
                             "provider": provider, "result": deepcopy(child["result"])})
+            if checkpoint:
+                checkpoint("after", history, current["execution_trace"], index)
         return runner._transition(current, "completed", result={
             "summary": history[-1]["result"]["summary"],
             "data": {"workflow": "research_review", "stages": history}})
+    except CheckpointError:
+        raise
     except NetworkError as error:
         return runner._transition(current, "failed", error=error.as_dict())
     except Exception:
