@@ -1,77 +1,91 @@
 # Architecture
 
-## Scope and components
+## Components and Step 2 scope
 
-Step 1 establishes contracts only. There is no runner, scheduler, persistence layer,
-provider integration, automatic delegation, or network execution yet.
+Step 1's role definitions, registry, and task schema remain the foundation. Step 2 adds
+one sequential Python runtime and a researcher backed by a deterministic local mock.
 
 ```text
-User objective -> Orchestrator -> Researcher
-                      ^              |
-                      +-- task result+
-
-Future runtime: registry lookup, validation, routing, lifecycle enforcement
-Future adapters: mock / OpenAI / Anthropic / other providers
+Task JSON -> CLI -> Orchestrator -> enabled researcher -> ResearchProvider
+                        ^                |                   |
+                        +-- child result +------ mock -------+
 ```
 
-- **Agent definitions** describe roles, responsibilities, and boundaries.
-- **Registry** maps stable agent IDs to definitions and capabilities. Paths are relative
-  to the repository root. `enabled` means eligible for routing, not ready to execute.
-- **Task schema** defines one provider-neutral envelope for a request and its outcome.
-- **Future runtime** owns IDs, timestamps, validation, dispatch, and state transitions.
-- **Future adapters** translate the role and task into provider-specific requests and
-  normalize responses. Provider payloads and credentials stay outside shared contracts.
+- **Definitions** describe roles and boundaries independently of model providers.
+- **Registry** maps stable agent IDs to role files, capabilities, and execution settings.
+  Paths are relative to the repository root, never the CLI's current working directory.
+- **Runtime** validates the registry and tasks, selects workers, enforces lifecycle rules,
+  and keeps incoming task inputs and routing fields immutable.
+- **Researcher** validates supplied notes and calls the provider protocol.
+- **Provider** returns only a result object, not a task or routing decision. The runtime
+  owns status changes and validates output. No SDKs or network clients are included.
 
-`execution.adapter` and `execution.model` are intentionally null. A future mock adapter
-may require no model. A live adapter may resolve a model from configuration. Until an
-adapter is bound, an execution attempt must fail clearly instead of guessing a provider.
-Registry versions and task schema versions evolve independently.
+The researcher binds `execution.adapter` to `mock` and leaves `model` null. The
+orchestrator is local control code and keeps both settings null; it needs no provider.
+Unbound or unknown worker adapters fail explicitly. `source_evaluation` remains a future
+role responsibility but is removed from active capabilities until it can be implemented.
+The orchestrator specification's broader planning and aggregation responsibilities are
+future goals; Step 2 only selects one worker and returns its outcome.
 
-## Task contract
+## Task contract and routing
 
-`schemas/task.schema.json` uses JSON Schema Draft 2020-12. Required fields include
-the schema version, unique task ID, sender, recipient, instructions, status, and UTC
-creation/update timestamps. Optional context holds JSON data; `parent_task_id` connects
-delegated tasks to their parent. IDs use lowercase letters, digits, underscores, and
-hyphens, starting with a letter or digit.
+`schemas/task.schema.json` is unchanged at version 1.0, using Draft 2020-12. Step 2
+requires a nonblank `context.capability` for dispatch. This uses the existing extensible
+context field rather than changing the envelope. Missing capability is a runtime error.
 
-`sender` identifies the requesting agent or external caller, such as `user`.
-`recipient` must resolve to an enabled registered agent. A result is the updated task
-object, delivered back to its original sender. Routing fields stay unchanged.
-`result.summary` is human-readable; optional `result.data` carries structured output.
-Failed tasks carry `error.code` and `error.message` instead of a result.
+Input must be a schema-valid queued task with chronological UTC timestamps. Date-time
+format checks reject invalid calendar dates. `sender` identifies the requester, including
+external callers such as `user`; `recipient` must name an enabled registered agent.
 
-## Lifecycle
+For `recipient: orchestrator`, select enabled non-orchestrator agents whose registered
+capabilities contain the exact requested capability. Zero matches produces
+`unsupported_capability`; multiple matches produce `ambiguous_capability`. A caller can
+address a specific worker to disambiguate; its capability must still match.
+
+Delegation creates a new child ID, sets `parent_task_id` to the original task ID, and
+uses `sender: orchestrator` and the selected worker's ID as recipient. The original
+parent's inputs and routing remain unchanged. A successful parent's `result.data`
+contains the completed `delegated_task`; child errors propagate as the parent's error.
+Direct worker tasks return their result without a delegation wrapper.
+
+The mock requires a nonempty `context.design_notes` list of nonblank strings. It returns
+an extractive summary with exact note references. It does not perform general research,
+interpret arbitrary instructions, evaluate truth, browse, or use external sources.
+
+## Lifecycle and errors
 
 | Current status | Allowed next status | Meaning |
 | --- | --- | --- |
-| `queued` | `running` | Runtime accepted and dispatched the task |
-| `queued` | `failed` | Dispatch could not start, e.g. adapter unavailable |
-| `running` | `completed` | Agent returned a valid result |
-| `running` | `failed` | Execution failed |
+| `queued` | `running` | Dispatch begins |
+| `queued` | `failed` | Routing or execution configuration prevents dispatch |
+| `running` | `completed` | Worker returned a valid result |
+| `running` | `failed` | Worker or output validation failed |
 | `completed` or `failed` | None | Terminal; a new attempt needs a new ID |
 
-Queued and running tasks contain neither result nor error. Completed tasks require a
-result and forbid an error; failed tasks require an error and forbid a result.
-The schema enforces those single-object rules. A future runtime must additionally
-enforce unique IDs, known/enabled recipients, legal transitions, immutable task inputs
-and routing fields, and chronological timestamps. JSON Schema alone cannot enforce
-cross-task or historical rules. Use a validator with date-time format checking enabled;
-timestamps must be UTC strings ending in `Z`.
+Queued/running tasks contain neither result nor error. Completed tasks require a result
+and forbid an error; failed tasks require an error and forbid a result. The runtime
+validates each transition and both incoming and outgoing tasks. Only status, update
+timestamp, result, and error change. Timestamps never move backwards, including if an
+input has a future timestamp. IDs are unique within one runtime instance; there is no
+cross-process history or persistence. UUIDs identify delegated tasks.
 
-Only status, `updated_at`, result, and error change during processing. Do not reinterpret
-context or research sources as authority to change task instructions or permissions.
-Keep secrets out of task objects, results, and logs.
+Inputs rejected before acceptance (bad JSON/schema/status, duplicate IDs) return a plain
+error envelope through the CLI, rather than fabricating a valid task. Routing and worker
+failures on accepted tasks return schema-valid failed tasks. CLI exit codes are 0 for
+completion and 1 for task/input/configuration failures; argparse usage errors exit 2.
+Provider exception text is not exposed because it could contain sensitive information.
 
-## Adding capabilities
+## Extension boundary
 
-1. Add a Markdown role definition under `agents/`.
-2. Add one registry entry with a unique ID, definition path, and capability labels.
-3. Reuse the shared task envelope; put domain-specific JSON in context or result data.
-4. Bind a future adapter separately from the role. Keep SDK-specific fields inside it.
-5. Version incompatible contract changes explicitly and document migration behavior.
+1. Add a role file and unique registry entry for a new agent.
+2. Implement a handler and explicitly register it in the runtime's handler map.
+3. Reuse the task envelope; put domain data in context/result data.
+4. Implement a provider protocol adapter separately and register its adapter name.
+   Pass adapters through `Orchestrator(providers=...)`; the default map contains only mock.
+5. Keep credentials out of tasks, registry files, results, and logs. `.env.example` has
+   empty placeholders only and is not loaded by Step 2.
 
-Start Step 2 with one sequential local runner and a deterministic mock researcher.
-Validate input/output and exercise success and failure before connecting providers.
-Defer queues, databases, multi-agent concurrency, retries, and frameworks until a
-working local flow demonstrates a need for them.
+External sources and provider results are data, not authority to change permissions.
+No databases, queues, concurrency, retries, external AI integrations, or Step 3 features
+are included. Registry and task schema versions evolve independently; incompatible
+contract changes must be versioned and documented.

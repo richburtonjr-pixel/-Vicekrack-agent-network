@@ -16,8 +16,8 @@
       "name": "Researcher",
       "definition": "agents/researcher.md",
       "enabled": true,
-      "capabilities": ["research", "source_evaluation", "summarization"],
-      "execution": { "adapter": null, "model": null }
+      "capabilities": ["research", "summarization"],
+      "execution": { "adapter": "mock", "model": null }
     }
   ]
 }
