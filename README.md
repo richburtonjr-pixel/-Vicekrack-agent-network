@@ -407,3 +407,50 @@ invalid dependencies or credential candidates leave a failing check; fix the pro
 and push again. The scanner remains heuristic and is not a general secret detector.
 These checks do not themselves block merging: repository branch protection/rulesets are
 separate settings and have not been changed. No runtime/agent/provider behavior changes.
+
+## Step 10: prepare your own workflow task
+
+Create a task without writing JSON (PowerShell, from the repository root):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack create-task --instructions "Summarize these project notes and identify gaps" --note "The project has three sequential agents." --note "Each agent can use a different provider."
+```
+
+The response contains `task_file`, a new task ID, and the planned Researcher -> Analyst ->
+Reviewer provider route. The UTF-8 task is saved under ignored `runtime/tasks/`. Every
+creation gets a new UUID; existing files are never overwritten. Copy the returned path
+into these commands:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack validate-task TASK_FILE
+.\.venv\Scripts\python.exe -m vicekrack run TASK_FILE
+.\.venv\Scripts\python.exe -m vicekrack dashboard RUN_ID
+```
+
+Replace TASK_FILE and RUN_ID with returned values; quote paths containing spaces.
+The default registry uses mock providers, so this workflow needs no API keys.
+For longer/private input, keep UTF-8 files in `runtime/` and use:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack create-task --instructions-file runtime/request.txt --notes-file runtime/notes.txt
+```
+
+Each nonblank line becomes one evidence note. Inline input may be saved by shell history;
+file input avoids putting content in the command line. Never include credentials.
+Existing sensitive-state checks reject recognized credentials before writing but cannot
+detect all sensitive user data. Source notes and tasks remain unencrypted local content.
+Keep them in ignored storage. On Linux/macOS use `.venv/bin/python`.
+
+Both new commands accept `--registry config/agents.workflow-mixed.json` to check a mixed
+OpenAI/Anthropic route. They do not open provider clients, check account access, run agents,
+reserve task IDs or resume work. They validate queued workflow inputs, evidence notes,
+shared routing/step-limit rules, provider selection and required model configuration.
+Success does not guarantee a later API call succeeds. Credentials, timeouts and duplicate
+saved IDs remain execution-time checks. Use the same `--registry` on the subsequent `run`
+command. Live execution may incur API charges; preparation does not.
+
+Task publication uses a flushed temporary file followed by an exclusive hard link, then
+removes the temporary name. It requires a local filesystem supporting hard links; failure
+leaves no partial final task. Orphan `.tmp` files after a crash are never executed
+implicitly. These commands prepare only the existing three-stage research workflow;
+earlier single-agent commands remain supported separately.

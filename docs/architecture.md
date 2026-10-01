@@ -295,3 +295,18 @@ verify connection blocking and nonzero failure exits. Existing provider mocks, p
 locks and workflow contracts remain the subjects of the full suite. Jobs receive no
 provider keys and have read-only repository permissions; action versions are immutable
 commit pins. This adds validation automation only, without agent background execution.
+
+## Step 10: local task preparation
+
+`task_preparation.py` supplies create-task and validate-task. Creation generates the
+existing v1 envelope with a UUID, UTC timestamps, research capability and supplied notes.
+Validation reuses Orchestrator schema checks and `workflow.preflight_workflow`, which is
+also used by execution to enforce the fixed plan, provider availability and step budget.
+It additionally checks preparation-specific root/queued fields, note content, model
+configuration and sensitive-state rules. No provider client or run store is opened.
+
+Only validated tasks are published to ignored runtime/tasks through fsync plus exclusive
+hard-link publication, preventing partial final files and overwrite races. Preparation
+returns metadata and file location, not source text. Execution remains a separate explicit
+operation with unchanged duplicate, locking, uncertain-retry and budget protections.
+Input validation does not reserve task IDs or certify provider credentials.

@@ -35,6 +35,30 @@ def make_child(task, history, agent_id, capability, index, updated_at, child_id=
     return child
 
 
+def preflight_workflow(runner, task):
+    """Validate fixed workflow routing without dispatching or opening a provider client."""
+    settings = runner.workflow
+    if task["context"]["workflow"] != "research_review" or not isinstance(settings, dict):
+        raise NetworkError("unsupported_workflow", "Select the configured research_review workflow.")
+    limit = settings.get("max_steps")
+    if type(limit) is not int or not 1 <= limit <= HARD_MAX_STEPS:
+        raise NetworkError("invalid_workflow", "max_steps must be an integer from 1 to 3.")
+    if settings.get("agents") != [agent for agent, _ in STAGES]:
+        raise NetworkError("invalid_workflow", "The workflow must be researcher, analyst, reviewer exactly once.")
+    if len(STAGES) > limit:
+        raise NetworkError("maximum_steps_exceeded", "The workflow exceeds its configured step budget; no agents ran.")
+    # Check all routing before any potentially billable request.
+    for agent_id, capability in STAGES:
+        agent = runner.agents.get(agent_id)
+        if not agent or not agent["enabled"] or capability not in agent["capabilities"]:
+            raise NetworkError("workflow_agent_unavailable", "A required workflow agent is unavailable.")
+        if (agent["execution"]["adapter"] not in runner.providers
+                or agent["execution"]["adapter"] not in {"mock", "openai", "anthropic"}):
+            raise NetworkError("adapter_unavailable", "A workflow provider adapter is unavailable.")
+    WorkflowState(task["task_id"], settings.get("max_retries", 1))
+    return limit
+
+
 def run_workflow(runner, task, *, history=None, checkpoint=None, workflow_state=None):
     current = deepcopy(task)
     history = deepcopy(history or [])
@@ -49,27 +73,11 @@ def run_workflow(runner, task, *, history=None, checkpoint=None, workflow_state=
             for row in history:
                 state.begin(row["agent"], row["provider"])
                 state.finish(True)
-        if task["context"]["workflow"] != "research_review" or not isinstance(settings, dict):
-            raise NetworkError("unsupported_workflow", "Select the configured research_review workflow.")
-        limit = settings.get("max_steps")
-        if type(limit) is not int or not 1 <= limit <= HARD_MAX_STEPS:
-            raise NetworkError("invalid_workflow", "max_steps must be an integer from 1 to 3.")
-        if settings.get("agents") != [agent for agent, _ in STAGES]:
-            raise NetworkError("invalid_workflow", "The workflow must be researcher, analyst, reviewer exactly once.")
-        if len(STAGES) > limit:
-            raise NetworkError("maximum_steps_exceeded", "The workflow exceeds its configured step budget; no agents ran.")
+        limit = preflight_workflow(runner, task)
         if state.data["completed_stages"] != [row["agent"] for row in history]:
             raise NetworkError("invalid_state", "Completed stages do not match workflow history.")
         for row in history:
             runner.manager.status[row["agent"]] = "completed"
-        # Check all routing before any potentially billable request.
-        for agent_id, capability in STAGES:
-            agent = runner.agents.get(agent_id)
-            if not agent or not agent["enabled"] or capability not in agent["capabilities"]:
-                raise NetworkError("workflow_agent_unavailable", "A required workflow agent is unavailable.")
-            if (agent["execution"]["adapter"] not in runner.providers
-                    or agent["execution"]["adapter"] not in {"mock", "openai", "anthropic"}):
-                raise NetworkError("adapter_unavailable", "A workflow provider adapter is unavailable.")
         current = runner._transition(current, "running")
         for index, (agent_id, capability) in enumerate(STAGES, 1):
             if index <= len(history):
