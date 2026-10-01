@@ -273,3 +273,15 @@ schemas enforce strict fields, integer versions/counters, date-time formats and 
 arrays. Execution preflight still checks all three routes/providers and max_steps before
 any call. Retry policy is validated before execution and stored in the snapshot when
 explicitly configured. The defaults preserve existing Step 6 registry snapshots.
+
+## Step 8: metadata presentation
+
+`dashboard.py` adds `dashboard [RUN_ID]` and `agents` CLI commands with optional JSON
+output. It projects validated RunStore inspection results into metadata summaries and
+uses AgentManager inventory for configured availability. A selected run does not load
+the default registry. No orchestration, provider call, automatic resume, or background
+refresh is reachable from these commands. Run locks and validation remain authoritative.
+Full task/result bodies and raw errors are excluded. Older compact traces remain readable;
+unrecorded retry budgets are explicitly unknown. Tests cover empty/completed/failed,
+uncertain/exhausted, corrupt/locked/missing and legacy records, no network calls and
+unchanged saved JSON. Existing commands and provider interfaces are preserved.
