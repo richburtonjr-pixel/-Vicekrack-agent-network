@@ -346,3 +346,34 @@ and searches accessible commit trees for committed environment files. It prints 
 only. Pattern scanning cannot establish that arbitrary opaque strings are not secrets.
 Step 8, background execution, automatic retries, new providers, and external tools are
 outside this implementation.
+
+## Step 8: local CLI dashboard
+
+Use these one-shot views from the repository root (PowerShell):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack dashboard
+.\.venv\Scripts\python.exe -m vicekrack agents --registry config/agents.workflow-mixed.json
+.\.venv\Scripts\python.exe -m vicekrack dashboard RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack dashboard RUN_ID --json
+```
+
+Replace RUN_ID with a saved run ID. On Linux/macOS use `.venv/bin/python`.
+The overview shows registered agents, configured providers/capabilities, and saved-run
+progress. The detail view shows timestamped attempt history, failures, remaining attempts
+for the next incomplete stage, and recovery guidance. Legacy records show unknown budgets
+rather than inventing historic attempts. Completed-stage budgets are not actionable.
+
+These commands never call providers, start workflows, or resume runs. They show metadata
+only, excluding task IDs, prompts, output bodies, models, raw errors, and environment
+values. Agent availability means configured/enabled, not a live health check. A locked
+run is shown as unavailable; a corrupt record does not prevent other rows from appearing.
+Overview exits 1 if any record is unavailable; otherwise viewing failed runs exits 0.
+A selected run can be viewed even if the default registry is broken. Overview/agents
+require a valid selected registry. There is no automatic refresh or background process.
+
+Recovery still uses `python -m vicekrack resume RUN_ID` and, only for a deliberately
+approved uncertain retry, `--retry-uncertain`. The dashboard does not bypass configuration
+validation, locks, duplicate protection, or retry limits. Viewing records leaves run JSON
+unchanged; storage initialization and inspection may create local directories/lock files.
+No dependencies or live API credentials are needed. Run the full unittest command above.

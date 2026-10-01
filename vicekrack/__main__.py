@@ -45,6 +45,10 @@ def saved_command():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in {"dashboard", "agents"}:
+        from .dashboard import main as dashboard_main
+        return dashboard_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"run", "list", "inspect", "resume"}:
         return saved_command()
 
