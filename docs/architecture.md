@@ -285,3 +285,13 @@ Full task/result bodies and raw errors are excluded. Older compact traces remain
 unrecorded retry budgets are explicitly unknown. Tests cover empty/completed/failed,
 uncertain/exhausted, corrupt/locked/missing and legacy records, no network calls and
 unchanged saved JSON. Existing commands and provider interfaces are preserved.
+
+## Step 9: validation pipeline
+
+`.github/workflows/checks.yml` runs the complete suite across Windows/Linux and Python
+3.11/3.12, plus an independent history credential audit. `scripts/run_tests.py` supplies
+a shared local/CI entry point with socket guards and empty-suite rejection. Its self-tests
+verify connection blocking and nonzero failure exits. Existing provider mocks, persistence
+locks and workflow contracts remain the subjects of the full suite. Jobs receive no
+provider keys and have read-only repository permissions; action versions are immutable
+commit pins. This adds validation automation only, without agent background execution.
