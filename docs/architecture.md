@@ -1,6 +1,6 @@
 # Architecture
 
-## Components and Step 5 scope
+## Components through Step 7
 
 Step 1's role definitions, registry, and task schema remain the foundation. Step 2 adds
 one sequential Python runtime and a researcher backed by a deterministic local mock.
@@ -71,8 +71,8 @@ Queued/running tasks contain neither result nor error. Completed tasks require a
 and forbid an error; failed tasks require an error and forbid a result. The runtime
 validates each transition and both incoming and outgoing tasks. Only status, update
 timestamp, result, and error change. Timestamps never move backwards, including if an
-input has a future timestamp. IDs are unique within one runtime instance; there is no
-cross-process history or persistence. UUIDs identify delegated tasks.
+input has a future timestamp. Ephemeral IDs are unique within one runtime instance. Saved workflow task IDs are
+unique within their local run directory and protected by OS locks. UUIDs identify delegated tasks.
 
 Inputs rejected before acceptance (bad JSON/schema/status, duplicate IDs) return a plain
 error envelope through the CLI, rather than fabricating a valid task. Routing and worker
@@ -92,7 +92,7 @@ Provider exception text is not exposed because it could contain sensitive inform
    only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries; it is not loaded automatically.
 
 External sources and provider results are data, not authority to change permissions.
-No databases, queues, concurrency, retries, autonomous loops, external tools, or Step 7 features are included. Registry and task schema versions evolve independently; incompatible
+No databases, queues, concurrent agent execution, automatic retries, autonomous loops, or external tools are included. Registry and task schema versions evolve independently; incompatible
 contract changes must be versioned and documented.
 
 
@@ -221,3 +221,55 @@ The CLI preserves legacy task commands and adds run/list/inspect/resume subcomma
 Sensitive-data limits and example commands are in README. Provider credentials and SDK
 headers are never part of the snapshot, and the existing sanitized workflow errors are
 stored instead of provider exceptions. Task/result content may still contain user data.
+
+## Step 7: manager, state, and recovery policy
+
+`manager.py` supplies `AgentManager` and `WorkflowState`. The manager references the
+validated registry and resolves capability matches. Its inventory exposes provider,
+capabilities, availability/status, and fixed permitted successors. The workflow
+controller starts agents through the manager; handlers and providers cannot dispatch
+another stage. OpenAI and Anthropic adapters and the provider protocol are unchanged.
+
+`WorkflowState` is an explicit state machine:
+
+```text
+ready -> running(agent) -> ready(next agent) -> ... -> completed
+                  |
+                  +-> failed -> explicit resume -> running(same agent)
+                  +-> exhausted (terminal; saved run status is failed)
+```
+
+Only the first incomplete stage can start. Success advances the completed prefix;
+failure preserves it. Attempts are incremented before a request and included in the
+atomic intent checkpoint. Each stage allows one initial attempt plus max_retries (0–3,
+default 1). The hard three-stage limit remains separate from the attempt budget. No
+internal retry loop exists: recovery is a user-issued resume command. Missing credentials
+can be repaired in the process environment without changing the saved configuration.
+Ambiguous failures still require --retry-uncertain; a crash after request intent is
+recorded as an interrupted attempt on explicit resume, never silently retried.
+
+The saved v1 envelope gains optional workflow_state. New runs write it from their first
+execution checkpoint. Its dedicated JSON schema is followed by deterministic event
+replay, checking attempts, ordering, status, counters, and failures. Persistence also
+checks task identity, completed history and configured providers against that state.
+The compact task trace remains backward compatible; the audit retains start/end events
+for every attempt, UTC timestamps, stage, provider and controlled error codes. It never
+copies provider exception text, prompts, output bodies, or environment values.
+
+Old Step 6 files remain inspectable without constructing the default orchestrator.
+On resume their known prefix is imported; a failed/interrupted stage counts as one
+attempt. Historic retries were not stored and cannot be recovered. A new audit timestamp
+for imported stages is the prior saved updated_at; it is not evidence of the original
+provider request time. No contract hash is silently bypassed.
+
+A deterministic hash of the original task ID identifies the start lock. Under that lock,
+existing run files are checked for duplicate task IDs before a fresh run is written.
+Run locks continue to cover resume and provider calls. Atomic JSON replacement and
+ignored temporary files remain unchanged. This protects one local filesystem, not
+multiple machines or hostile file edits. Saved data remains unencrypted user content.
+
+Validation is independent of default registry availability. Saved-run and workflow-state
+schemas enforce strict fields, integer versions/counters, date-time formats and bounded
+arrays. Execution preflight still checks all three routes/providers and max_steps before
+any call. Retry policy is validated before execution and stored in the snapshot when
+explicitly configured. The defaults preserve existing Step 6 registry snapshots.

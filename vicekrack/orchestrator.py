@@ -9,6 +9,7 @@ from uuid import uuid4
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .errors import NetworkError
+from .manager import AgentManager
 from .providers import default_providers
 from .researcher import run_research
 from .analyst import run_analysis
@@ -39,6 +40,8 @@ class Orchestrator:
         try:
             registry = read_json(self._path(registry_path))
             self._load_registry(registry)
+            self.manager = AgentManager(self.agents)
+            self.last_workflow_state = None
             self.workflow = registry.get("workflow")
             schema = read_json(self._path(registry["task_schema"]))
             Draft202012Validator.check_schema(schema)
@@ -132,8 +135,7 @@ class Orchestrator:
                     raise NetworkError("invalid_workflow", "Only the orchestrator can start a workflow.")
                 return run_workflow(self, current)
             if recipient["id"] == self.entrypoint:
-                matches = [agent for agent in self.agents.values() if agent["id"] != self.entrypoint
-                           and agent["enabled"] and capability in agent["capabilities"]]
+                matches = self.manager.matches(capability, self.entrypoint)
                 if not matches:
                     raise NetworkError("unsupported_capability", "No enabled worker supports the requested capability.")
                 if len(matches) > 1:

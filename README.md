@@ -8,7 +8,8 @@ OpenAI, or Anthropic through its registry entry. The default demos stay offline.
 
 ```mermaid
 flowchart LR
-    T[Structured task] --> O[Orchestrator: validate and enforce step budget]
+    T[Structured task] --> O[Orchestrator + Agent Manager: validate transitions and budgets]
+    O --> S[Workflow state + atomic local checkpoints]
     O --> R[Researcher]
     R --> H1[Validated research handoff]
     H1 --> A[Analyst]
@@ -119,7 +120,7 @@ workflow deadlines. Automatic retries are disabled; a timeout stops the workflow
 ## Handoffs, safeguards, and trace
 
 The task selects `context.workflow: "research_review"` and addresses `orchestrator`.
-The registry declares `workflow.agents` and `workflow.max_steps`. Step 5 permits only
+The registry declares `workflow.agents`, `workflow.max_steps`, and optional `workflow.max_retries`. The controller permits only
 researcher, analyst, reviewer, in that order exactly once, with a hard ceiling of three.
 A lower budget rejects the run before execution. Unknown/disabled agents, unsupported
 adapters, reordered stages, duplicate stages, and recursive orchestrator stages are rejected.
@@ -145,7 +146,7 @@ Example trace from a successful mock run:
 ```
 
 Find the final review in `result.summary`, all stage outputs in `result.data.stages`,
-and the trace at `execution_trace`. The trace is returned, not persisted or logged, and
+and the compact trace at `execution_trace`. Saved runs also retain a timestamped attempt audit, which
 contains only controlled metadata, never prompts, response bodies, credentials, or env.
 Actual task results and handoffs contain user data and should be handled accordingly.
 
@@ -168,7 +169,7 @@ legacy invocations remain ephemeral; use the saved-run commands below for persis
 - `tests/test_workflow.py`: sequence, mixed providers, errors, budgets, and trace tests.
 
 The original provider and orchestration tests remain part of the complete suite.
-See [architecture details](docs/architecture.md). Step 7 is not implemented.
+See [architecture details](docs/architecture.md) and the [Steps 1–6 audit](docs/step-7-audit.md).
 
 
 ## Step 6: saved workflows and explicit recovery
@@ -250,10 +251,10 @@ A nonblocking OS lock covers validation, provider calls, and writes for one run 
 Competing execution or inspection returns `run_locked`. Locks release when the process
 exits, including crashes; harmless .lock files remain. Do not delete a lock file to bypass
 an active process. Missing/corrupt state returns run_not_found/invalid_state. There is no
-automatic repair, migration, cross-machine lock, or deletion command.
+automatic corruption repair, cross-machine lock, or deletion command. Legacy valid Step 6 files remain readable.
 
-The trace records the latest attempt plus the completed prefix, not a full retry audit
-log. Completed result IDs stay stable; a retried incomplete stage gets a new child ID.
+The compact task trace records the latest attempt plus the completed prefix. The saved
+`workflow_state.audit_trace` retains every Step 7 attempt, including failures and interruptions. Completed result IDs stay stable; a retried incomplete stage gets a new child ID.
 The fixed three-stage plan and step budget remain enforced on every explicit resume.
 
 Saved task content and outputs may contain sensitive user data and are not encrypted.
@@ -267,3 +268,81 @@ Tests in `tests/test_persistence.py` cover atomic replacement failures, interrup
 requests, uncertain retries, configuration mismatches, corrupt history, cross-process
 locking, and resume without repeated completed stages. Run the full suite with the
 existing unittest command. No live API requests are part of validation.
+
+## Step 7: Agent Manager and bounded recovery
+
+The Agent Manager owns the registered-agent inventory, capabilities, provider bindings,
+availability/status, and permitted handoffs. `Orchestrator.manager.inventory()` exposes
+that inventory. `Orchestrator.last_workflow_state` exposes the most recent ephemeral
+workflow state; saved runs expose it under `workflow_state` through `inspect`.
+The original task envelope and compact trace are unchanged.
+
+State includes task ID, completed stages, current/next agent, per-agent attempt counts,
+retry count, failures, and final status. Its schema and transition replay are validated
+before resume. A stage can only start after its predecessor succeeds. Provider output
+cannot modify routing. Each agent's provider remains selected by its registry entry.
+
+Optional policy inside a workflow registry:
+
+```json
+"workflow": {
+  "agents": ["researcher", "analyst", "reviewer"],
+  "max_steps": 3,
+  "max_retries": 1
+}
+```
+
+`max_retries` defaults to 1, accepts integers 0–3, and counts additional attempts **per
+stage across explicit resumes**. It does not enable automatic retries. `max_steps`
+limits distinct stages to three; total stage attempts cannot exceed
+`3 * (1 + max_retries)` (at most 12). Both SDKs still disable their own retries.
+An exhausted stage leaves the saved run `failed`, with workflow state `exhausted`;
+further resume returns `retry_exhausted` without any provider call. An uncertain remote
+outcome remains unknown even if its local recovery budget is exhausted.
+
+Start with `run`, inspect with `inspect`, and explicitly recover with `resume` using the
+commands above. If Analyst fails once and succeeds on resume, the audit contains:
+
+```text
+stage agent       provider status     attempt
+1     researcher  mock     running    1
+1     researcher  mock     completed  1
+2     analyst     mock     running    1
+2     analyst     mock     failed     1  (missing_credentials)
+2     analyst     mock     running    2
+2     analyst     mock     completed  2
+3     reviewer    mock     running    1
+3     reviewer    mock     completed  1
+```
+
+Each real audit row also contains a UTC timestamp and an allowlisted error code or null.
+It contains no prompts, output bodies, raw errors, model names, or environment values.
+A failure is retained after recovery. Completed Researcher output is reused unchanged.
+A second Analyst failure exhausts the default budget; Reviewer does not run.
+
+Saved task IDs are unique within the local run directory, across processes and run IDs.
+Submitting the same ID again returns `duplicate_task`: inspect/resume its existing run.
+To start genuinely new work, use a new task ID. The ephemeral API retains its existing
+per-Orchestrator-instance duplicate protection. Do not delete saved files to circumvent
+recovery budgets. Concurrent starts use a task-ID lock as well as a run-ID lock.
+Corrupt saved files block new starts until the local records are repaired/restored.
+
+Legacy Step 6 files have no attempt audit. Resume imports their completed prefix and
+counts one known incomplete attempt, using the saved timestamp. Earlier retries cannot
+be reconstructed; the new budget applies to this imported minimum history. Changing
+provider/model/contracts/policy still rejects resume. Local JSON consistency checks are
+not tamper-proof signatures; anyone able to rewrite all saved data can rewrite history.
+
+Run the location-only credential audit alongside tests:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/audit_credentials.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pip check
+```
+
+The scanner checks tracked files and all local Git blobs, including unreachable objects,
+and searches accessible commit trees for committed environment files. It prints locations
+only. Pattern scanning cannot establish that arbitrary opaque strings are not secrets.
+Step 8, background execution, automatic retries, new providers, and external tools are
+outside this implementation.
