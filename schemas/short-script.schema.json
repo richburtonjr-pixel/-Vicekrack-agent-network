@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack Short Script",
+  "description": "Subject-neutral script for a short vertical video, version 1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "script_id",
+    "content_profile",
+    "format",
+    "aspect_ratio",
+    "duration_seconds",
+    "language",
+    "title",
+    "angle",
+    "sources",
+    "claims",
+    "beats",
+    "captions",
+    "audio",
+    "provenance"
+  ],
+  "properties": {
+    "contract": { "const": "short_script" },
+    "version": { "const": "1.0" },
+    "script_id": { "$ref": "#/$defs/identifier" },
+    "parent_task_id": { "$ref": "#/$defs/identifier" },
+    "content_profile": { "$ref": "#/$defs/identifier" },
+    "format": { "enum": ["vertical_short_15s"] },
+    "aspect_ratio": { "enum": ["9:16"] },
+    "duration_seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 180 },
+    "language": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+    "title": { "$ref": "#/$defs/text", "maxLength": 100 },
+    "angle": { "$ref": "#/$defs/text", "maxLength": 200 },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "beats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/beat" }
+    },
+    "captions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "mode"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "enum": ["word_highlight", "phrase"] }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["voiceover", "music_mood"],
+      "properties": {
+        "voiceover": { "type": "boolean" },
+        "music_mood": { "type": ["string", "null"], "maxLength": 60 }
+      }
+    },
+    "disclosures": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/text", "maxLength": 120 }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_by", "provider", "model", "created_at"],
+      "properties": {
+        "created_by": { "$ref": "#/$defs/identifier" },
+        "provider": { "enum": ["mock", "openai", "anthropic", "human"] },
+        "model": { "type": ["string", "null"], "maxLength": 100 },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 128 },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"
+    },
+    "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "method": {
+      "enum": [
+        "ai_video_clip",
+        "sourced_media",
+        "generated_image",
+        "animated_image",
+        "motion_graphics",
+        "text_card"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "title", "publisher", "kind"],
+      "properties": {
+        "source_id": { "$ref": "#/$defs/identifier" },
+        "title": { "$ref": "#/$defs/text", "maxLength": 200 },
+        "publisher": { "$ref": "#/$defs/text", "maxLength": 100 },
+        "kind": { "enum": ["official", "press", "community", "other"] },
+        "url": { "type": "string", "maxLength": 2048 },
+        "accessed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "text", "status", "source_ids"],
+      "properties": {
+        "claim_id": { "$ref": "#/$defs/identifier" },
+        "text": { "$ref": "#/$defs/text", "maxLength": 300 },
+        "status": { "enum": ["verified", "unverified"] },
+        "source_ids": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
+    "beat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "beat",
+        "start_seconds",
+        "end_seconds",
+        "narration",
+        "on_screen_text",
+        "claim_ids",
+        "visual",
+        "sound_cue"
+      ],
+      "properties": {
+        "beat": { "enum": ["hook", "context", "key_info", "payoff"] },
+        "start_seconds": { "type": "number", "minimum": 0 },
+        "end_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "narration": { "$ref": "#/$defs/text", "maxLength": 300 },
+        "on_screen_text": { "type": ["string", "null"], "maxLength": 60 },
+        "claim_ids": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "sound_cue": { "type": ["string", "null"], "maxLength": 80 },
+        "visual": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "description",
+            "preferred_method",
+            "fallback_methods",
+            "source_ids",
+            "generation_prompt",
+            "avoid"
+          ],
+          "properties": {
+            "description": { "$ref": "#/$defs/text", "maxLength": 300 },
+            "preferred_method": { "$ref": "#/$defs/method" },
+            "fallback_methods": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/method" }
+            },
+            "source_ids": {
+              "type": "array",
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/identifier" }
+            },
+            "generation_prompt": { "type": ["string", "null"], "maxLength": 500 },
+            "avoid": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/text", "maxLength": 100 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
