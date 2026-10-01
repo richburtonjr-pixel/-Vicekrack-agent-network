@@ -377,3 +377,33 @@ approved uncertain retry, `--retry-uncertain`. The dashboard does not bypass con
 validation, locks, duplicate protection, or retry limits. Viewing records leaves run JSON
 unchanged; storage initialization and inspection may create local directories/lock files.
 No dependencies or live API credentials are needed. Run the full unittest command above.
+
+## Step 9: automatic repository checks
+
+GitHub Actions runs `Project checks` on pushes, pull requests and manual dispatch.
+The test matrix covers Windows/Linux with Python 3.11/3.12. Each job installs the existing
+pinned requirements, checks dependency compatibility, runs all tests, compiles Python
+sources and checks commit whitespace. An independent credential job scans tracked files
+and fetched Git history, printing candidate locations only. No API secrets are supplied.
+Official checkout/setup-python actions are pinned to full commit IDs; checkout retains
+full history and does not persist its authentication credential. Workflow permissions
+are read-only. There is no deployment, scheduling, or automatic merge.
+
+Run the same guarded test suite locally:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_tests.py
+.\.venv\Scripts\python.exe scripts/audit_credentials.py
+.\.venv\Scripts\python.exe -m pip check
+```
+
+The test runner blocks Python socket connection entry points during discovery/execution
+and fails if discovery finds no tests. SDK transports remain mocked. This is an accidental
+network-call safeguard, not an OS sandbox: subprocesses/native code are not isolated.
+Dependency installation still needs internet access. Existing unittest commands still work.
+
+Open the PR's Checks tab or the repository Actions tab to inspect results. Failed tests,
+invalid dependencies or credential candidates leave a failing check; fix the problem
+and push again. The scanner remains heuristic and is not a general secret detector.
+These checks do not themselves block merging: repository branch protection/rulesets are
+separate settings and have not been changed. No runtime/agent/provider behavior changes.
