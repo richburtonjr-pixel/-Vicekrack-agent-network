@@ -1,0 +1,140 @@
+{
+  "contract": "short_script",
+  "version": "1.0",
+  "script_id": "gta6-vice-city-basics-001",
+  "content_profile": "gta",
+  "format": "vertical_short_15s",
+  "aspect_ratio": "9:16",
+  "duration_seconds": 15,
+  "language": "en-US",
+  "title": "GTA 6 in 15 seconds",
+  "angle": "The three things every returning player should know about GTA 6.",
+  "sources": [
+    {
+      "source_id": "rockstar-trailer-1",
+      "title": "Grand Theft Auto VI Trailer 1",
+      "publisher": "Rockstar Games",
+      "kind": "official"
+    },
+    {
+      "source_id": "rockstar-trailer-2",
+      "title": "Grand Theft Auto VI Trailer 2",
+      "publisher": "Rockstar Games",
+      "kind": "official"
+    },
+    {
+      "source_id": "rockstar-release-date",
+      "title": "Rockstar Newswire release date announcement",
+      "publisher": "Rockstar Games",
+      "kind": "official"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "c1",
+      "text": "GTA VI returns to Vice City.",
+      "status": "verified",
+      "source_ids": ["rockstar-trailer-1"]
+    },
+    {
+      "claim_id": "c2",
+      "text": "The game is set in Leonida, a fictional state based on Florida.",
+      "status": "verified",
+      "source_ids": ["rockstar-trailer-1"]
+    },
+    {
+      "claim_id": "c3",
+      "text": "The two protagonists are Lucia and Jason.",
+      "status": "verified",
+      "source_ids": ["rockstar-trailer-2"]
+    },
+    {
+      "claim_id": "c4",
+      "text": "Release is currently set for November 19, 2026.",
+      "status": "unverified",
+      "source_ids": ["rockstar-release-date"]
+    }
+  ],
+  "beats": [
+    {
+      "beat": "hook",
+      "start_seconds": 0,
+      "end_seconds": 3,
+      "narration": "GTA 6 takes you back to Vice City.",
+      "on_screen_text": "GTA 6: BACK TO VICE CITY",
+      "claim_ids": ["c1"],
+      "sound_cue": "bass hit",
+      "visual": {
+        "description": "Neon coastal skyline at dusk with a fast push-in.",
+        "preferred_method": "ai_video_clip",
+        "fallback_methods": ["animated_image", "text_card"],
+        "source_ids": [],
+        "generation_prompt": "Original neon coastal city skyline at dusk, palm trees, vertical 9:16, cinematic push-in",
+        "avoid": ["Rockstar logos", "likenesses of game characters"]
+      }
+    },
+    {
+      "beat": "context",
+      "start_seconds": 3,
+      "end_seconds": 7,
+      "narration": "It's set in Leonida, Rockstar's fictional take on Florida.",
+      "on_screen_text": "LEONIDA = FICTIONAL FLORIDA",
+      "claim_ids": ["c2"],
+      "sound_cue": null,
+      "visual": {
+        "description": "Official trailer frame showing the Leonida setting.",
+        "preferred_method": "sourced_media",
+        "fallback_methods": ["animated_image", "motion_graphics"],
+        "source_ids": ["rockstar-trailer-1"],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    },
+    {
+      "beat": "key_info",
+      "start_seconds": 7,
+      "end_seconds": 12,
+      "narration": "You'll play as two protagonists: Lucia and Jason.",
+      "on_screen_text": "LUCIA + JASON",
+      "claim_ids": ["c3"],
+      "sound_cue": null,
+      "visual": {
+        "description": "Split screen of the two protagonists from the official trailer.",
+        "preferred_method": "sourced_media",
+        "fallback_methods": ["animated_image", "text_card"],
+        "source_ids": ["rockstar-trailer-2"],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    },
+    {
+      "beat": "payoff",
+      "start_seconds": 12,
+      "end_seconds": 15,
+      "narration": "Current target: November 19, 2026. Follow for updates.",
+      "on_screen_text": "NOV 19, 2026",
+      "claim_ids": ["c4"],
+      "sound_cue": "whoosh out",
+      "visual": {
+        "description": "Animated release-date card with a countdown feel.",
+        "preferred_method": "motion_graphics",
+        "fallback_methods": ["text_card"],
+        "source_ids": [],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    }
+  ],
+  "captions": { "enabled": true, "mode": "word_highlight" },
+  "audio": { "voiceover": true, "music_mood": "synthwave, high energy" },
+  "disclosures": [
+    "Fan-made. Not affiliated with Rockstar Games.",
+    "Some visuals are AI-generated."
+  ],
+  "provenance": {
+    "created_by": "creator",
+    "provider": "human",
+    "model": null,
+    "created_at": "2026-09-30T12:00:00Z"
+  }
+}
