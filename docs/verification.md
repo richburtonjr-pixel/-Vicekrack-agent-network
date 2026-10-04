@@ -175,3 +175,9 @@ doubt the result is `insufficient_evidence`.
   comes from Take-Two's news releases.
 - There is no optional AI matcher. If one is added later it may only propose matches that
   these deterministic rules must still accept; it can never set a status.
+
+## Next stage (Step 18)
+
+`select-stories` ranks Verification Records and `brief-from-selection` builds briefs from
+the chosen ones using the same verified-only builder described above. Selection never
+changes a verification status. See [Story Selection](selection.md).

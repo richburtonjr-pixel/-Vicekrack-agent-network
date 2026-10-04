@@ -1,0 +1,24 @@
+{
+  "profile_version": "1.0",
+  "profile": "gta",
+  "description": "GTA VI editorial priorities. Verification gates always come first; audience data is not used.",
+  "relevance": {
+    "core_terms": ["gta vi", "gta 6", "gta6", "grand theft auto vi", "grand theft auto 6"],
+    "related_terms": ["vice city", "leonida", "rockstar", "rockstar games", "take two", "lucia", "jason"]
+  },
+  "topics": [
+    { "topic_id": "release_date", "priority": 5, "terms": ["release date", "release", "launch", "launches", "launching", "delay", "delayed", "delays", "postponed"], "angle": "What has officially changed about GTA VI's release timing." },
+    { "topic_id": "official_announcement", "priority": 5, "terms": ["announces", "announced", "announcement", "newswire", "official"], "angle": "What Rockstar has officially announced about GTA VI." },
+    { "topic_id": "trailer_media", "priority": 4, "terms": ["trailer", "trailers", "screenshot", "screenshots", "teaser", "artwork", "video"], "angle": "What the newest official GTA VI media shows." },
+    { "topic_id": "gameplay_features", "priority": 4, "terms": ["gameplay", "feature", "features", "mechanic", "mechanics", "multiplayer", "online", "mission", "missions"], "angle": "What we know about how GTA VI plays." },
+    { "topic_id": "map_world", "priority": 3, "terms": ["map", "vice city", "leonida", "world", "location", "locations", "region"], "angle": "What we know about GTA VI's world and map." },
+    { "topic_id": "characters_story", "priority": 3, "terms": ["lucia", "jason", "character", "characters", "story", "protagonist", "protagonists"], "angle": "What we know about GTA VI's characters and story." },
+    { "topic_id": "corporate", "priority": 2, "terms": ["take two", "earnings", "fiscal", "guidance", "investors", "quarter", "revenue"], "angle": "What Take-Two's official update means for GTA VI." },
+    { "topic_id": "development_news", "priority": 2, "terms": ["development", "developer", "studio", "rockstar north"], "angle": "The latest confirmed GTA VI development news." }
+  ],
+  "rumor_terms": ["rumor", "rumors", "rumour", "rumours", "leak", "leaks", "leaked", "leaker", "insider", "insiders", "allegedly", "reportedly", "speculation"],
+  "weights": { "confidence": 35, "authority": 20, "corroboration": 10, "recency": 15, "relevance": 10, "significance": 10 },
+  "thresholds": { "select_min_score": 60, "hold_min_score": 30, "select_max_age_days": 7, "stale_after_days": 30, "max_selections_per_run": 3 },
+  "history": { "max_entries": 200, "window_days": 60, "duplicate_threshold": 0.9, "similar_threshold": 0.6 },
+  "limits": { "max_records": 200 }
+}
