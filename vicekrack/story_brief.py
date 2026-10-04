@@ -82,11 +82,40 @@ def validate_story_brief(brief, *, require_verified_claims=False):
         if claim["status"] == "verified" and not claim["source_ids"]:
             _fail(f"{where}.source_ids", "a verified claim must cite at least one source")
 
+    if "verification" in brief:
+        _check_verification_links(brief)
+
     if require_verified_claims:
         unverified = count_unverified(brief)
         if unverified:
             raise NetworkError("unverified_claims",
                                f"{unverified} claim(s) are not verified; production requires verified claims.")
+
+
+def _check_verification_links(brief):
+    """Step 17: a brief built from Verification Records must agree with them.
+
+    Every claim maps to exactly one record claim from a listed record. A claim marked
+    verified must come from a `verified` record claim; a `corroborated` record claim may
+    only appear as unverified (draft-only). This checks internal consistency; the
+    records themselves are re-validated by the verified-brief builder.
+    """
+    links = brief["verification"]
+    records = set(links["record_ids"])
+    mapped = {}
+    for index, link in enumerate(links["claims"]):
+        where = f"verification.claims[{index}]"
+        if link["claim_id"] in mapped:
+            _fail(f"{where}.claim_id", "duplicate claim link")
+        if link["record_id"] not in records:
+            _fail(f"{where}.record_id", "references an unlisted record")
+        mapped[link["claim_id"]] = link
+    if set(mapped) != {claim["claim_id"] for claim in brief["claims"]}:
+        _fail("verification.claims", "must link every claim exactly once")
+    for index, claim in enumerate(brief["claims"]):
+        expected = "verified" if mapped[claim["claim_id"]]["verification_status"] == "verified" else "unverified"
+        if claim["status"] != expected:
+            _fail(f"claims[{index}].status", "does not match its verification record")
 
 
 def count_unverified(document):

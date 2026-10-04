@@ -64,9 +64,36 @@
       "required": ["created_by", "provider", "model", "created_at"],
       "properties": {
         "created_by": { "$ref": "#/$defs/identifier" },
-        "provider": { "enum": ["mock", "openai", "anthropic", "human"] },
+        "provider": { "enum": ["mock", "openai", "anthropic", "human", "local"] },
         "model": { "type": ["string", "null"], "maxLength": 100 },
         "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "verification": {
+      "description": "Optional (Step 17). Links each claim to the Verification Record that decided it. When present, claim statuses must agree with it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_sha256", "record_ids", "claims"],
+      "properties": {
+        "policy_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "record_ids": {
+          "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" }
+        },
+        "claims": {
+          "type": "array", "minItems": 1, "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["claim_id", "record_id", "record_claim_id", "verification_status"],
+            "properties": {
+              "claim_id": { "$ref": "#/$defs/identifier" },
+              "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+              "record_claim_id": { "enum": ["k1", "k2", "k3"] },
+              "verification_status": { "enum": ["verified", "corroborated"] }
+            }
+          }
+        }
       }
     }
   },

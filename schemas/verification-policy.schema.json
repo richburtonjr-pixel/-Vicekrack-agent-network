@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack verification policy",
+  "description": "Auditable source-authority and corroboration rules for one research profile, version 1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_version", "profile", "primary_sources", "secondary_sources", "attribution_aliases", "rules", "brief_defaults"],
+  "properties": {
+    "policy_version": { "const": "1.0" },
+    "profile": { "$ref": "#/$defs/identifier" },
+    "description": { "type": "string", "maxLength": 300 },
+    "primary_sources": {
+      "description": "First-party official sources. A first-hand matching statement from one of these, on one of its hosts, verifies a claim.",
+      "type": "array", "maxItems": 20,
+      "items": { "$ref": "#/$defs/source_rule" }
+    },
+    "secondary_sources": {
+      "description": "Reputable secondary reporting. Can corroborate (with independent origins) but never verify alone.",
+      "type": "array", "maxItems": 40,
+      "items": { "$ref": "#/$defs/source_rule" }
+    },
+    "attribution_aliases": {
+      "description": "Normalized names that refer to the same organization, e.g. rockstar -> rockstar games.",
+      "type": "object", "maxProperties": 100,
+      "propertyNames": { "pattern": "^[a-z0-9]+( [a-z0-9]+)*$", "maxLength": 60 },
+      "additionalProperties": { "type": "string", "pattern": "^[a-z0-9]+( [a-z0-9]+)*$", "maxLength": 60 }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_independent_secondary_origins", "match_threshold", "near_duplicate_threshold",
+                   "max_candidates", "max_evidence_per_claim", "max_record_age_days"],
+      "properties": {
+        "min_independent_secondary_origins": { "type": "integer", "minimum": 2, "maximum": 10 },
+        "match_threshold": { "type": "number", "minimum": 0.5, "maximum": 1 },
+        "near_duplicate_threshold": { "type": "number", "minimum": 0.5, "maximum": 1 },
+        "max_candidates": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "max_evidence_per_claim": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "max_record_age_days": { "type": "integer", "minimum": 1, "maximum": 90 }
+      }
+    },
+    "brief_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["avoid", "disclosures"],
+      "properties": {
+        "avoid": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S" } },
+        "disclosures": { "type": "array", "maxItems": 4, "items": { "type": "string", "minLength": 1, "maxLength": 120, "pattern": "\\S" } }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+    "source_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "hosts"],
+      "properties": {
+        "source_id": { "$ref": "#/$defs/identifier" },
+        "hosts": {
+          "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", "maxLength": 253 }
+        },
+        "note": { "type": "string", "maxLength": 200 }
+      }
+    }
+  }
+}

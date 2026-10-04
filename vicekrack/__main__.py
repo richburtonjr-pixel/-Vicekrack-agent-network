@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"verify", "verify-list", "brief-from-verified"}:
+        from .verification_cli import main as verification_main
+        return verification_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"scout-sources", "scout", "scout-list"}:
         from .scout_cli import main as scout_main
         return scout_main()

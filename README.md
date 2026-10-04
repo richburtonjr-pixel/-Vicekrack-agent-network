@@ -597,3 +597,37 @@ URL, or same headline from the same source). A broken source is reported by erro
 and the run continues. Candidates and run reports go to ignored `runtime/scout/`; run
 output shows counts only. There is no scheduling, crawling, model call, verification or
 publishing. See [Scout details](docs/scout.md).
+
+## Step 17: Verification — from Scout candidates to a verified Story Brief
+
+The Verifier checks every Scout claim against all stored candidates and saves a
+**Verification Record** with one explicit status per claim: `verified`, `corroborated`,
+`disputed`, `insufficient_evidence` or `rejected`. Each status comes with the evidence,
+source tiers, independent-origin count and rationale. Rules are fixed and offline: no
+model, no network, no keys.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout
+.\.venv\Scripts\python.exe -m vicekrack verify --all
+.\.venv\Scripts\python.exe -m vicekrack verify-list --status verified
+.\.venv\Scripts\python.exe -m vicekrack brief-from-verified RECORD_ID --topic "Your topic"
+.\.venv\Scripts\python.exe -m vicekrack draft-short BRIEF_FILE
+```
+
+On Linux/macOS use `.venv/bin/python`. For GTA VI, run the live Scout first, then add
+`--policy config/verification.gta.json` to the verification commands.
+
+- **Verified** needs a first-hand statement from a primary source (Rockstar Games or
+  Take-Two, on their official sites) that nothing primary contradicts.
+- **Corroborated** needs at least 2 truly independent reputable press origins. It is
+  draft-only.
+- **Never enough on their own:** one page, many outlets repeating one report (including
+  "according to Rockstar"), unnamed insiders, headlines, the Scout having collected it.
+- **Untrusted text:** source text that tries to instruct an AI is excluded and flagged.
+- **Brief handoff:** `brief-from-verified` copies only verified claims as verified, cites
+  only their supporting sources, refuses records older than the policy allows, and links
+  every claim to its record.
+- **Story Brief change:** briefs gain an optional `verification` block, enforced by the
+  validator when present. Existing briefs are unaffected.
+
+See [Verification details](docs/verification.md).

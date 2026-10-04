@@ -1,0 +1,27 @@
+{
+  "policy_version": "1.0",
+  "profile": "gta",
+  "description": "Offline policy for the synthetic Scout fixtures. Not real sources.",
+  "primary_sources": [
+    { "source_id": "fixture-official", "hosts": ["official.example.com"] }
+  ],
+  "secondary_sources": [
+    { "source_id": "fixture-press", "hosts": ["press.example.org"] }
+  ],
+  "attribution_aliases": {
+    "example studio": "example studio",
+    "the studio": "example studio"
+  },
+  "rules": {
+    "min_independent_secondary_origins": 2,
+    "match_threshold": 0.6,
+    "near_duplicate_threshold": 0.85,
+    "max_candidates": 500,
+    "max_evidence_per_claim": 20,
+    "max_record_age_days": 7
+  },
+  "brief_defaults": {
+    "avoid": ["real studio logos"],
+    "disclosures": ["Fixture data. Not real news."]
+  }
+}

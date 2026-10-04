@@ -357,3 +357,14 @@ Candidates are deliberately a different contract from Story Briefs. Discovery,
 verification and creation stay separate: the planned Verification stage will read
 candidates and produce Story Briefs whose claims it marks verified. No existing module
 changes except CLI routing. See [Scout](scout.md).
+
+## Step 17: Verification layer
+
+Stored Story Candidates + verification policy -> `verify_candidate` (deterministic
+matching, policy-only source tiers, origin clustering over citations/unnamed
+sources/copied text/cycles, fixed decision rules) -> Verification Record (replayed on
+every load) -> `build_verified_brief` (verified claims only, freshness and policy checks)
+-> Story Brief with an optional `verification` link block -> existing Creator. The only
+change to earlier contracts is that additive, optional Story Brief block (plus provenance
+provider `local`), validated when present. Scout, Creator, Short Script, planner,
+renderer, narration and providers are unchanged. See [Verification](verification.md).

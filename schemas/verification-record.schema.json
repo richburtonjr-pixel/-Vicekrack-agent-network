@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack Verification Record",
+  "description": "Deterministic verification of one Story Candidate's claims against stored evidence, version 1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "record_id", "content_profile", "candidate", "policy", "evidence_pool",
+               "verified_at", "claims", "summary", "flags"],
+  "properties": {
+    "contract": { "const": "verification_record" },
+    "version": { "const": "1.0" },
+    "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+    "content_profile": { "$ref": "#/$defs/identifier" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "source_id", "publisher", "url", "title", "published_at", "retrieved_at", "url_sha256"],
+      "properties": {
+        "candidate_id": { "$ref": "#/$defs/candidate_id" },
+        "source_id": { "$ref": "#/$defs/identifier" },
+        "publisher": { "$ref": "#/$defs/text", "maxLength": 100 },
+        "url": { "$ref": "#/$defs/url" },
+        "title": { "$ref": "#/$defs/text", "maxLength": 200 },
+        "published_at": { "$ref": "#/$defs/optional_timestamp" },
+        "retrieved_at": { "$ref": "#/$defs/timestamp" },
+        "url_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "policy_sha256"],
+      "properties": {
+        "profile": { "$ref": "#/$defs/identifier" },
+        "policy_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidence_pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidates_considered", "pool_sha256"],
+      "properties": {
+        "candidates_considered": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "pool_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "verified_at": { "$ref": "#/$defs/timestamp" },
+    "claims": {
+      "type": "array", "minItems": 1, "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "text", "basis", "status", "rationale_codes", "rationale",
+                     "primary_support", "independent_origins", "evidence"],
+        "properties": {
+          "claim_id": { "enum": ["k1", "k2", "k3"] },
+          "text": { "$ref": "#/$defs/text", "maxLength": 300 },
+          "basis": { "enum": ["headline", "excerpt"] },
+          "status": { "$ref": "#/$defs/status" },
+          "rationale_codes": {
+            "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true,
+            "items": { "enum": [
+              "primary_first_hand_support", "primary_contradiction", "independent_secondary_origins",
+              "secondary_contradiction", "single_origin_only", "repeated_single_origin",
+              "secondhand_primary_report", "unrated_sources_only", "no_matching_evidence",
+              "claim_contains_instructions", "conflicting_secondary_reports", "circular_citation"
+            ] }
+          },
+          "rationale": { "$ref": "#/$defs/text", "maxLength": 400 },
+          "primary_support": { "type": "integer", "minimum": 0, "maximum": 20 },
+          "independent_origins": { "type": "integer", "minimum": 0, "maximum": 20 },
+          "evidence": {
+            "type": "array", "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["candidate_id", "source_id", "publisher", "url", "title", "tier", "relation", "statement",
+                           "first_hand", "origin", "published_at", "retrieved_at"],
+              "properties": {
+                "candidate_id": { "$ref": "#/$defs/candidate_id" },
+                "source_id": { "$ref": "#/$defs/identifier" },
+                "publisher": { "$ref": "#/$defs/text", "maxLength": 100 },
+                "url": { "$ref": "#/$defs/url" },
+                "title": { "$ref": "#/$defs/text", "maxLength": 200 },
+                "tier": { "enum": ["primary", "secondary", "unrated"] },
+                "relation": { "enum": ["supports", "contradicts"] },
+                "statement": { "$ref": "#/$defs/text", "maxLength": 300 },
+                "first_hand": { "type": "boolean" },
+                "origin": { "type": "string", "minLength": 1, "maxLength": 120 },
+                "published_at": { "$ref": "#/$defs/optional_timestamp" },
+                "retrieved_at": { "$ref": "#/$defs/timestamp" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "corroborated", "disputed", "insufficient_evidence", "rejected"],
+      "properties": {
+        "verified": { "type": "integer", "minimum": 0 },
+        "corroborated": { "type": "integer", "minimum": 0 },
+        "disputed": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "flags": {
+      "type": "array", "maxItems": 5, "uniqueItems": true,
+      "items": { "enum": ["instruction_like_text_excluded", "circular_citation", "duplicate_evidence_collapsed",
+                          "evidence_truncated", "pool_truncated"] }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+    "candidate_id": { "type": "string", "pattern": "^cand-[0-9a-f]{24}$" },
+    "status": { "enum": ["verified", "corroborated", "disputed", "insufficient_evidence", "rejected"] },
+    "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "optional_timestamp": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] }
+  }
+}
