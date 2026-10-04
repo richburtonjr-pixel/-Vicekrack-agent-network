@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"validate-brief", "draft-short"}:
+        from .creator_cli import main as creator_main
+        return creator_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"validate-short-script", "plan-short"}:
         from .scene_cli import main as scene_main
         return scene_main()

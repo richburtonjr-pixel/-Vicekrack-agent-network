@@ -332,3 +332,15 @@ The offline scene planner feeds a separate, bounded local preview renderer. It v
 ## Step 14: optional local narration
 
 The preview renderer accepts an optional user-supplied 16-bit PCM WAV. A separate `vicekrack/narration.py` validates and normalizes it locally; the renderer adds one bounded mux step. Silent rendering stays the default, and no agent, provider or workflow code changes. See [preview architecture](preview.md).
+
+## Step 15: Creator stage
+
+Story Brief JSON -> `validate_story_brief` -> drafter (mock, or OpenAI/Anthropic via the
+new adapter method `generate_structured`) -> closed draft schema -> assembly with
+brief-owned sources/claims and format-owned timing -> unchanged `validate_short_script`
+-> atomic publication in `runtime/scripts` -> existing `plan-short`. `creator_cli` adds
+`validate-brief` and `draft-short` without entering `Orchestrator.run`; the research
+workflow, saved runs, registries, scene planner and renderer are unchanged. Both adapters
+now share one private request method between `research` and `generate_structured`; research
+requests and error handling are unchanged. The Story Brief is the contract future
+Scout and Verification stages will produce. See [Creator stage](creator.md).

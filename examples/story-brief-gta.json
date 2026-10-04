@@ -1,0 +1,55 @@
+{
+  "contract": "story_brief",
+  "version": "1.0",
+  "brief_id": "gta6-basics-brief-001",
+  "content_profile": "gta",
+  "format": "vertical_short_15s",
+  "language": "en-US",
+  "topic": "GTA 6 basics for returning players",
+  "angle": "The three things every returning player should know about GTA 6.",
+  "sources": [
+    {
+      "source_id": "rockstar-trailer-1",
+      "title": "Grand Theft Auto VI Trailer 1",
+      "publisher": "Rockstar Games",
+      "kind": "official"
+    },
+    {
+      "source_id": "rockstar-trailer-2",
+      "title": "Grand Theft Auto VI Trailer 2",
+      "publisher": "Rockstar Games",
+      "kind": "official"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "c1",
+      "text": "GTA VI returns to Vice City.",
+      "status": "unverified",
+      "source_ids": ["rockstar-trailer-1"]
+    },
+    {
+      "claim_id": "c2",
+      "text": "The game is set in Leonida, a fictional state based on Florida.",
+      "status": "unverified",
+      "source_ids": ["rockstar-trailer-1"]
+    },
+    {
+      "claim_id": "c3",
+      "text": "The two protagonists are Lucia and Jason.",
+      "status": "unverified",
+      "source_ids": ["rockstar-trailer-2"]
+    }
+  ],
+  "constraints": {
+    "avoid": ["Rockstar logos", "likenesses of game characters"],
+    "disclosures": ["Fan-made. Not affiliated with Rockstar Games."],
+    "tone": "energetic, factual"
+  },
+  "provenance": {
+    "created_by": "user",
+    "provider": "human",
+    "model": null,
+    "created_at": "2026-10-04T12:00:00Z"
+  }
+}

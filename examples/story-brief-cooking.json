@@ -1,0 +1,45 @@
+{
+  "contract": "story_brief",
+  "version": "1.0",
+  "brief_id": "roast-potatoes-brief-001",
+  "content_profile": "home-cooking",
+  "format": "vertical_short_15s",
+  "language": "en",
+  "topic": "Crispier roast potatoes",
+  "angle": "One step most home cooks skip.",
+  "sources": [
+    {
+      "source_id": "s1",
+      "title": "Test kitchen notes",
+      "publisher": "Example Kitchen",
+      "kind": "other",
+      "url": "https://example.com/roast-potatoes",
+      "accessed_at": "2026-09-30T12:00:00Z"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "c1",
+      "text": "Parboiling roughens the potato surface.",
+      "status": "verified",
+      "source_ids": ["s1"]
+    },
+    {
+      "claim_id": "c2",
+      "text": "A rougher surface browns into a crispier crust.",
+      "status": "verified",
+      "source_ids": ["s1"]
+    }
+  ],
+  "constraints": {
+    "avoid": [],
+    "disclosures": [],
+    "tone": null
+  },
+  "provenance": {
+    "created_by": "user",
+    "provider": "human",
+    "model": null,
+    "created_at": "2026-10-04T12:00:00Z"
+  }
+}
