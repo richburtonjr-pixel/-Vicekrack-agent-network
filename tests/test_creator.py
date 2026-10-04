@@ -391,7 +391,8 @@ class CreatorCliTests(NetworkGuard):
                 self.assertEqual((result["production_gate"], result["next_command"]), (gate, hint))
                 self.assertEqual((result["provider"], result["assets_produced"], result["published"]), ("mock", False, False))
                 path = Path(result["script_file"])
-                self.assertEqual(path.parent, self.folder / "runtime/scripts")
+                # Compare resolved paths: Windows temp folders may use 8.3 short names.
+                self.assertEqual(path.parent, (self.folder / "runtime/scripts").resolve())
                 script = read_json(path)
                 validate_short_script(script)
                 self.assertEqual(script["script_id"], result["script_id"])
