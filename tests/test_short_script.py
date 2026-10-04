@@ -57,8 +57,9 @@ def cooking_script():
 
 class ShortScriptTests(unittest.TestCase):
     def setUp(self):
-        self.addCleanup(patch.stopall)
-        patch("socket.socket.connect", side_effect=AssertionError("No network in tests")).start()
+        guard = patch("socket.socket.connect", side_effect=AssertionError("No network in tests"))
+        guard.start()
+        self.addCleanup(guard.stop)
         self.script = read_json(ROOT / "examples/short-script-gta.json")
 
     def assert_invalid(self, script, code="invalid_short_script", **kwargs):

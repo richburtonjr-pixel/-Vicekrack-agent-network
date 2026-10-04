@@ -454,3 +454,30 @@ removes the temporary name. It requires a local filesystem supporting hard links
 leaves no partial final task. Orphan `.tmp` files after a crash are never executed
 implicitly. These commands prepare only the existing three-stage research workflow;
 earlier single-agent commands remain supported separately.
+
+## Step 12: offline scene planning
+
+Plan the four scenes of a Step 11 Short Script without creating media or calling APIs:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack validate-short-script examples/short-script-gta.json
+.\.venv\Scripts\python.exe -m vicekrack plan-short examples/short-script-gta.json --draft
+.\.venv\Scripts\python.exe -m vicekrack plan-short examples/short-script-cooking.json
+```
+
+Run from this checkout after the usual setup; on Linux/macOS use `.venv/bin/python`.
+`validate-short-script --require-verified` and normal `plan-short` require declared
+verified claims. The GTA example deliberately fails that gate unless explicitly planned
+as a draft. Every draft is blocked_for_production. The cooking example is synthetic test
+data, not an independently verified publishable script. No command verifies facts or rights.
+
+The response gives a local JSON path under ignored `runtime/plans/`, deterministic plan
+ID and mode. Plans preserve original script data and timings, frame dimensions, source
+hash, chosen methods and skip reasons. They explicitly say assets_produced=false.
+`--capabilities config/visual-capabilities.json` selects available methods; defaults are
+local motion_graphics and text_card. Declaring a method available permits planning only.
+No downloads, video generation, speech, rendering, uploads or extra providers are added.
+
+Saved plans may contain sensitive user content and are not encrypted. Publication is
+atomic and never overwrites an earlier plan, using a local filesystem with hard-link
+support. See [scene-plan contract, commands and limits](docs/scene-plan.md).

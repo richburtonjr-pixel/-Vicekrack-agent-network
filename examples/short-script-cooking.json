@@ -1,0 +1,129 @@
+{
+  "contract": "short_script",
+  "version": "1.0",
+  "script_id": "roast-potatoes-001",
+  "content_profile": "home-cooking",
+  "format": "vertical_short_15s",
+  "aspect_ratio": "9:16",
+  "duration_seconds": 15,
+  "language": "en",
+  "title": "Crispier roast potatoes",
+  "angle": "One step most home cooks skip.",
+  "sources": [
+    {
+      "source_id": "s1",
+      "title": "Test kitchen notes",
+      "publisher": "Example Kitchen",
+      "kind": "other",
+      "url": "https://example.com/roast-potatoes",
+      "accessed_at": "2026-09-30T12:00:00Z"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "c1",
+      "text": "Parboiling roughens the potato surface.",
+      "status": "verified",
+      "source_ids": [
+        "s1"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "beat": "hook",
+      "start_seconds": 0,
+      "end_seconds": 3,
+      "narration": "Your roast potatoes can be way crispier.",
+      "on_screen_text": "CRISPIER POTATOES",
+      "claim_ids": [],
+      "sound_cue": null,
+      "visual": {
+        "description": "Scene visual.",
+        "preferred_method": "generated_image",
+        "fallback_methods": [
+          "text_card"
+        ],
+        "source_ids": [],
+        "generation_prompt": "Golden roast potatoes, vertical",
+        "avoid": []
+      }
+    },
+    {
+      "beat": "context",
+      "start_seconds": 3,
+      "end_seconds": 7,
+      "narration": "The trick happens before they hit the oven.",
+      "on_screen_text": null,
+      "claim_ids": [],
+      "sound_cue": null,
+      "visual": {
+        "description": "Scene visual.",
+        "preferred_method": "motion_graphics",
+        "fallback_methods": [
+          "text_card"
+        ],
+        "source_ids": [],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    },
+    {
+      "beat": "key_info",
+      "start_seconds": 7,
+      "end_seconds": 12,
+      "narration": "Parboil them, then shake the pot to rough up the edges.",
+      "on_screen_text": "PARBOIL + SHAKE",
+      "claim_ids": [
+        "c1"
+      ],
+      "sound_cue": null,
+      "visual": {
+        "description": "Scene visual.",
+        "preferred_method": "sourced_media",
+        "fallback_methods": [
+          "animated_image",
+          "text_card"
+        ],
+        "source_ids": [
+          "s1"
+        ],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    },
+    {
+      "beat": "payoff",
+      "start_seconds": 12,
+      "end_seconds": 15,
+      "narration": "Roast hot and enjoy the crunch.",
+      "on_screen_text": null,
+      "claim_ids": [],
+      "sound_cue": "crunch",
+      "visual": {
+        "description": "Scene visual.",
+        "preferred_method": "text_card",
+        "fallback_methods": [
+          "motion_graphics"
+        ],
+        "source_ids": [],
+        "generation_prompt": null,
+        "avoid": []
+      }
+    }
+  ],
+  "captions": {
+    "enabled": true,
+    "mode": "phrase"
+  },
+  "audio": {
+    "voiceover": false,
+    "music_mood": null
+  },
+  "provenance": {
+    "created_by": "creator",
+    "provider": "mock",
+    "model": null,
+    "created_at": "2026-09-30T12:00:00Z"
+  }
+}
