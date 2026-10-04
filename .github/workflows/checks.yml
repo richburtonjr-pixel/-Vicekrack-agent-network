@@ -63,3 +63,27 @@ jobs:
           python-version: '3.12'
       - name: Scan tracked files and local Git history (locations only)
         run: python scripts/audit_credentials.py
+
+  renderer:
+    name: Local preview (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      OPENAI_API_KEY: ''
+      ANTHROPIC_API_KEY: ''
+      PYTHONUTF8: '1'
+      RUN_LOCAL_RENDER_TESTS: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-render.txt
+      - run: python -m pip check
+      - run: python scripts/run_tests.py

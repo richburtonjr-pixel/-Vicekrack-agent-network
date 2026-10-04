@@ -481,3 +481,37 @@ No downloads, video generation, speech, rendering, uploads or extra providers ar
 Saved plans may contain sensitive user content and are not encrypted. Publication is
 atomic and never overwrites an earlier plan, using a local filesystem with hard-link
 support. See [scene-plan contract, commands and limits](docs/scene-plan.md).
+
+## Step 13: local silent video previews
+
+Install the optional rendering dependencies after the normal setup:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-render.txt
+.\.venv\Scripts\python.exe -m vicekrack plan-short examples/short-script-cooking.json
+.\.venv\Scripts\python.exe -m vicekrack render-preview PLAN_FILE
+```
+
+Replace `PLAN_FILE` with the returned plan path, quoted if it contains spaces. On Linux/macOS use `.venv/bin/python`. Pillow draws the cards; imageio-ffmpeg supplies a local FFmpeg executable on supported wheel platforms. No provider credentials are needed.
+
+The command returns paths to an MP4 and JSON manifest under ignored `runtime/previews/`. Each package also contains four PNG scene posters. The video is 1080x1920, 24 fps, 15 seconds, H.264, and silent. Text cards are static; local motion graphics use fades. Narration is displayed as text regardless of caption settings. Word highlighting, voiceover, music, audio cues, external footage and generated media are not rendered. Every preview is visibly marked as non-publishable; the cooking fixture is synthetic test data.
+
+For an explicitly marked draft:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack plan-short examples/short-script-gta.json --draft
+.\.venv\Scripts\python.exe -m vicekrack render-preview DRAFT_PLAN_FILE --allow-draft-preview
+```
+
+This preserves the source production block. Plans selecting external methods are rejected; replan with the default local capabilities. English printable ASCII and common smart punctuation are supported; unsupported glyphs and overflowing text fail clearly instead of being silently omitted.
+
+Run all tests, including the real local encoder integration (no API credits):
+
+```powershell
+$env:RUN_LOCAL_RENDER_TESTS='1'
+.\.venv\Scripts\python.exe scripts/run_tests.py
+Remove-Item Env:RUN_LOCAL_RENDER_TESTS
+.\.venv\Scripts\python.exe -m pip check
+```
+
+Without the environment flag the optional encoder test is skipped; mocked renderer tests still run. CI includes separate Windows/Linux rendering jobs with the flag enabled. Local media contains your script text and is unencrypted: keep it out of Git and inspect it before sharing. See [preview architecture and limitations](docs/preview.md).
