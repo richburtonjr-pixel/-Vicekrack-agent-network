@@ -324,3 +324,7 @@ Existing Researcher -> Analyst -> Reviewer dispatch, providers and saved workflo
 unchanged. Drafts are explicitly blocked; declared verified status is not independent
 fact-checking. Both local methods are planning placeholders until a later renderer exists.
 See docs/scene-plan.md for contract evolution, storage, commands and limitations.
+
+## Step 13: local preview boundary
+
+The offline scene planner feeds a separate, bounded local preview renderer. It validates the immutable plan, draws text cards, encodes four scenes with local FFmpeg, validates decoding, and publishes an ignored MP4/poster/manifest package. No agent/provider workflow changes are required. See [preview architecture](preview.md) for publication, privacy, error handling and rendering limitations.
