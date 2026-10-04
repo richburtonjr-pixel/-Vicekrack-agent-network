@@ -328,3 +328,7 @@ See docs/scene-plan.md for contract evolution, storage, commands and limitations
 ## Step 13: local preview boundary
 
 The offline scene planner feeds a separate, bounded local preview renderer. It validates the immutable plan, draws text cards, encodes four scenes with local FFmpeg, validates decoding, and publishes an ignored MP4/poster/manifest package. No agent/provider workflow changes are required. See [preview architecture](preview.md) for publication, privacy, error handling and rendering limitations.
+
+## Step 14: optional local narration
+
+The preview renderer accepts an optional user-supplied 16-bit PCM WAV. A separate `vicekrack/narration.py` validates and normalizes it locally; the renderer adds one bounded mux step. Silent rendering stays the default, and no agent, provider or workflow code changes. See [preview architecture](preview.md).
