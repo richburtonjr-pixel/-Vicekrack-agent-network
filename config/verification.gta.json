@@ -1,0 +1,36 @@
+{
+  "policy_version": "1.0",
+  "profile": "gta",
+  "description": "GTA VI verification policy. Primary = first-party Rockstar/Take-Two statements; secondary = reputable games press.",
+  "primary_sources": [
+    { "source_id": "rockstar-newswire", "hosts": ["www.rockstargames.com"], "note": "Rockstar Games official newswire." },
+    { "source_id": "take-two-ir", "hosts": ["ir.take2games.com"], "note": "Take-Two Interactive official news releases and filings." }
+  ],
+  "secondary_sources": [
+    { "source_id": "gamespot-news", "hosts": ["www.gamespot.com", "gamespot.com"] },
+    { "source_id": "ign-games", "hosts": ["www.ign.com", "ign.com"] }
+  ],
+  "attribution_aliases": {
+    "rockstar": "rockstar games",
+    "rockstar north": "rockstar games",
+    "rockstar newswire": "rockstar games",
+    "take two": "take two interactive",
+    "taketwo": "take two interactive",
+    "take two interactive software": "take two interactive",
+    "t2": "take two interactive",
+    "gamespot": "gamespot",
+    "ign": "ign"
+  },
+  "rules": {
+    "min_independent_secondary_origins": 2,
+    "match_threshold": 0.6,
+    "near_duplicate_threshold": 0.85,
+    "max_candidates": 500,
+    "max_evidence_per_claim": 20,
+    "max_record_age_days": 7
+  },
+  "brief_defaults": {
+    "avoid": ["Rockstar logos", "likenesses of game characters"],
+    "disclosures": ["Fan-made. Not affiliated with Rockstar Games or Take-Two Interactive."]
+  }
+}

@@ -143,3 +143,10 @@ rejection of 20+ malformed drafter outputs; sanitized drafter failures; both rea
 through in-memory transports (request shape, schema/semantic rejection, error codes, no
 retries, missing credentials before client creation); and CLI output, storage and config
 validation. No test uses the network or credentials.
+
+## Briefs from the Verification stage (Step 17)
+
+`brief-from-verified` produces Story Briefs whose verified claims each link to a
+Verification Record through an optional `verification` block; the brief validator rejects
+any status that disagrees with its link. The Creator copies claims and statuses unchanged,
+so it cannot upgrade a verification decision. See [Verification](verification.md).
