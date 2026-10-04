@@ -1,4 +1,6 @@
-"""Bounded local silent previews. No external assets, provider clients or shell commands."""
+"""Bounded local previews, silent by default with optional local narration.
+
+No external assets, provider clients or shell commands."""
 import argparse
 import hashlib
 import json
@@ -9,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .errors import NetworkError
+from .narration import load_narration
 from .orchestrator import ROOT, read_json
 from .persistence import reject_secrets
 from .scene_plan import validate_scene_plan
@@ -76,7 +79,7 @@ def draw_text(draw, font_module, text, box, size, color):
     raise NetworkError("preview_text_overflow", "Text does not fit the preview layout; shorten the source script.")
 
 
-def make_card(plan, scene, path, modules):
+def make_card(plan, scene, path, modules, narrated=False):
     Image, ImageDraw, ImageFont, _ = modules
     image = Image.new("RGB", (1080,1920), "#0c1425")
     draw = ImageDraw.Draw(image)
@@ -84,7 +87,8 @@ def make_card(plan, scene, path, modules):
     draw.rounded_rectangle((60,60,1020,168),radius=20,fill=accent)
     label = "DRAFT - NOT FOR PRODUCTION" if plan["blocked_for_production"] else "LOCAL PREVIEW - NOT FOR PUBLISHING"
     draw_text(draw,ImageFont,label,(88,88,905,70),36,"#0c1425")
-    draw_text(draw,ImageFont,"VICEKRACK / SILENT STORYBOARD",(76,222,928,70),30,"#b9c7db")
+    subtitle = "VICEKRACK / LOCAL NARRATION STORYBOARD" if narrated else "VICEKRACK / SILENT STORYBOARD"
+    draw_text(draw,ImageFont,subtitle,(76,222,928,70),30,"#b9c7db")
     beat = scene["beat"]
     draw_text(draw,ImageFont,f"{scene['index']:02d} / {beat['beat'].upper()}",(76,330,928,90),44,accent)
     draw_text(draw,ImageFont,beat["on_screen_text"] or plan["script"]["title"],(76,465,928,400),82,"#ffffff")
@@ -111,8 +115,10 @@ def invoke(exe, arguments, cwd):
         raise NetworkError("render_failed", "Local encoding failed; no output was published.") from None
 
 
-def render_preview(plan, *, allow_draft=False, directory=None):
+def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
     preflight(plan,allow_draft)
+    # Validate optional audio before any encoder launch, folder creation or staging.
+    audio, wav = load_narration(narration) if narration is not None else (None, None)
     modules = dependencies()
     exe = modules[3]
     folder = (Path(directory) if directory is not None else ROOT / "runtime/previews").resolve()
@@ -134,7 +140,10 @@ def render_preview(plan, *, allow_draft=False, directory=None):
                 raise NetworkError("render_failed", "Invalid local staging location.")
             for scene in plan["scenes"]:
                 number = scene["index"]
-                make_card(plan,scene,work / f"scene-{number}.png",modules)
+                if audio is None:
+                    make_card(plan,scene,work / f"scene-{number}.png",modules)
+                else:
+                    make_card(plan,scene,work / f"scene-{number}.png",modules,narrated=True)
                 duration = scene["beat"]["end_seconds"] - scene["beat"]["start_seconds"]
                 filters = "format=yuv420p"
                 if scene["selected_method"] == "motion_graphics":
@@ -143,7 +152,14 @@ def render_preview(plan, *, allow_draft=False, directory=None):
                             "-frames:v",str(int(duration*FPS)),"-vf",filters,"-an","-c:v","libx264",
                             "-preset","ultrafast","-crf","23","-threads","2",f"scene-{number}.mp4"],work)
             (work / "segments.txt").write_text("".join(f"file 'scene-{i}.mp4'\n" for i in range(1,5)),encoding="ascii")
-            invoke(exe,["-f","concat","-safe","1","-i","segments.txt","-c","copy","-an","-movflags","+faststart","preview.mp4"],work)
+            silent = "preview.mp4" if audio is None else "silent.mp4"
+            invoke(exe,["-f","concat","-safe","1","-i","segments.txt","-c","copy","-an","-movflags","+faststart",silent],work)
+            if audio is not None:
+                # Metadata-free, silence-padded WAV staged locally; container metadata is also dropped.
+                (work / "narration.wav").write_bytes(wav)
+                invoke(exe,["-i",silent,"-i","narration.wav","-map","0:v:0","-map","1:a:0",
+                            "-map_metadata","-1","-map_chapters","-1","-c:v","copy",
+                            "-c:a","aac","-b:a","128k","-ar","48000","-movflags","+faststart","preview.mp4"],work)
             # Decode every frame before publishing, instead of trusting an encoder exit alone.
             invoke(exe,["-xerror","-i","preview.mp4","-f","null","-"],work)
             video = work / "preview.mp4"
@@ -152,21 +168,28 @@ def render_preview(plan, *, allow_draft=False, directory=None):
             manifest = {"contract":"preview_render","version":"1.0","plan_id":plan["plan_id"],
                         "input_sha256":plan["input_sha256"],"preview_only":True,"publishable":False,
                         "source_blocked_for_production":plan["blocked_for_production"],
-                        "width":1080,"height":1920,"fps":FPS,"duration_seconds":15,"audio_present":False,
+                        "width":1080,"height":1920,"fps":FPS,"duration_seconds":15,"audio_present":audio is not None,
                         "video":"preview.mp4","video_sha256":hashlib.sha256(video.read_bytes()).hexdigest(),
-                        "limitations":["silent storyboard", "narration displayed as text", "no word timing or lip sync",
-                                       "no sourced or generated media", "no fact or rights verification"],
+                        "limitations":(["silent storyboard"] if audio is None else
+                                       ["user-supplied local narration padded with silence to 15 seconds",
+                                        "no voice consent, rights or content verification of narration"])
+                                      + ["narration displayed as text", "no word timing or lip sync",
+                                         "no sourced or generated media", "no fact or rights verification"],
                         "scenes":[{"index":s["index"],"method":s["selected_method"],
                                    "start_seconds":s["beat"]["start_seconds"],"end_seconds":s["beat"]["end_seconds"],
                                    "poster":f"scene-{s['index']}.png"} for s in plan["scenes"]]}
+            if audio is not None:
+                manifest["audio"] = dict(audio)
             reject_secrets(manifest)
             (work / "manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
             for path in [video,work/"manifest.json"]:
                 with path.open("r+b") as stream: os.fsync(stream.fileno())
-            for path in [work/"segments.txt", *work.glob("scene-*.mp4")]: path.unlink()
+            for path in [work/"segments.txt", *work.glob("scene-*.mp4"), work/"silent.mp4", work/"narration.wav"]:
+                path.unlink(missing_ok=True)
             os.rename(work,target)
         return {"preview_file":str(target/"preview.mp4"),"manifest_file":str(target/"manifest.json"),
-                "preview_only":True,"publishable":False,"source_blocked_for_production":plan["blocked_for_production"]}
+                "preview_only":True,"publishable":False,"source_blocked_for_production":plan["blocked_for_production"],
+                "audio_present":audio is not None}
     except OSError:
         raise NetworkError("preview_storage_error", "Could not save the complete preview.") from None
     finally:
@@ -175,13 +198,15 @@ def render_preview(plan, *, allow_draft=False, directory=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Render a local silent, watermarked storyboard preview")
+    parser = argparse.ArgumentParser(description="Render a local watermarked storyboard preview (silent unless --narration is given)")
     parser.add_argument("command",choices=["render-preview"])
     parser.add_argument("plan",type=Path)
     parser.add_argument("--allow-draft-preview",action="store_true")
+    parser.add_argument("--narration",type=Path,default=None,
+                        help="Optional local 16-bit PCM WAV (mono/stereo, 8-48 kHz, max 15 s and 12 MB)")
     args=parser.parse_args()
     try:
-        result=render_preview(read_json(args.plan),allow_draft=args.allow_draft_preview)
+        result=render_preview(read_json(args.plan),allow_draft=args.allow_draft_preview,narration=args.narration)
         print(json.dumps(result,indent=2))
         return 0
     except NetworkError as error:

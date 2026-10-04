@@ -515,3 +515,20 @@ Remove-Item Env:RUN_LOCAL_RENDER_TESTS
 ```
 
 Without the environment flag the optional encoder test is skipped; mocked renderer tests still run. CI includes separate Windows/Linux rendering jobs with the flag enabled. Local media contains your script text and is unencrypted: keep it out of Git and inspect it before sharing. See [preview architecture and limitations](docs/preview.md).
+
+## Step 14: optional local narration
+
+Previews stay silent by default. To add your own recorded narration, pass a local WAV file:
+
+```
+python -m vicekrack render-preview PLAN_FILE
+python -m vicekrack render-preview PLAN_FILE --narration recording.wav
+```
+
+The first command is the unchanged silent preview. The second muxes `recording.wav` into the same watermarked 15-second video. Use your virtual environment's Python as in Step 13 (for example `.\.venv\Scripts\python.exe` on Windows), and quote paths that contain spaces. Drafts still require `--allow-draft-preview`.
+
+Accepted input: uncompressed 16-bit PCM WAV, mono or stereo, 8–48 kHz, at most 15 seconds and 12 MB. Missing, corrupt, empty, compressed, 8/24/32-bit or float, multichannel, out-of-range or overlong files are rejected with a short error code such as `narration_too_long`; the path and file contents are never echoed. Audio longer than 15 seconds is never trimmed — shorten the recording instead. Shorter audio is padded with silence to 15 seconds.
+
+All WAV metadata (title, artist, broadcast, cue and other chunks) is removed before encoding, and container metadata is dropped during muxing. The audio is encoded as AAC; the video stream is copied unchanged. The manifest records only `audio_present` and an `audio` object with the source duration, channels, sample rate, padded duration and SHA-256 of the normalized WAV — never the file name or path. Output remains `publishable: false`.
+
+Nothing is sent to OpenAI, Anthropic or any other service, and no voice is generated: you are responsible for having rights and consent for any voice you record. The optional real-encoder test (`RUN_LOCAL_RENDER_TESTS=1`) now also checks that a narrated MP4 contains 15 seconds of audio and that no temporary files remain. See [preview architecture and limitations](docs/preview.md).
