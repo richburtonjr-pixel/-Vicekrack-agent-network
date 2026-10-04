@@ -1,0 +1,50 @@
+{
+  "config_version": "1.0",
+  "profile": "gta",
+  "description": "Offline GTA-profile fixtures with synthetic example.com/example.org feeds. Not real news.",
+  "fetch_mode": "fixture",
+  "keywords": ["GTA VI", "GTA 6", "GTA6", "Grand Theft Auto VI", "Grand Theft Auto 6", "Vice City", "Leonida"],
+  "limits": {
+    "max_items_per_source": 20,
+    "max_bytes_per_source": 1000000,
+    "timeout_seconds": 10,
+    "max_candidates_per_run": 50
+  },
+  "sources": [
+    {
+      "source_id": "fixture-official",
+      "name": "Fixture Official Newsroom",
+      "publisher": "Example Studio",
+      "kind": "official",
+      "category": "official_publisher",
+      "enabled": true,
+      "feed_url": "https://official.example.com/feed.xml",
+      "link_hosts": ["official.example.com"],
+      "fixture": "examples/scout/official-feed.xml",
+      "note": "Synthetic RSS 2.0 test data."
+    },
+    {
+      "source_id": "fixture-press",
+      "name": "Fixture Games Press",
+      "publisher": "Example Press",
+      "kind": "press",
+      "category": "press",
+      "enabled": true,
+      "feed_url": "https://press.example.org/atom.xml",
+      "link_hosts": ["press.example.org"],
+      "fixture": "examples/scout/press-feed.atom",
+      "note": "Synthetic Atom test data."
+    },
+    {
+      "source_id": "fixture-disabled",
+      "name": "Fixture Disabled Source",
+      "publisher": "Example Community",
+      "kind": "community",
+      "category": "community",
+      "enabled": false,
+      "feed_url": "https://community.example.net/feed.xml",
+      "link_hosts": ["community.example.net"],
+      "note": "Disabled sources are listed for audit but never read."
+    }
+  ]
+}

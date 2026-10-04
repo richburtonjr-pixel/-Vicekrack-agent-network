@@ -1,0 +1,59 @@
+{
+  "config_version": "1.0",
+  "profile": "gta",
+  "description": "GTA VI research intake from approved public feeds. Live fetching requires the --live flag.",
+  "fetch_mode": "http",
+  "keywords": ["GTA VI", "GTA 6", "GTA6", "Grand Theft Auto VI", "Grand Theft Auto 6", "Vice City", "Leonida"],
+  "limits": {
+    "max_items_per_source": 20,
+    "max_bytes_per_source": 1000000,
+    "timeout_seconds": 10,
+    "max_candidates_per_run": 50
+  },
+  "sources": [
+    {
+      "source_id": "rockstar-newswire",
+      "name": "Rockstar Newswire",
+      "publisher": "Rockstar Games",
+      "kind": "official",
+      "category": "official_publisher",
+      "enabled": false,
+      "feed_url": "https://www.rockstargames.com/newswire",
+      "link_hosts": ["www.rockstargames.com"],
+      "note": "No public RSS/Atom feed confirmed (checked 2026-10-04). Keep disabled until a real feed URL is confirmed."
+    },
+    {
+      "source_id": "take-two-ir",
+      "name": "Take-Two Interactive News Releases",
+      "publisher": "Take-Two Interactive",
+      "kind": "official",
+      "category": "official_parent_company",
+      "enabled": true,
+      "feed_url": "https://ir.take2games.com/rss/news-releases.xml",
+      "link_hosts": ["ir.take2games.com"],
+      "note": "Investor-relations RSS 2.0 feed, confirmed 2026-10-04."
+    },
+    {
+      "source_id": "gamespot-news",
+      "name": "GameSpot - All News",
+      "publisher": "GameSpot",
+      "kind": "press",
+      "category": "press",
+      "enabled": true,
+      "feed_url": "https://www.gamespot.com/feeds/news/",
+      "link_hosts": ["www.gamespot.com", "gamespot.com"],
+      "note": "RSS 2.0 feed, confirmed 2026-10-04."
+    },
+    {
+      "source_id": "ign-games",
+      "name": "IGN Video Games",
+      "publisher": "IGN",
+      "kind": "press",
+      "category": "press",
+      "enabled": true,
+      "feed_url": "https://feeds.feedburner.com/ign/games-all",
+      "link_hosts": ["www.ign.com", "ign.com"],
+      "note": "RSS 2.0 feed, confirmed 2026-10-04."
+    }
+  ]
+}

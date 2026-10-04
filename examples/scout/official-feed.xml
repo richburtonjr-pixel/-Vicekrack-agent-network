@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Fixture Official Newsroom</title>
+    <link>https://official.example.com/</link>
+    <description>Synthetic test feed. Not real news.</description>
+    <item>
+      <title>Fixture: GTA VI trailer event scheduled</title>
+      <link>https://official.example.com/news/gta-vi-trailer-event?utm_source=rss&amp;utm_medium=feed</link>
+      <pubDate>Fri, 02 Oct 2026 15:30:00 +0000</pubDate>
+      <description><![CDATA[<p>Fixture text: the studio says a <b>GTA VI</b> trailer event is scheduled for next week.</p><p>The fixture also says the event will stream online. This sentence has no keyword.</p>]]></description>
+    </item>
+    <item>
+      <title>Fixture: Community spotlight for an older racing game</title>
+      <link>https://official.example.com/news/community-spotlight</link>
+      <pubDate>Thu, 01 Oct 2026 12:00:00 +0000</pubDate>
+      <description>An unrelated story that should be skipped by the keyword filter.</description>
+    </item>
+    <item>
+      <title>Fixture: GTA VI trailer event scheduled (repost)</title>
+      <link>https://OFFICIAL.example.com/news/gta-vi-trailer-event?utm_campaign=social#top</link>
+      <pubDate>Fri, 02 Oct 2026 16:00:00 +0000</pubDate>
+      <description>The same URL with different tracking parameters; it must be treated as a duplicate.</description>
+    </item>
+    <item>
+      <title>Fixture: Insecure GTA 6 link</title>
+      <link>http://official.example.com/news/insecure</link>
+      <description>Plain http links are rejected.</description>
+    </item>
+    <item>
+      <title>Fixture: GTA 6 link to an unapproved host</title>
+      <link>https://unapproved.example.net/gta-6</link>
+      <description>Links outside the source's approved hosts are rejected.</description>
+    </item>
+  </channel>
+</rss>
