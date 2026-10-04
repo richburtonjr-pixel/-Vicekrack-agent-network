@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack Story Brief",
+  "description": "Subject-neutral input to the Creator stage, version 1.0: the topic, angle, sources and the only claims a script may state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "brief_id",
+    "content_profile",
+    "format",
+    "language",
+    "topic",
+    "angle",
+    "sources",
+    "claims",
+    "constraints",
+    "provenance"
+  ],
+  "properties": {
+    "contract": { "const": "story_brief" },
+    "version": { "const": "1.0" },
+    "brief_id": { "$ref": "#/$defs/identifier", "maxLength": 100 },
+    "parent_task_id": { "$ref": "#/$defs/identifier" },
+    "content_profile": { "$ref": "#/$defs/identifier" },
+    "format": { "enum": ["vertical_short_15s"] },
+    "language": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+    "topic": { "$ref": "#/$defs/text", "maxLength": 200 },
+    "angle": { "$ref": "#/$defs/text", "maxLength": 200 },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["avoid", "disclosures", "tone"],
+      "properties": {
+        "avoid": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/text", "maxLength": 100 }
+        },
+        "disclosures": {
+          "type": "array",
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/text", "maxLength": 120 }
+        },
+        "tone": { "type": ["string", "null"], "maxLength": 60 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_by", "provider", "model", "created_at"],
+      "properties": {
+        "created_by": { "$ref": "#/$defs/identifier" },
+        "provider": { "enum": ["mock", "openai", "anthropic", "human"] },
+        "model": { "type": ["string", "null"], "maxLength": 100 },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 128 },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"
+    },
+    "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "title", "publisher", "kind"],
+      "properties": {
+        "source_id": { "$ref": "#/$defs/identifier" },
+        "title": { "$ref": "#/$defs/text", "maxLength": 200 },
+        "publisher": { "$ref": "#/$defs/text", "maxLength": 100 },
+        "kind": { "enum": ["official", "press", "community", "other"] },
+        "url": { "type": "string", "maxLength": 2048 },
+        "accessed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "text", "status", "source_ids"],
+      "properties": {
+        "claim_id": { "$ref": "#/$defs/identifier" },
+        "text": { "$ref": "#/$defs/text", "maxLength": 300 },
+        "status": { "enum": ["verified", "unverified"] },
+        "source_ids": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    }
+  }
+}

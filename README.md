@@ -163,7 +163,7 @@ legacy invocations remain ephemeral; use the saved-run commands below for persis
 - `vicekrack/researcher.py`, `analyst.py`, `reviewer.py`: specialized role handlers.
 - `vicekrack/handoff.py`: schema and semantic handoff checks.
 - `vicekrack/providers.py`: protocol, mock, and provider registration.
-- `vicekrack/openai_provider.py`, `anthropic_provider.py`: unchanged real adapters.
+- `vicekrack/openai_provider.py`, `anthropic_provider.py`: real adapters (Step 15 adds `generate_structured`).
 - `agents/`: role definitions; `config/`: independent provider selections.
 - `schemas/`: task and handoff contracts; `examples/`: runnable tasks.
 - `tests/test_workflow.py`: sequence, mixed providers, errors, budgets, and trace tests.
@@ -532,3 +532,33 @@ Accepted input: uncompressed 16-bit PCM WAV, mono or stereo, 8–48 kHz, at most
 All WAV metadata (title, artist, broadcast, cue and other chunks) is removed before encoding, and container metadata is dropped during muxing. The audio is encoded as AAC; the video stream is copied unchanged. The manifest records only `audio_present` and an `audio` object with the source duration, channels, sample rate, padded duration and SHA-256 of the normalized WAV — never the file name or path. Output remains `publishable: false`.
 
 Nothing is sent to OpenAI, Anthropic or any other service, and no voice is generated: you are responsible for having rights and consent for any voice you record. The optional real-encoder test (`RUN_LOCAL_RENDER_TESTS=1`) now also checks that a narrated MP4 contains 15 seconds of audio and that no temporary files remain. See [preview architecture and limitations](docs/preview.md).
+
+## Step 15: Creator — draft a Short Script from a Story Brief
+
+Until now every Short Script was written by hand. The Creator writes one from a
+**Story Brief**: a small JSON file with the topic, angle, sources and the only claims the
+video may state. GTA is the first profile; the same commands work for any subject.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack validate-brief examples/story-brief-gta.json
+.\.venv\Scripts\python.exe -m vicekrack draft-short examples/story-brief-cooking.json
+.\.venv\Scripts\python.exe -m vicekrack plan-short SCRIPT_FILE
+.\.venv\Scripts\python.exe -m vicekrack render-preview PLAN_FILE
+```
+
+Replace `SCRIPT_FILE` / `PLAN_FILE` with the returned paths. For the GTA brief, whose claims
+are intentionally unverified, use `plan-short SCRIPT_FILE --draft` and
+`render-preview PLAN_FILE --allow-draft-preview`; `draft-short` prints the right next command.
+On Linux/macOS use `.venv/bin/python`.
+
+The default `config/creator.json` uses an offline mock: no keys, no cost, and deliberately
+plain wording. To have a model write the script, set the key as in "Provider selection and
+live runs" above and add `--config config/creator.openai.json` or
+`--config config/creator.anthropic.json`. That makes one paid request with no retries.
+
+The Creator only writes beats, a title and a music mood. Sources and claims are copied
+unchanged from the brief, so it cannot add facts or mark anything verified. Timing comes
+from the format table. Brief disclosures and avoid lists are always applied. Output is
+checked by the existing Short Script validator and saved to ignored `runtime/scripts/`.
+Nothing is fetched, verified, generated as media, or published. See
+[Creator stage details](docs/creator.md).

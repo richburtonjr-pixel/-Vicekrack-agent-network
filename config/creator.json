@@ -1,0 +1,6 @@
+{
+  "config_version": "1.0",
+  "agent": "creator",
+  "definition": "agents/creator.md",
+  "execution": { "adapter": "mock", "model": null }
+}
