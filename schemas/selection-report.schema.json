@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack Selection Report",
+  "description": "Deterministic editorial ranking of verified stories, version 1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "selection_run_id", "profile", "editorial_profile_sha256", "policy_sha256",
+               "history_sha256", "evaluated_at", "audience_signals", "entries", "summary", "skipped"],
+  "properties": {
+    "contract": { "const": "selection_report" },
+    "version": { "const": "1.0" },
+    "selection_run_id": { "type": "string", "pattern": "^sel-[0-9a-f]{24}$" },
+    "profile": { "$ref": "#/$defs/identifier" },
+    "editorial_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "policy_sha256": { "$ref": "#/$defs/sha256" },
+    "history_sha256": { "$ref": "#/$defs/sha256" },
+    "evaluated_at": { "$ref": "#/$defs/timestamp" },
+    "audience_signals": { "$ref": "#/$defs/unavailable" },
+    "entries": {
+      "type": "array", "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "record_id", "candidate_id", "source_id", "title", "url", "published_at", "disposition",
+                     "score", "components", "audience_interest", "topics", "novelty", "verification", "reasons", "rationale"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1 },
+          "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+          "candidate_id": { "type": "string", "pattern": "^cand-[0-9a-f]{24}$" },
+          "source_id": { "$ref": "#/$defs/identifier" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
+          "published_at": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+          "disposition": { "enum": ["select", "hold", "reject"] },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "components": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["confidence", "authority", "corroboration", "recency", "relevance", "significance"],
+            "properties": {
+              "confidence": { "$ref": "#/$defs/unit" }, "authority": { "$ref": "#/$defs/unit" },
+              "corroboration": { "$ref": "#/$defs/unit" }, "recency": { "$ref": "#/$defs/unit" },
+              "relevance": { "$ref": "#/$defs/unit" }, "significance": { "$ref": "#/$defs/unit" }
+            }
+          },
+          "audience_interest": { "$ref": "#/$defs/unavailable" },
+          "topics": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/identifier" } },
+          "novelty": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "related_selection_id", "similarity"],
+            "properties": {
+              "status": { "enum": ["new", "update", "near_duplicate", "duplicate"] },
+              "related_selection_id": { "anyOf": [{ "type": "string", "pattern": "^pick-[0-9a-f]{24}$" }, { "type": "null" }] },
+              "similarity": { "$ref": "#/$defs/unit" }
+            }
+          },
+          "verification": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["verified", "corroborated", "disputed", "insufficient_evidence", "rejected",
+                         "verified_claim_ids", "primary_support", "independent_origins", "verified_at"],
+            "properties": {
+              "verified": { "type": "integer", "minimum": 0 }, "corroborated": { "type": "integer", "minimum": 0 },
+              "disputed": { "type": "integer", "minimum": 0 }, "insufficient_evidence": { "type": "integer", "minimum": 0 },
+              "rejected": { "type": "integer", "minimum": 0 },
+              "verified_claim_ids": { "type": "array", "maxItems": 3, "items": { "enum": ["k1", "k2", "k3"] } },
+              "primary_support": { "type": "integer", "minimum": 0 },
+              "independent_origins": { "type": "integer", "minimum": 0 },
+              "verified_at": { "$ref": "#/$defs/timestamp" }
+            }
+          },
+          "reasons": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/reason" } },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["select", "hold", "reject"],
+      "properties": {
+        "select": { "type": "integer", "minimum": 0 }, "hold": { "type": "integer", "minimum": 0 },
+        "reject": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["superseded_records", "invalid_records", "over_limit"],
+      "properties": {
+        "superseded_records": { "type": "integer", "minimum": 0 },
+        "invalid_records": { "type": "integer", "minimum": 0 },
+        "over_limit": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "unit": { "type": "number", "minimum": 0, "maximum": 1 },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "unavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "used_in_score"],
+      "properties": { "status": { "const": "unavailable" }, "used_in_score": { "const": false } }
+    },
+    "reason": {
+      "enum": [
+        "primary_verified", "independent_corroboration", "recent", "high_priority_topic", "new_story",
+        "update_to_previous", "no_verified_claims", "corroborated_only", "contradicted_claims", "disputed_claims",
+        "unconfirmed_rumor", "not_relevant", "stale", "not_recent", "publish_date_unknown", "future_date",
+        "instruction_like_text", "duplicate_of_previous", "near_duplicate_of_previous", "similar_to_higher_ranked",
+        "duplicate_in_batch", "below_select_score", "below_hold_score", "selection_limit"
+      ]
+    }
+  }
+}

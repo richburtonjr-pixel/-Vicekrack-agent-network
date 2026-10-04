@@ -95,6 +95,23 @@
           }
         }
       }
+    },
+    "editorial": {
+      "description": "Optional (Step 18). Why Story Selection chose this story. Requires the verification block.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_id", "selection_run_id", "record_id", "editorial_profile_sha256", "score", "topics", "novelty", "reasons"],
+      "properties": {
+        "selection_id": { "type": "string", "pattern": "^pick-[0-9a-f]{24}$" },
+        "selection_run_id": { "type": "string", "pattern": "^sel-[0-9a-f]{24}$" },
+        "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+        "editorial_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "topics": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/identifier" } },
+        "novelty": { "enum": ["new", "update"] },
+        "reasons": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
+                     "items": { "type": "string", "pattern": "^[a-z_]+$", "maxLength": 40 } }
+      }
     }
   },
   "$defs": {

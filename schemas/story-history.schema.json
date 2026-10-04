@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack story history",
+  "description": "Bounded memory of stories already turned into briefs, version 1.0. Holds fingerprints, not article text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "profile", "entries"],
+  "properties": {
+    "contract": { "const": "story_history" },
+    "version": { "const": "1.0" },
+    "profile": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+    "entries": {
+      "type": "array", "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["selection_id", "record_id", "candidate_id", "url_sha256", "brief_id", "topics",
+                     "claim_fingerprints", "story_tokens", "fact_tokens", "selected_at"],
+        "properties": {
+          "selection_id": { "type": "string", "pattern": "^pick-[0-9a-f]{24}$" },
+          "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+          "candidate_id": { "type": "string", "pattern": "^cand-[0-9a-f]{24}$" },
+          "url_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "brief_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 100 },
+          "topics": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 64 } },
+          "claim_fingerprints": { "type": "array", "maxItems": 3, "uniqueItems": true,
+                                  "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" } },
+          "story_tokens": { "type": "array", "maxItems": 80, "uniqueItems": true,
+                            "items": { "type": "string", "pattern": "^[a-z0-9]{1,40}$" } },
+          "fact_tokens": { "type": "array", "maxItems": 40, "uniqueItems": true,
+                           "items": { "type": "string", "pattern": "^[a-z0-9]{1,40}$" } },
+          "selected_at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+          }
+        }
+      }
+    }
+  }
+}

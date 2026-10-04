@@ -84,6 +84,14 @@ def validate_story_brief(brief, *, require_verified_claims=False):
 
     if "verification" in brief:
         _check_verification_links(brief)
+    if "editorial" in brief:
+        # Step 18: a selection can only describe a story whose claims went through Verification.
+        if "verification" not in brief:
+            _fail("editorial", "requires the verification block")
+        if brief["editorial"]["record_id"] not in brief["verification"]["record_ids"]:
+            _fail("editorial.record_id", "must be one of the verification records")
+        if not any(claim["status"] == "verified" for claim in brief["claims"]):
+            _fail("editorial", "a selected story needs at least one verified claim")
 
     if require_verified_claims:
         unverified = count_unverified(brief)

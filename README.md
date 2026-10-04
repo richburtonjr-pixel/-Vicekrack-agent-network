@@ -631,3 +631,36 @@ On Linux/macOS use `.venv/bin/python`. For GTA VI, run the live Scout first, the
   validator when present. Existing briefs are unaffected.
 
 See [Verification details](docs/verification.md).
+
+## Step 18: Story Selection — which verified stories are worth making
+
+The Story Selector ranks Verification Records and gives each story an explicit
+**`select`**, **`hold`** or **`reject`** disposition with reasons. It also remembers what
+was already made, so ViceKrack doesn't repeat itself.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout
+.\.venv\Scripts\python.exe -m vicekrack verify --all
+.\.venv\Scripts\python.exe -m vicekrack select-stories --all
+.\.venv\Scripts\python.exe -m vicekrack brief-from-selection SELECTION_RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack draft-short BRIEF_FILE
+```
+
+On Linux/macOS use `.venv/bin/python`. For GTA VI add
+`--policy config/verification.gta.json --profile config/editorial.gta.json`.
+
+- **Hard gates first.** No verified claim, a contradiction or dispute, an unconfirmed
+  rumor, irrelevance, staleness, a duplicate, or instruction-like text each block
+  selection. Excitement can never outweigh weak evidence.
+- **Then a 0–100 score** with fixed weights: confidence 35, authority 20,
+  corroboration 10, recency 15, relevance 10, significance (topic priority) 10.
+- **No popularity data.** None is available, so it is recorded as `unavailable` and never
+  invented.
+- **Story history** (bounded, fingerprints only) tells duplicates (reject),
+  near-duplicates (hold) and genuine updates (a new verified claim with new facts:
+  allowed) apart.
+- **Brief handoff.** `brief-from-selection` re-checks the story against the current
+  history, then builds the brief with the Step 17 builder (verified claims only). It adds
+  an optional `editorial` block with the reasons and records the story in history.
+
+See [Story Selection details](docs/selection.md).

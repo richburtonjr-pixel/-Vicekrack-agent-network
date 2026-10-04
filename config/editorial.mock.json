@@ -1,0 +1,20 @@
+{
+  "profile_version": "1.0",
+  "profile": "gta",
+  "description": "Offline editorial profile for the synthetic Scout fixtures. Same rules as the GTA VI profile.",
+  "relevance": {
+    "core_terms": ["gta vi", "gta 6", "gta6", "grand theft auto vi", "grand theft auto 6"],
+    "related_terms": ["vice city", "leonida"]
+  },
+  "topics": [
+    { "topic_id": "release_date", "priority": 5, "terms": ["release date", "release", "launch", "launches", "delay", "delayed"], "angle": "What has officially changed about the release timing." },
+    { "topic_id": "trailer_media", "priority": 4, "terms": ["trailer", "screenshot", "screenshots", "teaser"], "angle": "What the newest official media shows." },
+    { "topic_id": "map_world", "priority": 3, "terms": ["map", "vice city", "leonida", "world"], "angle": "What we know about the world and map." },
+    { "topic_id": "corporate", "priority": 2, "terms": ["marketing", "earnings", "analysts", "quarter"], "angle": "What the business update means." }
+  ],
+  "rumor_terms": ["rumor", "rumors", "leak", "leaks", "leaked", "insider", "insiders", "reportedly", "speculation"],
+  "weights": { "confidence": 35, "authority": 20, "corroboration": 10, "recency": 15, "relevance": 10, "significance": 10 },
+  "thresholds": { "select_min_score": 60, "hold_min_score": 30, "select_max_age_days": 7, "stale_after_days": 30, "max_selections_per_run": 3 },
+  "history": { "max_entries": 200, "window_days": 60, "duplicate_threshold": 0.9, "similar_threshold": 0.6 },
+  "limits": { "max_records": 200 }
+}

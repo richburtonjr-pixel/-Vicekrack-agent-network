@@ -368,3 +368,14 @@ every load) -> `build_verified_brief` (verified claims only, freshness and polic
 change to earlier contracts is that additive, optional Story Brief block (plus provenance
 provider `local`), validated when present. Scout, Creator, Short Script, planner,
 renderer, narration and providers are unchanged. See [Verification](verification.md).
+
+## Step 18: Story Selection
+
+Verification Records (replay-validated) + editorial profile + bounded story history ->
+`rank_stories` (hard gates, fixed-weight score, novelty classification, within-run
+deduplication, selection limit) -> Selection Report -> `select_brief` (re-scores against
+the current history, then reuses `build_verified_brief`) -> Story Brief with an optional
+`editorial` block (valid only alongside the verification block) -> existing Creator.
+History is written only at handoff, atomically and with a conflict check. Audience data is
+recorded as unavailable. Earlier stages are unchanged apart from that additive, optional
+Story Brief block. See [Story Selection](selection.md).
