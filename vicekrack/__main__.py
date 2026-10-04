@@ -45,6 +45,10 @@ def saved_command():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in {"validate-short-script", "plan-short"}:
+        from .scene_cli import main as scene_main
+        return scene_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"create-task", "validate-task"}:
         from .task_preparation import main as preparation_main
         return preparation_main()

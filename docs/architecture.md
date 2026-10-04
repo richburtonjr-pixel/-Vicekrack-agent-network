@@ -310,3 +310,17 @@ hard-link publication, preventing partial final files and overwrite races. Prepa
 returns metadata and file location, not source text. Execution remains a separate explicit
 operation with unchanged duplicate, locking, uncertain-retry and budget protections.
 Input validation does not reserve task IDs or certify provider credentials.
+
+## Step 12: offline scene planning
+
+Short Script JSON -> validate_short_script -> build_scene_plan -> validate_scene_plan
+-> explicit CLI publication in runtime/plans. The planner is a pure function; capabilities
+are configuration, not callable tools. Source beats and metadata are copied unchanged.
+Canonical input and content hashes provide deterministic traceability. Schema plus
+reconstruction checks bind method decisions and production flags to the source.
+
+scene_cli adds validate-short-script and plan-short without entering Orchestrator.run.
+Existing Researcher -> Analyst -> Reviewer dispatch, providers and saved workflows remain
+unchanged. Drafts are explicitly blocked; declared verified status is not independent
+fact-checking. Both local methods are planning placeholders until a later renderer exists.
+See docs/scene-plan.md for contract evolution, storage, commands and limitations.
