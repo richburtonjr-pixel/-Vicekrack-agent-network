@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"scout-sources", "scout", "scout-list"}:
+        from .scout_cli import main as scout_main
+        return scout_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"validate-brief", "draft-short"}:
         from .creator_cli import main as creator_main
         return creator_main()

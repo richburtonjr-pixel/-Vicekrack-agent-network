@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Fixture Games Press</title>
+  <id>https://press.example.org/</id>
+  <updated>2026-10-03T09:00:00Z</updated>
+  <entry>
+    <title>Fixture: Analysts discuss the Grand Theft Auto VI launch window</title>
+    <link rel="alternate" href="https://press.example.org/2026/10/gta-6-launch-window/"/>
+    <id>https://press.example.org/2026/10/gta-6-launch-window/</id>
+    <published>2026-10-03T08:15:00Z</published>
+    <updated>2026-10-03T09:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Fixture text: two analysts expect Grand Theft Auto VI marketing to increase this quarter.&lt;/p&gt;&lt;script&gt;alert('removed')&lt;/script&gt;&lt;p&gt;Neither analyst cites an official source.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>Fixture: Leonida map speculation roundup</title>
+    <link rel="alternate" href="https://press.example.org/2026/10/leonida-map"/>
+    <id>https://press.example.org/2026/10/leonida-map</id>
+    <summary>Fixture text: fans compare screenshots of Leonida. No publication date is provided.</summary>
+  </entry>
+  <entry>
+    <title>Fixture: Analysts discuss the Grand Theft Auto VI launch window</title>
+    <link rel="alternate" href="https://press.example.org/amp/2026/10/gta-6-launch-window/"/>
+    <id>https://press.example.org/amp/2026/10/gta-6-launch-window/</id>
+    <published>2026-10-03T08:20:00Z</published>
+    <summary>A syndicated copy with the same headline at a different URL.</summary>
+  </entry>
+</feed>

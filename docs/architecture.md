@@ -344,3 +344,16 @@ workflow, saved runs, registries, scene planner and renderer are unchanged. Both
 now share one private request method between `research` and `generate_structured`; research
 requests and error handling are unchanged. The Story Brief is the contract future
 Scout and Verification stages will produce. See [Creator stage](creator.md).
+
+## Step 16: Scout research intake
+
+Source list (explicit, schema-validated) -> fetcher (`FixtureFetcher` offline, or
+`HttpFetcher` only with `--live`) -> DTD-free RSS/Atom parsing -> link/host/keyword
+filters -> deduplication by cleaned-URL ID and per-source headline fingerprint -> Story
+Candidates (contract fixes `unverified`) -> atomic files in `runtime/scout`. `scout_cli`
+adds `scout-sources`, `scout`, `scout-list` without entering `Orchestrator.run`.
+
+Candidates are deliberately a different contract from Story Briefs. Discovery,
+verification and creation stay separate: the planned Verification stage will read
+candidates and produce Story Briefs whose claims it marks verified. No existing module
+changes except CLI routing. See [Scout](scout.md).

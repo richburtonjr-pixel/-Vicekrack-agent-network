@@ -562,3 +562,38 @@ from the format table. Brief disclosures and avoid lists are always applied. Out
 checked by the existing Short Script validator and saved to ignored `runtime/scripts/`.
 Nothing is fetched, verified, generated as media, or published. See
 [Creator stage details](docs/creator.md).
+
+## Step 16: Scout — research intake from approved sources
+
+The Scout collects *possible* stories from an explicit, reviewable list of feeds and saves
+them as **Story Candidates** with full provenance. Every candidate is `unverified`, and
+candidates are not Story Briefs, so nothing found online can reach the Creator without the
+future Verification stage.
+
+Offline (default; synthetic fixtures, no network or keys):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout-sources
+.\.venv\Scripts\python.exe -m vicekrack scout
+.\.venv\Scripts\python.exe -m vicekrack scout-list
+```
+
+GTA VI profile, live (explicit opt-in; no API keys needed):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout-sources --sources config/scout-sources.gta.json
+.\.venv\Scripts\python.exe -m vicekrack scout --sources config/scout-sources.gta.json --live
+```
+
+On Linux/macOS use `.venv/bin/python`. Without `--live`, the GTA list is refused with
+`live_fetch_not_enabled` and no request is made. The live list reads Take-Two's
+news-release RSS, GameSpot and IGN. Rockstar Newswire is listed but disabled until a real
+feed is confirmed.
+
+Each run reads each enabled feed once: https only, no redirects or retries, with byte,
+item, time and candidate caps. It keeps items whose link is on the source's approved
+hosts and that mention a GTA VI keyword. It skips stories already collected (same cleaned
+URL, or same headline from the same source). A broken source is reported by error code
+and the run continues. Candidates and run reports go to ignored `runtime/scout/`; run
+output shows counts only. There is no scheduling, crawling, model call, verification or
+publishing. See [Scout details](docs/scout.md).
