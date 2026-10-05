@@ -781,3 +781,36 @@ Optional flags:
 
 See [Production pipeline](docs/production.md) for all codes, the paid-request example
 and limitations.
+
+## Step 22: production quality report
+
+Check a finished production run and save a structured report:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack production-list
+.\.venv\Scripts\python.exe -m vicekrack quality-report PRODUCTION_ID
+.\.venv\Scripts\python.exe -m vicekrack quality-list
+```
+
+On Linux/macOS use `.venv/bin/python`. The result is `pass`, `needs_review` or `fail`,
+with specific reason codes per check (exit code 0 only for `pass`). Ten read-only checks:
+1. state and stage completion
+2. artifact existence, hashes and validators
+3. claim and source provenance against the verification record
+4. evidence freshness
+5. draft restrictions and watermark colour
+6. scene timing
+7. measured video (1080×1920, 24 fps, 15 s, 360 frames)
+8. audio (only with narration, 15 s, matching the narration file)
+9. manifest vs. actual media
+10. story history
+
+- **Can't verify means review.** Checks that cannot run, such as without the rendering
+  dependencies, are reported as `unavailable` and prevent a `pass`.
+- **Technical only.** A pass is never a fact check, rights clearance or permission to
+  publish. Every report says so, and previews stay `publishable: false`.
+- **Storage.** Reports go to ignored `runtime/quality/`, with IDs, codes and measurements
+  only.
+- **Read-only.** Nothing is repaired, retried or published.
+
+See [Quality report](docs/quality.md).
