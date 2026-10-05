@@ -1,0 +1,23 @@
+{
+  "config_version": "1.0",
+  "mode": "paper",
+  "description": "Paper-only limits for the offline Step 23 demo. Synthetic symbols only; no broker.",
+  "account_currency": "USD",
+  "allowed_symbols": ["SYNTH1", "SYNTH2"],
+  "allowed_order_types": ["market", "limit"],
+  "allow_short": false,
+  "limits": {
+    "max_order_notional": "1000.00",
+    "max_position_notional": "2000.00",
+    "max_position_fraction": "0.10",
+    "max_daily_loss": "200.00",
+    "max_orders_per_day": 5,
+    "max_quantity": "100",
+    "max_snapshot_age_seconds": 300,
+    "max_signal_lifetime_seconds": 3600
+  },
+  "kill_switch": {
+    "engaged": false,
+    "note": "Set to true, or run trading-kill-switch engage, to block every order intent."
+  }
+}

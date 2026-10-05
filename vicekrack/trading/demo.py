@@ -1,0 +1,166 @@
+"""Bounded offline paper-trading demo.
+
+Loads one clearly labelled synthetic scenario from examples/trading/, validates the
+synthetic market snapshot, passes each synthetic signal (at most three) through the
+deterministic risk engine and records an allowed or blocked paper order intent in the
+local journal. No network, no feeds, no broker, no loops: one pass and it stops.
+Decisions use the scenario's simulated clock (`as_of`); journal timestamps use the real clock.
+"""
+
+import json
+from datetime import datetime, timezone
+
+from . import PAPER_ONLY_NOTICE
+from .config import kill_switch_state, load_config
+from .contracts import ROOT, parse_time, reject_trading_secrets, validate_portfolio, validate_signal, validate_snapshot
+from .errors import TradingError
+from .journal import TradingJournal
+from .orders import build_intent
+from .risk import evaluate
+
+SCENARIOS = ("allowed", "exposure-breach", "daily-loss", "stale-data", "invalid-money", "duplicate-signal")
+SCENARIO_KEYS = {"fixture", "version", "scenario", "description", "synthetic", "as_of", "orders_today",
+                 "snapshot", "signals", "portfolio"}
+MAX_SIGNALS = 3
+
+
+def utc_now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def load_scenario(name):
+    if name not in SCENARIOS:
+        raise TradingError("unknown_scenario", "Unknown trading demo scenario.")
+    try:
+        scenario = json.loads((ROOT / "examples/trading" / f"scenario-{name}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError):
+        raise TradingError("invalid_scenario", "Cannot read the synthetic scenario fixture.") from None
+    if (not isinstance(scenario, dict) or set(scenario) != SCENARIO_KEYS
+            or scenario["fixture"] != "synthetic_trading_scenario" or scenario["version"] != "1.0"
+            or scenario["synthetic"] is not True or scenario["scenario"] != name
+            or not isinstance(scenario["signals"], list) or not 1 <= len(scenario["signals"]) <= MAX_SIGNALS
+            or not isinstance(scenario["orders_today"], int) or isinstance(scenario["orders_today"], bool)
+            or not 0 <= scenario["orders_today"] <= 1000 or not isinstance(scenario["as_of"], str)):
+        raise TradingError("invalid_scenario", "The synthetic scenario fixture has an invalid structure.")
+    reject_trading_secrets(scenario)
+    return scenario
+
+
+def _try(validator, document, *args):
+    try:
+        validator(document, *args)
+        return None
+    except TradingError as error:
+        if error.code == "sensitive_state":
+            raise
+        return error.code
+
+
+def run_demo(name, *, root=None, config_path="config/trading.paper.json", clock=utc_now):
+    root = root if root is not None else ROOT
+    scenario = load_scenario(name)
+    as_of = scenario["as_of"]
+    try:
+        parse_time(as_of)
+    except ValueError:
+        raise TradingError("invalid_scenario", "The scenario clock is not a UTC timestamp.") from None
+
+    config_problem = None
+    try:
+        config, config_sha = load_config(config_path)
+    except TradingError as error:
+        if error.code == "sensitive_state":
+            raise
+        config, config_sha, config_problem = None, None, error.code
+    switch = kill_switch_state(config, root)
+
+    journal = TradingJournal(root)
+    run_id = journal.start_run()
+    started = journal.append(run_id, stage="run_started", status="started", agent="trading_demo", recorded_at=clock(),
+                             subject={"scenario": name},
+                             observed={"simulated_as_of": as_of, "kill_switch_engaged": switch[0],
+                                       "kill_switch_source": switch[1], "config_valid": config is not None,
+                                       "signals": len(scenario["signals"])},
+                             reason_codes=[config_problem] if config_problem else [])
+
+    snapshot = scenario["snapshot"]
+    snapshot_problem = _try(validate_snapshot, snapshot)
+    snap_event = journal.append(
+        run_id, stage="market_snapshot", status="rejected" if snapshot_problem else "accepted", agent="demo_market_data",
+        recorded_at=clock(), causation_id=started["event_id"],
+        subject=_subject(snapshot, "symbol", "snapshot_id"),
+        observed={} if snapshot_problem else {"last": snapshot["price"]["last"], "bid": snapshot["price"]["bid"],
+                                              "ask": snapshot["price"]["ask"], "observed_at": snapshot["observed_at"],
+                                              "source_kind": snapshot["source"]["kind"]},
+        reason_codes=[snapshot_problem] if snapshot_problem else [], document=None if snapshot_problem else snapshot)
+    if snapshot_problem:
+        snapshot = None
+
+    portfolio = scenario["portfolio"]
+    portfolio_problem = _try(validate_portfolio, portfolio)
+    if portfolio_problem:
+        portfolio = None
+
+    orders_today, used, intents = scenario["orders_today"], [], []
+    for signal in scenario["signals"]:
+        signal_problem = _try(validate_signal, signal, [snapshot] if snapshot is not None else [])
+        sig_event = journal.append(
+            run_id, stage="signal", status="rejected" if signal_problem else "accepted", agent="demo_strategy",
+            recorded_at=clock(), causation_id=snap_event["event_id"], subject=_subject(signal, "symbol", "signal_id"),
+            observed={} if signal_problem else {"strategy": signal["strategy"]["strategy_id"], "side": signal["proposal"]["side"],
+                                                "quantity": signal["proposal"]["quantity"],
+                                                "order_type": signal["proposal"]["order_type"],
+                                                "expires_at": signal["expires_at"],
+                                                "observations_checked": snapshot is not None,
+                                                "rationale": signal["rationale"]["summary"][:200]},
+            reason_codes=[signal_problem] if signal_problem else list(signal["rationale"]["codes"]),
+            document=None if signal_problem else signal)
+        valid_signal = None if signal_problem else signal
+        problems = [p for p in (config_problem, snapshot_problem, portfolio_problem, signal_problem) if p]
+        decision = evaluate(config=config, config_sha256=config_sha, snapshot=snapshot, signal=valid_signal,
+                            portfolio=portfolio, as_of=as_of, kill_switch=switch, orders_today=orders_today,
+                            used_signal_ids=used, input_problems=problems)
+        risk_event = journal.append(
+            run_id, stage="risk_check", status=decision["outcome"], agent="risk_engine", recorded_at=clock(),
+            causation_id=sig_event["event_id"],
+            subject={k: v for k, v in (("signal_id", decision["signal_id"]), ("snapshot_id", decision["snapshot_id"]),
+                                       ("decision_id", decision["decision_id"])) if v},
+            observed={"checks_failed": sum(c["status"] == "fail" for c in decision["checks"]),
+                      "checks_passed": sum(c["status"] == "pass" for c in decision["checks"]),
+                      "checks_skipped": sum(c["status"] == "skipped" for c in decision["checks"])},
+            reason_codes=decision["reason_codes"], document=decision)
+        if valid_signal is None:
+            intents.append({"intent_id": None, "status": "not_created", "signal_valid": False,
+                            "reason_codes": decision["reason_codes"]})
+            continue
+        intent = build_intent(valid_signal, decision, snapshot, as_of)
+        journal.append(
+            run_id, stage="order_intent", status="recorded" if intent["status"] == "authorized_paper" else "blocked",
+            agent="paper_order_desk", recorded_at=clock(), causation_id=risk_event["event_id"],
+            subject={"symbol": intent["symbol"], "signal_id": intent["signal_id"], "decision_id": intent["decision_id"],
+                     "intent_id": intent["intent_id"]},
+            observed={"intent_status": intent["status"], "notional": intent["notional"], "submitted": False, "executed": False},
+            reason_codes=decision["reason_codes"], document=intent)
+        if intent["status"] == "authorized_paper":
+            orders_today += 1
+            used.append(valid_signal["signal_id"])
+        intents.append({"intent_id": intent["intent_id"], "status": intent["status"], "symbol": intent["symbol"],
+                        "side": intent["side"], "quantity": intent["quantity"], "notional": intent["notional"],
+                        "reason_codes": decision["reason_codes"], "submitted": False, "executed": False})
+
+    authorized = sum(i["status"] == "authorized_paper" for i in intents)
+    journal.append(run_id, stage="run_finished", status="completed", agent="trading_demo", recorded_at=clock(),
+                   causation_id=started["event_id"], subject={"scenario": name},
+                   observed={"authorized_paper": authorized, "blocked": len(intents) - authorized, "executed": False})
+    return {
+        "notice": PAPER_ONLY_NOTICE, "scenario": name, "description": scenario["description"], "synthetic": True,
+        "simulated_as_of": as_of, "run_id": run_id, "kill_switch_engaged": switch[0], "intents": intents,
+        "submitted": False, "executed": False,
+        "journal": f"runtime/trading/journal/{run_id}",
+    }
+
+
+def _subject(document, *keys):
+    if not isinstance(document, dict):
+        return {}
+    return {k: document[k] for k in keys if isinstance(document.get(k), str) and len(document[k]) <= 80}

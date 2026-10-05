@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack trading signal",
+  "description": "A strategy's proposal with its supporting observations, version 1.0. Not an order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "signal_id",
+    "strategy",
+    "symbol",
+    "created_at",
+    "expires_at",
+    "observations",
+    "rationale",
+    "proposal",
+    "synthetic"
+  ],
+  "properties": {
+    "contract": {
+      "const": "trading_signal"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^sig-[a-z0-9-]{4,64}$"
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy_id",
+        "version"
+      ],
+      "properties": {
+        "strategy_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "symbol": {
+      "$ref": "#/$defs/symbol"
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "expires_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "snapshot_id",
+          "field",
+          "value"
+        ],
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "pattern": "^snap-[a-z0-9-]{4,64}$"
+          },
+          "field": {
+            "enum": [
+              "last",
+              "bid",
+              "ask",
+              "volume"
+            ]
+          },
+          "value": {
+            "$ref": "#/$defs/decimal"
+          }
+        }
+      }
+    },
+    "rationale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codes",
+        "summary"
+      ],
+      "properties": {
+        "codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "side",
+        "quantity",
+        "order_type",
+        "limit_price"
+      ],
+      "properties": {
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "quantity": {
+          "$ref": "#/$defs/decimal"
+        },
+        "order_type": {
+          "enum": [
+            "market",
+            "limit"
+          ]
+        },
+        "limit_price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "synthetic": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

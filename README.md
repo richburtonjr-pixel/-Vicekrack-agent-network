@@ -814,3 +814,41 @@ with specific reason codes per check (exit code 0 only for `pass`). Ten read-onl
 - **Read-only.** Nothing is repaired, retried or published.
 
 See [Quality report](docs/quality.md).
+
+## Step 23: trading subsystem foundation (paper only)
+
+A separate subsystem in `vicekrack/trading/`. It is **simulated only**: no market feeds,
+no broker, no live orders and no execution. Run the bounded offline demo with labelled
+synthetic data:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack trading-config-check
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario allowed
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario exposure-breach
+.\.venv\Scripts\python.exe -m vicekrack trading-journal
+.\.venv\Scripts\python.exe -m vicekrack trading-journal RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack trading-kill-switch engage
+.\.venv\Scripts\python.exe -m vicekrack trading-kill-switch release
+```
+
+On Linux/macOS use `.venv/bin/python`. The other scenarios are `daily-loss`,
+`stale-data`, `invalid-money` and `duplicate-signal`.
+
+- **Contracts:** versioned 1.0 JSON contracts in `schemas/trading/` cover market
+  snapshots, signals, paper portfolio, risk decisions, paper order intents and journal
+  events.
+- **Exact money:** prices and money are decimal strings. Floats, exponents and excess
+  precision are rejected.
+- **Paper config:** `config/trading.paper.json` sets order, position, exposure-fraction,
+  daily-loss, orders-per-day, quantity and freshness limits, plus a kill switch.
+- **Fail-safe blocking:** missing or invalid inputs, an invalid config, or an unreadable
+  kill-switch file block authorization.
+- **Journal:** ignored `runtime/trading/journal/` is append-only with atomic writes,
+  duplicate-ID rejection, credential rejection and sanitized errors. Every event records
+  which agent acted, what it saw and why the risk checks allowed or blocked it.
+- **Output label:** every result says `SIMULATED`, with `submitted: false` and
+  `executed: false`.
+
+Limitations: synthetic fixtures only, there is no persistent paper ledger, and there is
+no dashboard. See [Trading](docs/trading.md) and
+[Subsystem boundaries](docs/subsystems.md).

@@ -308,10 +308,11 @@ def _write_reservation(profile, production_id, entry, root, now):
 class Pipeline:
     """Executes/resumes one production. Injection points exist only for tests."""
 
-    def __init__(self, root=None, clock=utc_now, drafter=None, renderer=None, providers=None):
+    def __init__(self, root=None, clock=None, drafter=None, renderer=None, providers=None):
         self.root = root
         self.store = ProductionStore(root)
-        self.clock = clock
+        # Late-bound default so the module clock can be patched (keeps CLI tests date-independent).
+        self.clock = clock if clock is not None else (lambda: utc_now())
         self.drafter = drafter
         self.providers = providers
         if renderer is None:

@@ -1,0 +1,85 @@
+{
+  "fixture": "synthetic_trading_scenario",
+  "version": "1.0",
+  "scenario": "stale-data",
+  "description": "SYNTHETIC FIXTURE - the synthetic snapshot is 20 minutes old (limit 5 minutes); expect blocked.",
+  "synthetic": true,
+  "as_of": "2026-01-15T15:00:00Z",
+  "orders_today": 0,
+  "snapshot": {
+    "contract": "market_snapshot",
+    "version": "1.0",
+    "snapshot_id": "snap-synth1-0001",
+    "symbol": "SYNTH1",
+    "observed_at": "2026-01-15T14:40:00Z",
+    "currency": "USD",
+    "price": {
+      "last": "50.00",
+      "bid": "49.98",
+      "ask": "50.02"
+    },
+    "volume": "120000",
+    "source": {
+      "name": "vicekrack_synthetic_fixture",
+      "kind": "synthetic_fixture"
+    },
+    "freshness": {
+      "max_age_seconds": 300
+    },
+    "synthetic": true
+  },
+  "signals": [
+    {
+      "contract": "trading_signal",
+      "version": "1.0",
+      "signal_id": "sig-synth1-demo-0001",
+      "strategy": {
+        "strategy_id": "synthetic_demo_rule",
+        "version": "1.0"
+      },
+      "symbol": "SYNTH1",
+      "created_at": "2026-01-15T14:59:30Z",
+      "expires_at": "2026-01-15T15:29:30Z",
+      "observations": [
+        {
+          "snapshot_id": "snap-synth1-0001",
+          "field": "last",
+          "value": "50.00"
+        },
+        {
+          "snapshot_id": "snap-synth1-0001",
+          "field": "volume",
+          "value": "120000"
+        }
+      ],
+      "rationale": {
+        "codes": [
+          "synthetic_fixture",
+          "demo_only"
+        ],
+        "summary": "SYNTHETIC FIXTURE: hard-coded demo signal. Not a market view, indicator or recommendation."
+      },
+      "proposal": {
+        "side": "buy",
+        "quantity": "10",
+        "order_type": "market",
+        "limit_price": null
+      },
+      "synthetic": true
+    }
+  ],
+  "portfolio": {
+    "contract": "paper_portfolio_state",
+    "version": "1.0",
+    "portfolio_id": "port-synthetic-demo",
+    "as_of": "2026-01-15T14:58:00Z",
+    "currency": "USD",
+    "equity": "25000.00",
+    "positions": [],
+    "day": {
+      "trading_date": "2026-01-15",
+      "pnl": "-50.00"
+    },
+    "synthetic": true
+  }
+}
