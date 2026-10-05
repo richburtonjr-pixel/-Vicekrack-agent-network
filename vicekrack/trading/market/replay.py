@@ -148,13 +148,14 @@ def plan(dataset, start=None, end=None, step_seconds=None, max_steps=5000):
     return start_at, end_at, step, steps
 
 
-def run_replay(dataset, *, config, created_at, start=None, end=None, step_seconds=None, consumers=None):
+def drive(dataset, instances, *, config, start=None, end=None, step_seconds=None, passthrough=()):
+    """Core bounded replay loop shared by run_replay and other observers (Step 26 indicators).
+
+    Each instance gets on_step(view) with only closed bars. Consumer errors are sanitized to
+    replay_consumer_failed unless their code is in `passthrough` (or is a future-bar leak).
+    Returns (simulation, summary, step_records)."""
     replay_config = config["replay"]
     start_at, end_at, step, steps = plan(dataset, start, end, step_seconds, replay_config["max_steps"])
-    names = list(consumers or CONSUMERS)
-    if not names or len(names) > 10 or len(set(names)) != len(names) or any(n not in CONSUMERS for n in names):
-        raise TradingError("unknown_consumer", "Replay consumers: bar_recorder, future_probe.")
-    instances = [CONSUMERS[n]() for n in names]
     bars = tuple(_freeze(expand_bar(dataset, i)) for i in range(dataset["bar_count"]))
     window_size = replay_config["max_window_bars"]
 
@@ -170,7 +171,7 @@ def run_replay(dataset, *, config, created_at, start=None, end=None, step_second
             try:
                 consumer.on_step(view)
             except TradingError as error:
-                if error.code == "future_bar_leak":
+                if error.code == "future_bar_leak" or error.code in passthrough:
                     raise
                 raise TradingError("replay_consumer_failed", "A replay consumer failed.") from None
             except Exception:
@@ -186,9 +187,20 @@ def run_replay(dataset, *, config, created_at, start=None, end=None, step_second
 
     simulation = {"start_utc": utc_text(start_at), "end_utc": utc_text(end_at), "step_seconds": step, "steps": steps,
                   "clock": "simulation"}
-    finals = [{"name": c.name, "final": c.final()} for c in instances]
     summary = {"bars_delivered": delivered, "steps_without_new_bar": quiet, "future_access_attempts": denied,
                "max_visible_bars": max_visible}
+    return simulation, summary, records
+
+
+def run_replay(dataset, *, config, created_at, start=None, end=None, step_seconds=None, consumers=None):
+    names = list(consumers or CONSUMERS)
+    if not names or len(names) > 10 or len(set(names)) != len(names) or any(n not in CONSUMERS for n in names):
+        raise TradingError("unknown_consumer", "Replay consumers: bar_recorder, future_probe.")
+    instances = [CONSUMERS[n]() for n in names]
+    simulation, summary, records = drive(dataset, instances, config=config, start=start, end=end,
+                                         step_seconds=step_seconds)
+    steps = simulation["steps"]
+    finals = [{"name": c.name, "final": c.final()} for c in instances]
     results = {"dataset_bars_sha256": dataset["bars_sha256"], "simulation": simulation, "consumers": finals,
                "summary": summary, "steps": records}
     replay_id = "rpl-" + sha256({"dataset_id": dataset["dataset_id"], "bars": dataset["bars_sha256"],

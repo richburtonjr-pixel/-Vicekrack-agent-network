@@ -555,3 +555,36 @@ flowchart LR
 (a test enforces this). `market_snapshot` still accepts only `synthetic_fixture` sources,
 so imported or replayed data can't reach paper-account authorization. See
 [Market data](market-data.md).
+
+## Step 26: offline technical indicators
+
+`vicekrack/trading/indicators/` adds descriptive indicators on top of Step 25's replay:
+
+```mermaid
+flowchart LR
+    D[(market_dataset)] --> R[market.replay.drive: SimulationClock + ReplayView of closed bars]
+    R --> C[IndicatorConsumer: new bars in sequence order, gap detection]
+    C --> F[formulas: EMA, WilderRSI, VolumeSMA, SessionVWAP - Decimal 50 digits, half-even]
+    C --> O[indicator_result 1.0]
+    O --> S[(runtime/trading/indicators: atomic, no overwrite)]
+    C -. no import .- X[PaperAccount / risk / orders / journal]
+```
+
+- `formulas.py`: pure calculators with `reset()` and `update()`. They return a value or
+  None plus reason codes, with no I/O and no clock.
+- `engine.py`: `build_settings` validates periods, duplicates, the gap policy and the VWAP
+  session. `IndicatorConsumer` is a replay consumer that processes only newly closed bars
+  and stops with `indicator_window_too_small` rather than skip any. `calculate` builds and
+  validates the result. Every point records `computed_at_sim_utc`, which is never before
+  its bar's close.
+- `store.py`: `IndicatorStore` saves with temp file + fsync + exclusive link and
+  re-validates the hashes on read. `load_indicator_config` reads
+  `config/indicators.json`.
+- `cli.py`: `indicator-calc`, `indicator-inspect` and `indicator-list`.
+- `market/replay.py`: the replay loop moved into `drive()`, which `run_replay` and the
+  indicators share. `run_replay` output is unchanged and the Step 25 tests pass
+  unmodified.
+
+**Boundary:** the indicator package never imports account, risk, order, journal or signal
+code (a test enforces this). Results always say `account_access: false` and
+`authorization_possible: false`. See [Indicators](indicators.md).

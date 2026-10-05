@@ -107,8 +107,9 @@ different label or a renamed copy. The same replay twice fails with `replay_exis
   `max_window_bars`. Future bars are not in the view at all.
 - **Asking for the future:** `view.bar(n)` for a later bar raises `future_bar_access`.
   The `future_probe` consumer tries this every step and reports `refused` and `leaked: 0`.
-- **No decisions:** the `bar_recorder` consumer only records what it saw. Nothing
-  calculates indicators, makes signals or places orders.
+- **No decisions:** the `bar_recorder` consumer only records what it saw. The built-in
+  replay consumers don't calculate indicators (Step 26's `indicator-calc` does that
+  separately), and nothing makes signals or places orders.
 - **Repeatable:** the same dataset and window always give the same `replay_id` and
   `results_sha256`.
 
@@ -129,5 +130,6 @@ Historical replay can't bypass freshness checks or change an account:
   splits, dividends or currency conversion, and only one symbol per dataset.
 - **Labels are not checked:** they are the importer's declaration and are never
   verified. Licensing and authenticity are the user's responsibility.
-- **Observation only:** replay consumers only observe. There are no indicators, signals,
-  fills or account updates.
+- **Observation only:** replay consumers only observe. Step 26 adds descriptive
+  indicators on top ([Indicators](indicators.md)); there are still no signals, fills or
+  account updates.

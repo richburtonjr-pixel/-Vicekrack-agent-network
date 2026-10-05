@@ -971,3 +971,44 @@ delivers 12 bars, and `future_probe` shows `refused: 14, leaked: 0`.
   old data can't bypass freshness checks.
 
 See [Market data](docs/market-data.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 26: offline technical indicators (descriptive only)
+
+Calculate EMA, Wilder RSI, rolling volume averages and session VWAP from a stored
+dataset. The calculation is a bounded replay that only ever sees **closed** bars. The
+results are descriptive values, **not signals**: no orders, no paper-account access.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack indicator-calc DATASET_ID --ema 3 --rsi 3 --volume-sma 2 --vwap --save
+.\.venv\Scripts\python.exe -m vicekrack indicator-list
+.\.venv\Scripts\python.exe -m vicekrack indicator-inspect RESULT_ID --key rsi_3 --points 12
+```
+
+On Linux/macOS use `.venv/bin/python`. With `synth1-5m`, the deliberately missing 10:00
+bar is a gap. Under the default `--gap-policy reset`, EMA, RSI and the volume average
+restart warm-up after it, and VWAP shows `session_gap` for the rest of that session.
+
+- **Formulas:**
+  - EMA is seeded with a simple average, then uses a = 2/(n+1).
+  - Wilder RSI uses simple first averages, then (prev·(n−1)+x)/n.
+  - The volume average is a simple mean.
+  - VWAP is Σ(tp·volume)/Σ(volume), with tp = (high+low+close)/3, an approximation.
+
+  All of them use exact decimals and are rounded half-even to 8 places.
+- **Never zero by default:**
+  - warm-up values are `unavailable` (`warming_up`);
+  - RSI with flat prices is `unavailable` (`flat_prices`); RSI with no losses is `100`
+    (`no_losses`);
+  - VWAP with zero volume is `unavailable` (`zero_volume`).
+- **Sessions:** VWAP sessions are an explicit timezone and clock window (default
+  America/New_York 09:30–16:00) that reset each local date. **There is no exchange
+  calendar.**
+- **Gaps:** `reset` (the default) restarts warm-up; `continue` keeps going and flags
+  values `gap_ignored`. Overnight breaks count as gaps.
+- **Results:** `indicator_result` 1.0 includes settings, dataset provenance, per-bar
+  timestamps, readiness and reason codes. Results are deterministic and saved atomically
+  to ignored `runtime/trading/indicators/`.
+
+See [Indicators](docs/indicators.md) and the [Roadmap](docs/roadmap.md).

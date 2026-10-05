@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data and replay | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay and descriptive indicators | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -38,7 +38,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 22 | Content | Production quality report (pass / needs_review / fail) | #22 |
 | 23 | Trading | Paper-only trading foundation: contracts, exact decimals, config limits, kill switch, risk engine, journal, synthetic demo | #23 |
 | 24 | Trading | Persistent paper risk state: processed signals, authorized intents, daily counters, pending exposure reservations, one locked operation, crash recovery, cancellation, roadmap | #24 |
-| 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | this PR |
+| 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | #25 |
+| 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | this PR |
 
 ## Deferred work
 
@@ -54,12 +55,29 @@ built. A future content step would:
   publishing**: previews stay `publishable: false` until a human approves them, and
   approval is still not a rights clearance.
 
+Other content work that is deferred and not scheduled:
+- Voice generation beyond Step 14's optional local narration file, and music or sound
+  effects.
+- Sourced or generated media for scenes, beyond the local silent previews. This needs
+  rights tracking per asset.
+- A Publisher (platform upload) and an Analyst (performance metrics). Both need explicit
+  consent, credentials handled through environment variables, and the human review step
+  above first.
+- More content profiles beyond GTA VI, using the same subject-neutral contracts.
+
+The content track has had no new steps since Step 22, while Steps 23–26 built the trading
+foundation. Nothing in the trading track changed content behaviour; all content tests
+still pass.
+
 ### Trading: not started, and out of scope until explicitly requested
 
 - Live, delayed or vendor market-data feeds. Step 25 has only offline synthetic and local
   CSV adapters.
 - Market calendars, corporate actions and multi-symbol datasets.
-- Indicators.
+- More indicators, price sources (for example open or typical price for EMA) and adjusted
+  data. Step 26 has EMA, Wilder RSI, the volume average and session VWAP only.
+- Signals or strategies built on indicators, and any connection from indicators to the
+  risk engine or paper accounts.
 - Connecting replayed or imported data to paper authorization. This would need a
   separate, freshness-safe design.
 - Strategy or AI-generated signals.
