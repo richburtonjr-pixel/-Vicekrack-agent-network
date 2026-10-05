@@ -664,3 +664,28 @@ On Linux/macOS use `.venv/bin/python`. For GTA VI add
   an optional `editorial` block with the reasons and records the story in history.
 
 See [Story Selection details](docs/selection.md).
+
+## Step 19: official updates supersede older official statements
+
+When the same official source (for example Rockstar Games) publishes a newer first-hand
+statement that changes a fact, such as a release date, the newer statement now
+**supersedes** the older one instead of leaving both claims disputed.
+
+- **The new value becomes `verified`.** The old value stays `disputed`.
+- **Nothing is lost.** Both statements are kept with their sources and dates, and the old
+  one is marked `superseded_by` with the reason.
+- **Strict conditions.** It only happens with:
+  - the same official source
+  - first-hand statements
+  - the same fact with clearly different values
+  - real publication dates at least 1 hour apart (never the collection time)
+- **Otherwise unchanged.** Missing, equal or close dates, different official sources,
+  press reports quoting officials, and unrelated statements all keep the existing
+  disputed/hold behavior.
+- **Selection.** A newly verified official change counts as an **update**, even if an
+  older version of the story was already made. Duplicates and all other gates still apply.
+
+Verification Records are now version 1.1; older 1.0 records stay valid. Re-run
+`verify` to apply the new rules. No new commands. See
+[Verification](docs/verification.md#step-19-dated-official-supersession) and
+[Story Selection](docs/selection.md#step-19-official-updates).

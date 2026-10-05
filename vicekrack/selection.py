@@ -56,6 +56,7 @@ PHRASES = {
     "high_priority_topic": "high-priority topic",
     "new_story": "materially new",
     "update_to_previous": "a genuine update with new verified facts",
+    "supersedes_older_official": "a newer official statement replaces an older conflicting one",
     "no_verified_claims": "no verified claims",
     "corroborated_only": "only corroborated, not officially verified; needs more evidence",
     "contradicted_claims": "some claims are contradicted",
@@ -221,12 +222,15 @@ def classify_novelty(record, features, history, profile, now):
         same_story = (entry["candidate_id"] == record["candidate"]["candidate_id"]
                       or entry["url_sha256"] == record["candidate"]["url_sha256"])
         new_claims = set(features["claim_fingerprints"]) - set(entry["claim_fingerprints"])
+        new_facts = set(features["fact_tokens"]) - set(entry["fact_tokens"])
+        # Step 19: a new verified claim carrying new dates/numbers is a genuine update even when
+        # the wording is almost identical (e.g. an official release-date change).
+        genuine_update = bool(new_claims and new_facts)
         if (same_story and not new_claims) or (features["claim_fingerprints"] and not new_claims) \
-                or similarity >= rules["duplicate_threshold"]:
+                or (similarity >= rules["duplicate_threshold"] and not genuine_update):
             return "duplicate", entry["selection_id"], max(similarity, 1.0 if same_story else similarity)
         if same_story or similarity >= rules["similar_threshold"]:
-            new_facts = set(features["fact_tokens"]) - set(entry["fact_tokens"])
-            status = "update" if new_claims and new_facts else "near_duplicate"
+            status = "update" if genuine_update else "near_duplicate"
             rank = {"near_duplicate": 2, "update": 1, "new": 0}
             if (rank[status], similarity) > (rank[best[0]], best[2]):
                 best = (status, entry["selection_id"], similarity)
@@ -306,6 +310,8 @@ def evaluate_story(record, profile, history, now):
         reasons.append("recent")
     if priority >= 4:
         reasons.append("high_priority_topic")
+    if any("older_official_contradiction_superseded" in c["rationale_codes"] for c in verified):
+        reasons.append("supersedes_older_official")
     if novelty == "update":
         reasons.append("update_to_previous")
     elif novelty == "new":

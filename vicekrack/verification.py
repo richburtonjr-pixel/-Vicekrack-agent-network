@@ -23,7 +23,7 @@ never executed. Records are re-checked by replaying these rules over their store
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -39,6 +39,11 @@ ROOT = Path(__file__).resolve().parent.parent
 POLICY_SCHEMA = ROOT / "schemas/verification-policy.schema.json"
 RECORD_SCHEMA = ROOT / "schemas/verification-record.schema.json"
 STATUSES = ("verified", "corroborated", "disputed", "insufficient_evidence", "rejected")
+# Record versions: 1.0 = Step 17 rules; 1.1 adds dated official supersession (Step 19).
+RECORD_VERSION = "1.1"
+SAME_FACT_MIN_OVERLAP = 0.75             # Each statement must share >= 75% of the other's subject words.
+SUPERSESSION_MIN_GAP = timedelta(hours=1)  # Closer publication times are treated as ambiguous.
+SUPERSESSION_REASON = "newer_first_hand_statement_same_source"
 
 STATEMENT_CHARS, MIN_STATEMENT_CHARS, MAX_STATEMENTS_PER_CANDIDATE = 300, 20, 12
 UNNAMED_ORIGIN = "unnamed sources"
@@ -272,15 +277,86 @@ def _cycle_nodes(edges):
     return cyclic
 
 
+# ---------------------------------------------------------------- supersession (Step 19)
+
+def _parse_time(stamp):
+    return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def same_fact_conflict(left_text, right_text):
+    """True when two statements are about the same fact and give clearly different values.
+
+    Same fact: each shares >= SAME_FACT_MIN_OVERLAP of the other's subject words. Clear
+    conflict: both state dates/numbers, each has values the other lacks, and neither is
+    negated (negation-only conflicts are too ambiguous to order).
+    """
+    left, right = analyze(left_text), analyze(right_text)
+    if left["negated"] or right["negated"] or left["instructions"] or right["instructions"]:
+        return False
+    if not (left["facts"] - right["facts"] and right["facts"] - left["facts"]):
+        return False
+    shared = left["topic"] & right["topic"]
+    if not left["topic"] or not right["topic"]:
+        return False
+    return (len(shared) / len(left["topic"]) >= SAME_FACT_MIN_OVERLAP
+            and len(shared) / len(right["topic"]) >= SAME_FACT_MIN_OVERLAP)
+
+
+def _trusted_published(item):
+    """Publication time only (never retrieval time); None when missing or implausible."""
+    if not item.get("published_at"):
+        return None
+    published = _parse_time(item["published_at"])
+    if published > _parse_time(item["retrieved_at"]):
+        return None  # Claims to be published after we collected it: not trustworthy.
+    return published
+
+
+def supersessions(evidence):
+    """Map evidence index -> superseded_by entry, for dated same-source official updates.
+
+    Only first-hand primary statements from the same source take part. Within one source,
+    if any same-fact conflicting pair lacks a trustworthy publication date or is closer
+    than SUPERSESSION_MIN_GAP, nothing from that source is superseded (ambiguous order).
+    Otherwise each statement is superseded by the newest conflicting newer statement.
+    Different official sources never supersede each other.
+    """
+    official = [i for i, e in enumerate(evidence) if e["tier"] == "primary" and e["first_hand"]]
+    groups = {}
+    for index in official:
+        item = evidence[index]
+        groups.setdefault((item["source_id"], item["publisher"]), []).append(index)
+    result = {}
+    for members in groups.values():
+        pairs = [(a, b) for n, a in enumerate(members) for b in members[n + 1:]
+                 if same_fact_conflict(evidence[a]["statement"], evidence[b]["statement"])]
+        dates = {i: _trusted_published(evidence[i]) for i in members}
+        if any(dates[a] is None or dates[b] is None or abs(dates[a] - dates[b]) < SUPERSESSION_MIN_GAP
+               for a, b in pairs):
+            continue  # Ambiguous ordering: keep the existing disputed behavior for this source.
+        for older in members:
+            newer = [n for a, b in pairs for n, o in ((a, b), (b, a)) if o == older and dates[n] > dates[older]]
+            if newer:
+                winner = min(newer, key=lambda n: (-dates[n].timestamp(), n))
+                result[older] = {"evidence_index": winner, "candidate_id": evidence[winner]["candidate_id"],
+                                 "published_at": evidence[winner]["published_at"], "reason": SUPERSESSION_REASON}
+    return result
+
+
 # ---------------------------------------------------------------- decision
 
 def decide(evidence, min_origins, claim_has_instructions=False):
-    """Pure decision over evidence items. Returns (status, codes, primary_support, origins)."""
+    """Pure decision over evidence items. Returns (status, codes, primary_support, origins).
+
+    Evidence marked `superseded_by` (record 1.1) is excluded from contradiction counting
+    only; superseded support is still counted and flagged.
+    """
     if claim_has_instructions:
         return "insufficient_evidence", ["claim_contains_instructions"], 0, 0
     reputable = ("primary", "secondary")
     support = [e for e in evidence if e["relation"] == "supports"]
-    contra = [e for e in evidence if e["relation"] == "contradicts"]
+    contra = [e for e in evidence if e["relation"] == "contradicts" and "superseded_by" not in e]
+    superseded_contra = [e for e in evidence if e["relation"] == "contradicts" and "superseded_by" in e]
     primary_support = [e for e in support if e["tier"] == "primary" and e["first_hand"]]
     primary_contra = [e for e in contra if e["tier"] == "primary" and e["first_hand"]]
     support_origins = {e["origin"] for e in support if e["tier"] in reputable}
@@ -323,6 +399,10 @@ def decide(evidence, min_origins, claim_has_instructions=False):
         codes.append("no_matching_evidence")
     if status != "verified" and any(e["tier"] == "primary" and not e["first_hand"] for e in support):
         codes.append("secondhand_primary_report")
+    if superseded_contra:
+        codes.append("older_official_contradiction_superseded")
+    if any("superseded_by" in e for e in primary_support):
+        codes.append("official_support_superseded")
     return status, codes, len(primary_support), len(support_origins)
 
 
@@ -378,7 +458,7 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
     claims, summary = [], dict.fromkeys(STATUSES, 0)
     for claim in candidate["candidate_claims"]:
         target = analyze(claim["text"])
-        evidence, seen = [], set()
+        evidence, seen = [], {}
         for member in members:
             publisher, rows = analyzed[member["candidate_id"]]
             tier = tier_for(member["source"]["source_id"], member["url"], policy)
@@ -389,8 +469,16 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
                 key = (publisher, found, " ".join(sorted(features["content"])))
                 if key in seen:
                     flags.add("duplicate_evidence_collapsed")
-                    continue
-                seen.add(key)
+                    kept = evidence[seen[key]]
+                    # Keep the newest dated copy so a repeated statement keeps its latest date.
+                    if member["published_at"] and (kept["published_at"] is None
+                                                   or member["published_at"] > kept["published_at"]):
+                        evidence[seen[key]] = None
+                        seen[key] = len(evidence)
+                    else:
+                        continue
+                else:
+                    seen[key] = len(evidence)
                 evidence.append({
                     "candidate_id": member["candidate_id"], "source_id": member["source"]["source_id"],
                     "publisher": member["source"]["publisher"], "url": member["url"],
@@ -399,6 +487,7 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
                     "first_hand": is_first_hand(text, member["source"]["publisher"], aliases),
                     "origin": source or publisher, "published_at": member["published_at"],
                     "retrieved_at": member["retrieved_at"], "_features": features})
+        evidence = [item for item in evidence if item is not None]
         # Near-identical wording from different publishers is one origin (copied/syndicated).
         local = origins.copy()
         for i, left in enumerate(evidence):
@@ -418,6 +507,10 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
         if len(evidence) > rules["max_evidence_per_claim"]:
             flags.add("evidence_truncated")
             evidence = evidence[:rules["max_evidence_per_claim"]]
+        # Computed on the final stored list so replay reaches the same result.
+        for index, superseded_by in supersessions(evidence).items():
+            evidence[index]["superseded_by"] = superseded_by
+            flags.add("official_statement_superseded")
         status, codes, primary, independent = decide(
             evidence, rules["min_independent_secondary_origins"], target["instructions"])
         if circular:
@@ -430,8 +523,8 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
 
     pool_sha = _pool_digest(members)
     record = {
-        "contract": "verification_record", "version": "1.0",
-        "record_id": "ver-" + _sha256(f"{candidate['candidate_id']}\n{policy_sha256}\n{pool_sha}")[:24],
+        "contract": "verification_record", "version": RECORD_VERSION,
+        "record_id": record_id_for(candidate["candidate_id"], policy_sha256, pool_sha, RECORD_VERSION),
         "content_profile": candidate["content_profile"],
         "candidate": {"candidate_id": candidate["candidate_id"], "source_id": candidate["source"]["source_id"],
                       "publisher": candidate["source"]["publisher"], "url": candidate["url"],
@@ -447,8 +540,21 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
     return record
 
 
+def record_id_for(candidate_id, policy_sha256, pool_sha256, version):
+    """1.0 keeps its original formula; newer rule versions get distinct IDs so an existing
+    1.0 file never blocks re-verification under the new rules."""
+    seed = f"{candidate_id}\n{policy_sha256}\n{pool_sha256}"
+    if version != "1.0":
+        seed += f"\nrules={version}"
+    return "ver-" + _sha256(seed)[:24]
+
+
 def validate_record(record, policy, policy_sha256=None):
-    """Schema check plus replay of every decision from the stored evidence."""
+    """Schema check plus replay of every decision from the stored evidence.
+
+    Version 1.0 records replay with Step 17 rules (no supersession allowed); 1.1 records
+    also recompute every supersession from the stored statements and dates.
+    """
     def fail(reason):
         raise NetworkError("invalid_verification_record", f"Verification Record rejected: {reason}.")
 
@@ -468,9 +574,15 @@ def validate_record(record, policy, policy_sha256=None):
         fail("claim identifiers are out of order")
     aliases, rules = policy["attribution_aliases"], policy["rules"]
     summary = dict.fromkeys(STATUSES, 0)
+    any_superseded = False
     for claim in record["claims"]:
         if len(claim["evidence"]) > rules["max_evidence_per_claim"]:
             fail("too much evidence")
+        expected = supersessions(claim["evidence"]) if record["version"] != "1.0" else {}
+        stored_marks = {i: e["superseded_by"] for i, e in enumerate(claim["evidence"]) if "superseded_by" in e}
+        if stored_marks != expected:
+            fail("superseded evidence does not follow from the stored statements and dates")
+        any_superseded |= bool(expected)
         for item in claim["evidence"]:
             if item["tier"] != tier_for(item["source_id"], item["url"], policy):
                 fail("evidence tier does not match the policy")
@@ -487,7 +599,9 @@ def validate_record(record, policy, policy_sha256=None):
         summary[status] += 1
     if summary != record["summary"]:
         fail("summary counts do not match the claims")
-    expected_id = "ver-" + _sha256(f"{record['candidate']['candidate_id']}\n{record['policy']['policy_sha256']}\n"
-                                   f"{record['evidence_pool']['pool_sha256']}")[:24]
+    if any_superseded != ("official_statement_superseded" in record["flags"]):
+        fail("supersession flag does not match the evidence")
+    expected_id = record_id_for(record["candidate"]["candidate_id"], record["policy"]["policy_sha256"],
+                                record["evidence_pool"]["pool_sha256"], record["version"])
     if record["record_id"] != expected_id:
         fail("record_id does not match its inputs")

@@ -112,7 +112,7 @@
     "reason": {
       "enum": [
         "primary_verified", "independent_corroboration", "recent", "high_priority_topic", "new_story",
-        "update_to_previous", "no_verified_claims", "corroborated_only", "contradicted_claims", "disputed_claims",
+        "update_to_previous", "supersedes_older_official", "no_verified_claims", "corroborated_only", "contradicted_claims", "disputed_claims",
         "unconfirmed_rumor", "not_relevant", "stale", "not_recent", "publish_date_unknown", "future_date",
         "instruction_like_text", "duplicate_of_previous", "near_duplicate_of_previous", "similar_to_higher_ranked",
         "duplicate_in_batch", "below_select_score", "below_hold_score", "selection_limit"
