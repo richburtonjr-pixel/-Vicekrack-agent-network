@@ -180,3 +180,13 @@ executed.
 - A return to an earlier value (A → B → A) is classified against all history entries.
   Its claim matches the first story, so it is rejected as a duplicate even though it is a
   real change. This is a known limitation.
+
+## Step 21: production reservations
+
+The production pipeline (`produce`) uses the same `select_brief` checks. It records its
+story in history with `state: reserved` and its `production_id` when the brief is
+created, then `state: produced` once the local preview is saved. Ranking treats reserved
+and produced entries like any made story, so the story cannot be selected or produced
+again. Only the owning production ignores its own reservation when it resumes. Entries
+written by `brief-from-selection` have neither field and are shown as `briefed`. See
+[Production pipeline](production.md).

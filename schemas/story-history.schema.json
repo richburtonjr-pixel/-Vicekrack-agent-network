@@ -29,6 +29,11 @@
                             "items": { "type": "string", "pattern": "^[a-z0-9]{1,40}$" } },
           "fact_tokens": { "type": "array", "maxItems": 40, "uniqueItems": true,
                            "items": { "type": "string", "pattern": "^[a-z0-9]{1,40}$" } },
+          "state": {
+            "description": "Optional (Step 21). Absent: a brief was made with brief-from-selection. reserved: a production run owns the story and has not finished its preview. produced: the production saved its local preview.",
+            "enum": ["reserved", "produced"]
+          },
+          "production_id": { "type": "string", "pattern": "^prod-[0-9a-f]{24}$" },
           "selected_at": {
             "type": "string",
             "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
