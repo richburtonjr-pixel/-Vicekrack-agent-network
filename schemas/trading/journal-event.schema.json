@@ -28,7 +28,11 @@
       "const": "trading_journal_event"
     },
     "version": {
-      "const": "1.0"
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "description": "1.1 (Step 24) adds account-state stages, the paper_state agent and account/operation subjects."
     },
     "event_id": {
       "type": "string",
@@ -64,7 +68,10 @@
         "signal",
         "risk_check",
         "order_intent",
-        "run_finished"
+        "run_finished",
+        "state_initialized",
+        "intent_cancelled",
+        "state_recovery"
       ]
     },
     "status": {
@@ -76,7 +83,10 @@
         "blocked",
         "recorded",
         "completed",
-        "failed"
+        "failed",
+        "cancelled",
+        "committed",
+        "rolled_back"
       ]
     },
     "agent": {
@@ -85,7 +95,8 @@
         "demo_market_data",
         "demo_strategy",
         "risk_engine",
-        "paper_order_desk"
+        "paper_order_desk",
+        "paper_state"
       ]
     },
     "subject": {
@@ -114,6 +125,14 @@
           "maxLength": 80
         },
         "scenario": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "account_id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "operation_id": {
           "type": "string",
           "maxLength": 80
         }

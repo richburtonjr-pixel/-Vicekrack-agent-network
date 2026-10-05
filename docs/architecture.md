@@ -167,7 +167,7 @@ Original request, evidence notes, previous result, provider, status, and stage h
 travel as explicit JSON. Reviewer receives both research and analysis, not just a summary
 of the last stage. Prior model output is data, not control flow.
 
-Only this fixed three-stage order is supported. Registry max_steps is an integer 1–3;
+Only this fixed three-stage order is supported. Registry max_steps is an integer 1â€“3;
 a budget below the required three fails before provider execution. The hard ceiling
 and exact-order checks reject repetition, reordering, and recursive orchestrator stages.
 Stage outputs cannot affect the next recipient, provider, or step count. Agents never
@@ -183,7 +183,7 @@ stage message; later agents do not run and no success result is returned.
 
 Successful result.summary is the Reviewer's final summary, and result.data.stages holds
 all stage outcomes. Successful execution is not certification of correctness. Timeouts
-retain the SDK operation limits from Steps 3–4 and propagate as failures; the pipeline
+retain the SDK operation limits from Steps 3â€“4 and propagate as failures; the pipeline
 has no total wall-clock deadline and does not forcibly interrupt arbitrary custom code.
 
 
@@ -241,7 +241,7 @@ ready -> running(agent) -> ready(next agent) -> ... -> completed
 
 Only the first incomplete stage can start. Success advances the completed prefix;
 failure preserves it. Attempts are incremented before a request and included in the
-atomic intent checkpoint. Each stage allows one initial attempt plus max_retries (0–3,
+atomic intent checkpoint. Each stage allows one initial attempt plus max_retries (0â€“3,
 default 1). The hard three-stage limit remains separate from the attempt budget. No
 internal retry loop exists: recovery is a user-issued resume command. Missing credentials
 can be repaired in the process environment without changing the saved configuration.
@@ -479,3 +479,44 @@ Modules:
 - `cli.py`: the `trading-*` commands.
 
 There are no feeds, brokers, AI decisions or background loops. See [Trading](trading.md).
+
+## Step 24: persistent paper risk state
+
+`vicekrack/trading/state.py` adds `PaperAccount`, with a validated, self-hashed
+`paper_account_state` 1.0 document stored in `runtime/trading/accounts/<id>/state.json`.
+
+```mermaid
+sequenceDiagram
+    participant D as demo / CLI
+    participant A as PaperAccount (account.lock held)
+    participant J as Journal
+    participant S as state.json
+    D->>A: authorize(signal, snapshot, portfolio)
+    A->>S: load + validate (blocks if pending.json exists)
+    A->>A: rollover, duplicate check, risk checks incl. pending reservations
+    A->>A: write pending.json (exclusive link)
+    A->>J: risk_check + order_intent events (account_id, operation_id)
+    A->>S: atomic replace (revision + 1)
+    A->>A: remove pending.json
+```
+
+- **Persisted:** processed signals (authorized, blocked or rolled back), authorized
+  intents with `active` or `released` reservations, daily counters with history, and
+  recovery records. It also keeps a ledger summary in which `submitted_orders`,
+  `executed_trades` and `realized_pnl` are fixed to 0, 0 and null.
+- **Risk engine:** `evaluate` gained `reserved` (pending quantity per symbol, added before
+  the exposure checks) and `trading_date`, plus a `pending_reservations` check.
+- **Recovery:** `recover` resolves an unfinished operation by comparing revisions
+  (committed or rolled back), keeps any rolled-back signal processed, and reconciles
+  journal intents that are missing from state.
+- **Cancellation:** `cancel` releases a reservation with a reason code and note.
+- **Locking:** a cross-process OS lock with a bounded wait; `account_busy` means nothing
+  was authorized.
+- **Contracts:** journal events are now version 1.1, adding the stages
+  `state_initialized`, `intent_cancelled` and `state_recovery`, the agent `paper_state`
+  and subject fields `account_id` and `operation_id`; 1.0 events still validate. A new
+  `paper_state_pending` 1.0 contract describes the write-ahead note. Demo scenario
+  fixtures are now version 1.1, dropping the per-run `orders_today` field.
+- **Dependency:** `tzdata` is added so IANA timezones work on Windows.
+
+See [Roadmap](roadmap.md).

@@ -1,8 +1,8 @@
-# Steps 1–6 audit and Step 7 repair record
+# Steps 1â€“6 audit and Step 7 repair record
 
 ## Baseline and confirmed defects
 
-The merged Steps 1–6 baseline passed all 96 existing tests. Four new regression tests
+The merged Steps 1â€“6 baseline passed all 96 existing tests. Four new regression tests
 were then run before repair: two failed and one errored; the UTC timestamp test already
 passed. This confirmed:
 

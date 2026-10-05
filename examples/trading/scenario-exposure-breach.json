@@ -1,11 +1,10 @@
 {
   "fixture": "synthetic_trading_scenario",
-  "version": "1.0",
+  "version": "1.1",
   "scenario": "exposure-breach",
   "description": "SYNTHETIC FIXTURE - an existing synthetic position pushes exposure above max_position_notional; expect blocked.",
   "synthetic": true,
   "as_of": "2026-01-15T15:00:00Z",
-  "orders_today": 0,
   "snapshot": {
     "contract": "market_snapshot",
     "version": "1.0",
@@ -32,7 +31,7 @@
     {
       "contract": "trading_signal",
       "version": "1.0",
-      "signal_id": "sig-synth1-demo-0001",
+      "signal_id": "sig-synth1-exposure-breach",
       "strategy": {
         "strategy_id": "synthetic_demo_rule",
         "version": "1.0"

@@ -1,4 +1,4 @@
-# Trading subsystem foundation (Step 23): paper only
+# Trading subsystem (Steps 23–24): paper only
 
 > **SIMULATED.** Nothing in this subsystem connects to a broker, sends an order or
 > executes a trade. An `authorized_paper` intent only means the risk rules would have
@@ -8,12 +8,18 @@
 
 ```powershell
 .\.venv\Scripts\python.exe -m vicekrack trading-config-check
+.\.venv\Scripts\python.exe -m vicekrack trading-state init
+.\.venv\Scripts\python.exe -m vicekrack trading-state show
+.\.venv\Scripts\python.exe -m vicekrack trading-state list
+.\.venv\Scripts\python.exe -m vicekrack trading-state cancel INTENT_ID --reason operator_request
+.\.venv\Scripts\python.exe -m vicekrack trading-state recover
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario allowed
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario exposure-breach
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario daily-loss
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario stale-data
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario invalid-money
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario duplicate-signal
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario pending-exposure
 .\.venv\Scripts\python.exe -m vicekrack trading-journal
 .\.venv\Scripts\python.exe -m vicekrack trading-journal RUN_ID
 .\.venv\Scripts\python.exe -m vicekrack trading-journal RUN_ID --full
@@ -136,19 +142,121 @@ same inputs always give the same decision and `decision_id`.
 | `stale-data` | blocked: `snapshot_stale` |
 | `invalid-money` | blocked: `invalid_or_missing_inputs`, `invalid_market_snapshot` (float price) |
 | `duplicate-signal` | first `authorized_paper`, second blocked: `duplicate_signal` |
+| `pending-exposure` | alone: `authorized_paper`. After `allowed` on the same account: blocked `position_exposure_exceeded` (pending reservation) |
 
-Decisions use each scenario's simulated clock (`as_of`), so results are repeatable.
+Each scenario has its own signal ID. Because the state persists, running any scenario a
+second time on the same account is blocked with `duplicate_signal`. Use
+`trading-state init --account NAME` to start fresh.
+
+Decisions use each scenario's simulated clock (`as_of`). All fixtures use the same
+`as_of`, so they can share an account.
 Journal `recorded_at` uses the real clock.
+
+## Persistent paper state (Step 24)
+
+### Paper intents are not trades
+
+| Term | Meaning in ViceKrack today |
+|---|---|
+| **Authorized paper intent** | The risk engine allowed it, and a reservation is held. Nothing is sent anywhere. |
+| **Submitted order** | Never happens. Every intent has `submitted: false` and the ledger shows `submitted_orders: 0`. |
+| **Executed trade** | Never happens. `executed: false` and `executed_trades: 0`. |
+| **Realized P&L** | Not tracked: `realized_pnl: null`. The portfolio's `day.pnl` is a synthetic fixture input. |
+
+### Account state
+
+Accounts live in `runtime/trading/accounts/acct-<name>/` (ignored by git).
+
+| File | Purpose |
+|---|---|
+| `state.json` | `paper_account_state` 1.0, validated with a self-hash, revision, schema and consistency checks |
+| `pending.json` | `paper_state_pending` 1.0 write-ahead note, present only while an operation is unfinished |
+| `account.lock` | the cross-process OS lock |
+
+`state.json` holds:
+- `processed_signals`: every signal ID ever decided, with its outcome (`authorized_paper`,
+  `blocked` or `rolled_back`).
+- `intents`: authorized paper intents, each with a reservation that is `active`, or
+  `released` together with its reason and note.
+- `trading_day`: the timezone, `rollover: local_midnight`, the current date, counters and
+  the last decision time. Earlier days are kept in `day_history`.
+- `recoveries`: what each recovery decided.
+- `ledger`: counts, with `submitted_orders` 0, `executed_trades` 0 and `realized_pnl` null.
+
+Accounts must be created explicitly with `trading-state init` (`--account`, `--timezone`).
+
+### One authorization = one locked operation
+
+While holding the account lock, an authorization:
+1. Loads and validates the state. It blocks if `pending.json` exists, or the state is
+   missing, corrupt or incompatible.
+2. Applies rollover.
+3. Checks for a duplicate signal.
+4. Runs every risk check, with the active reservations added to the position.
+5. Writes `pending.json`, then the journal events, then atomically replaces
+   `state.json`, then removes `pending.json`.
+
+Blocked signals are recorded too, so they are never re-evaluated. Invalid signals have no
+trustworthy ID, so they are blocked without touching state.
+
+### Trading day and rollover
+
+- **Timezone:** the default is `America/New_York` (daylight saving handled by `zoneinfo`
+  and `tzdata`). The day rolls over at local midnight.
+- **On the first decision of a new local date:** the previous day's counters move into
+  `day_history`, and `authorized_count`, `cancelled_count` and `blocked_count` reset.
+- **Never cleared by a day change:** processed signals (duplicate protection) and active
+  reservations.
+- **Clock going backwards:** a decision time more than 5 seconds before the last one, or
+  an earlier local date, blocks with `clock_regression`.
+- **Portfolio date:** the portfolio's `day.trading_date` must equal the account's local
+  trading date.
+- **Orders per day:** this counts authorizations on the account's trading day.
+  Cancelling does not un-count one.
+
+### Cancellation
+
+```
+python -m vicekrack trading-state cancel INTENT_ID --reason operator_request --note "Demo cancel"
+```
+
+- **Allowed for:** only `authorized_paper` intents with an active reservation, which
+  always means unsubmitted.
+- **Effect:** the reservation is released with its time, reason code and note, and a
+  journal `intent_cancelled` event is written. The intent stays in history.
+- **The signal stays processed,** so it cannot be authorized again.
+
+### Recovery
+
+`trading-state recover` takes the account lock and works through these steps:
+1. **Clean up** orphan `*.tmp` files.
+2. **Resolve the pending note**, by revision:
+   - **committed:** `state.revision` equals the note's `revision_after` and the hash
+     matches.
+   - **rolled_back:** the revision equals `revision_before`. For an authorization, the
+     signal is marked processed as `rolled_back`.
+   - **discarded_unreadable:** the note itself is damaged.
+   - **already_recovered:** a recovery record for this operation already exists, for
+     example after a crash during recovery.
+   - **conflict:** anything else gives `state_recovery_conflict` and nothing changes.
+3. **Reconcile the journal.** Any `order_intent` recorded for this account whose intent is
+   missing from state has its signal marked processed. A crash can never lead to the same
+   signal being authorized twice.
+4. **Record the recovery** in state and in the journal (`state_recovery`).
+
+Corrupted or incompatible `state.json` is never repaired automatically.
 
 ## Limitations
 
 - **Synthetic data only.** There are no market feeds, indicators, strategies or AI
-  trading decisions; the signal is hard-coded in the fixture.
-- **Nothing is executed.** There is no broker, no order submission, no fills and no
-  position or P&L updates. Each demo run starts from its fixture portfolio, and
-  `orders_today` and duplicate-signal tracking are per run (there is no persistent paper
-  ledger yet).
-- **Limited scope.** Only USD, long-only, with market and limit order types.
-- **Single process.** The journal has no cross-process lock, and the demo is one
-  foreground pass.
-- **No dashboard yet.** The journal format is ready for one.
+  trading decisions; signals are hard-coded in fixtures.
+- **Nothing is executed.** There is no broker, no order submission, no fills, no
+  positions and no realized P&L. Reservations stay active until cancelled; there is no
+  automatic expiry, which is the conservative choice. Portfolio positions and daily P&L
+  still come from fixture inputs.
+- **Limited scope.** Only USD, long-only, with market and limit order types. Each account
+  holds at most 10,000 processed signals and authorized intents; beyond that it blocks
+  with `state_capacity_reached` and you start a new account.
+- **Local only.** The lock covers processes on one machine and one disk, not network
+  shares. Recovery reads the whole local journal.
+- **No dashboard yet.** The journal and account state are ready for one.

@@ -20,9 +20,15 @@ def _check(checks, name, status, limit=None, observed=None):
 
 
 def evaluate(*, config, config_sha256, snapshot, signal, portfolio, as_of, kill_switch,
-             orders_today=0, used_signal_ids=(), input_problems=()):
+             orders_today=0, used_signal_ids=(), input_problems=(), reserved=None, trading_date=None):
     """Return a validated risk decision. Inputs that failed validation must be passed as None
-    and named in `input_problems` (reason codes such as 'invalid_snapshot')."""
+    and named in `input_problems` (reason codes such as 'invalid_snapshot').
+
+    Step 24: `reserved` maps symbol -> signed Decimal quantity held by pending (authorized,
+    unsubmitted, uncancelled) paper intents; it is added to the current position before the
+    exposure checks. `trading_date` is the account's trading day (defaults to the UTC date)."""
+    reserved = reserved or {}
+    trading_date = trading_date or as_of[:10]
     checks, reasons = [], []
 
     def block(name, code, limit=None, observed=None):
@@ -51,7 +57,7 @@ def evaluate(*, config, config_sha256, snapshot, signal, portfolio, as_of, kill_
 
     complete = not missing and not input_problems
     names = ("snapshot_fresh", "signal_active", "symbol_allowed", "symbol_consistent", "order_type_allowed",
-             "quantity_limit", "order_notional_limit", "position_notional_limit", "position_fraction_limit",
+             "quantity_limit", "order_notional_limit", "pending_reservations", "position_notional_limit", "position_fraction_limit",
              "no_short_position", "daily_loss_limit", "orders_per_day_limit", "signal_not_reused")
     if not complete:
         for name in names:
@@ -111,8 +117,10 @@ def evaluate(*, config, config_sha256, snapshot, signal, portfolio, as_of, kill_
         for position in portfolio["positions"]:
             if position["symbol"] == symbol:
                 current = parse(position["quantity"], "signed_decimal")
+        pending = reserved.get(symbol, Decimal(0))
+        _check(checks, "pending_reservations", "pass", None, pending)
         delta = quantity if proposal["side"] == "buy" else -quantity
-        resulting = add(current, delta)
+        resulting = add(add(current, pending), delta)
         exposure = multiply(abs(resulting), price)
         max_position = parse(limits["max_position_notional"], "money")
         if exposure > max_position:
@@ -132,7 +140,7 @@ def evaluate(*, config, config_sha256, snapshot, signal, portfolio, as_of, kill_
 
         pnl = parse(portfolio["day"]["pnl"], "signed_money")
         max_loss = parse(limits["max_daily_loss"], "money")
-        if portfolio["day"]["trading_date"] != as_of[:10]:
+        if portfolio["day"]["trading_date"] != trading_date:
             block("daily_loss_limit", "portfolio_day_mismatch")
         elif -pnl >= max_loss:
             block("daily_loss_limit", "daily_loss_limit_reached", max_loss, -pnl)
@@ -154,7 +162,7 @@ def evaluate(*, config, config_sha256, snapshot, signal, portfolio, as_of, kill_
               "portfolio_sha256": sha256(portfolio) if portfolio is not None else None}
     signal_id = signal["signal_id"] if signal is not None else None
     snapshot_id = snapshot["snapshot_id"] if snapshot is not None else None
-    seed = {"inputs": inputs, "as_of": as_of, "checks": checks, "reasons": reasons,
+    seed = {"inputs": inputs, "as_of": as_of, "trading_date": trading_date, "checks": checks, "reasons": reasons,
             "orders_today": orders_today, "signal_id": signal_id, "snapshot_id": snapshot_id}
     decision = {
         "contract": "risk_decision", "version": "1.0", "decision_id": "rdec-" + sha256(seed)[:24], "mode": "paper",
