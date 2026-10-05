@@ -457,3 +457,25 @@ block stating no fact check, no rights clearance and no permission to publish.
 
 `quality_cli.py` adds `quality-report` and `quality-list`. Production artifacts are never
 modified. See [Quality report](quality.md).
+
+## Step 23: trading subsystem foundation
+
+`vicekrack/trading/` is a separate, paper-only subsystem. It shares only the core error
+type (`vicekrack/errors.py`) and credential rejection (`vicekrack/persistence.py`) with
+the content pipeline; neither side imports the other. See
+[Subsystem boundaries](subsystems.md).
+
+Modules:
+- `money.py`: strict `Decimal` parsing from strings and exact arithmetic.
+- `contracts.py`: six versioned schemas plus semantic validators and stricter credential
+  rejection.
+- `config.py`: the paper config and the kill switch (config or atomic switch file; an
+  unreadable file means engaged).
+- `risk.py`: 15 deterministic checks producing a `risk_decision`.
+- `orders.py`: a `paper_order_intent` with `submitted`/`executed` fixed to false.
+- `journal.py`: append-only events under `runtime/trading/journal/`, written with temp file +
+  fsync + exclusive link.
+- `demo.py`: one bounded pass over a synthetic scenario.
+- `cli.py`: the `trading-*` commands.
+
+There are no feeds, brokers, AI decisions or background loops. See [Trading](trading.md).

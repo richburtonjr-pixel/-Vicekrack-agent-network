@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack paper order intent",
+  "description": "A paper-only order intent, version 1.0. Never submitted or executed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "intent_id",
+    "mode",
+    "status",
+    "signal_id",
+    "decision_id",
+    "symbol",
+    "side",
+    "quantity",
+    "order_type",
+    "limit_price",
+    "reference_price",
+    "notional",
+    "created_at",
+    "execution",
+    "simulated"
+  ],
+  "properties": {
+    "contract": {
+      "const": "paper_order_intent"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "intent_id": {
+      "type": "string",
+      "pattern": "^pint-[0-9a-f]{24}$"
+    },
+    "mode": {
+      "const": "paper"
+    },
+    "status": {
+      "enum": [
+        "authorized_paper",
+        "blocked"
+      ]
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^sig-[a-z0-9-]{4,64}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^rdec-[0-9a-f]{24}$"
+    },
+    "symbol": {
+      "$ref": "#/$defs/symbol"
+    },
+    "side": {
+      "enum": [
+        "buy",
+        "sell"
+      ]
+    },
+    "quantity": {
+      "$ref": "#/$defs/decimal"
+    },
+    "order_type": {
+      "enum": [
+        "market",
+        "limit"
+      ]
+    },
+    "limit_price": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/decimal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reference_price": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/decimal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "notional": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/decimal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "submitted",
+        "executed",
+        "broker"
+      ],
+      "properties": {
+        "submitted": {
+          "const": false
+        },
+        "executed": {
+          "const": false
+        },
+        "broker": {
+          "type": "null"
+        }
+      }
+    },
+    "simulated": {
+      "const": true
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
