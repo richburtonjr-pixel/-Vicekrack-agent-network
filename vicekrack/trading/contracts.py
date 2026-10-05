@@ -28,6 +28,7 @@ SCHEMAS = {
     "paper_account_state": "paper-account-state", "paper_state_pending": "paper-state-pending",
     "ohlcv_bar": "ohlcv-bar", "market_dataset": "market-dataset", "market_data_config": "market-data-config",
     "market_replay_report": "market-replay-report",
+    "indicator_config": "indicator-config", "indicator_result": "indicator-result",
 }
 FUTURE_SKEW = timedelta(seconds=5)
 # Field names that must never appear in trading data (in addition to the shared core list).

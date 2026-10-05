@@ -1,0 +1,23 @@
+{
+  "config_version": "1.0",
+  "description": "Offline indicator limits and defaults (Step 26). VWAP sessions are clock times only; no exchange calendar.",
+  "limits": {
+    "max_indicators": 8,
+    "max_period": 500,
+    "max_points": 200000,
+    "max_cli_points": 50
+  },
+  "defaults": {
+    "gap_policy": "reset",
+    "vwap_session": {
+      "timezone": "America/New_York",
+      "start": "09:30",
+      "end": "16:00"
+    }
+  },
+  "rounding": {
+    "places": 8,
+    "mode": "ROUND_HALF_EVEN",
+    "internal_precision": 50
+  }
+}
