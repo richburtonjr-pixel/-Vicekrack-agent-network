@@ -439,3 +439,21 @@ and marks it `produced` only after the preview is saved.
 `production_cli.py` adds `produce`, `production-resume`, `production-list` and
 `production-inspect`. No publishing, scheduling or background execution. See
 [Production pipeline](production.md).
+
+## Step 22: production quality report
+
+`quality.py` adds a read-only `QualityChecker`. Under the production's lock it loads the
+Step 21 state and runs ten checks:
+- Existing validators: `validate_story_brief`, `validate_short_script`,
+  `validate_scene_plan`, verification record replay (`load_record`), and Step 14
+  `load_narration` for the audio hash.
+- Media: real measurements from the bundled ffmpeg (restricted subprocess, output never
+  stored) and Pillow (poster size, watermark colour).
+
+Each check reports `pass`, `needs_review`, `fail` or `unavailable` with reason codes. Any
+fail means `fail`; any review or unavailable check means `needs_review`. Reports
+(`schemas/quality-report.schema.json`) are saved to `runtime/quality/` with a fixed scope
+block stating no fact check, no rights clearance and no permission to publish.
+
+`quality_cli.py` adds `quality-report` and `quality-list`. Production artifacts are never
+modified. See [Quality report](quality.md).

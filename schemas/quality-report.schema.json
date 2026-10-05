@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack production quality report",
+  "description": "Technical quality checks for one production run (Step 22), version 1.0. A pass means the local artifacts are internally consistent; it never means facts are accurate, rights are cleared or publishing is allowed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "report_id", "production_id", "checked_at", "result", "reasons", "checks",
+               "scope", "notes"],
+  "properties": {
+    "contract": { "const": "production_quality_report" },
+    "version": { "const": "1.0" },
+    "report_id": { "type": "string", "pattern": "^qr-[0-9a-f]{24}$" },
+    "production_id": { "type": "string", "pattern": "^prod-[0-9a-f]{24}$" },
+    "checked_at": { "$ref": "#/$defs/timestamp" },
+    "result": { "enum": ["pass", "needs_review", "fail"] },
+    "reasons": { "type": "array", "maxItems": 60, "uniqueItems": true, "items": { "$ref": "#/$defs/code" } },
+    "checks": {
+      "type": "array", "minItems": 10, "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "status", "reasons", "details"],
+        "properties": {
+          "check_id": { "enum": ["state", "artifacts", "provenance", "evidence_freshness", "draft_restrictions",
+                                 "scene_timing", "video", "audio", "manifest_consistency", "history"] },
+          "status": { "enum": ["pass", "needs_review", "fail", "unavailable"] },
+          "reasons": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/code" } },
+          "details": {
+            "type": "object", "maxProperties": 20,
+            "propertyNames": { "pattern": "^[a-z0-9_]{1,40}$" },
+            "additionalProperties": { "type": ["string", "number", "integer", "boolean", "null"], "maxLength": 200 }
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technical_checks_only", "factual_accuracy_verified", "rights_cleared", "publishable", "permission_to_publish"],
+      "properties": {
+        "technical_checks_only": { "const": true },
+        "factual_accuracy_verified": { "const": false },
+        "rights_cleared": { "const": false },
+        "publishable": { "const": false },
+        "permission_to_publish": { "const": false }
+      }
+    },
+    "notes": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 300 } }
+  },
+  "$defs": {
+    "code": { "type": "string", "pattern": "^[a-z0-9_]{1,60}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    }
+  }
+}

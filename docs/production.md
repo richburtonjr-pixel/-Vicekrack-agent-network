@@ -177,3 +177,9 @@ default).
 - **Local storage only.** Locks and atomic writes protect one local filesystem, not
   multiple machines or network/cloud-synced folders. Preview output is the Step 13/14
   storyboard (text cards, optional user narration), not a finished video.
+
+## Quality report (Step 22)
+
+After a production completes, run `python -m vicekrack quality-report PRODUCTION_ID` to
+check its artifacts, provenance, evidence freshness, timing and actual media. The report
+never changes the production and never makes it publishable. See [Quality report](quality.md).
