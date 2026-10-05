@@ -14,8 +14,9 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-24]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-25]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
+        T2[market/: offline datasets + replay, no account access]
     end
     CC[Future Command Center: read-only views]
     Content --> Core
@@ -35,13 +36,16 @@ flowchart TB
 
 - **Code:** `vicekrack/trading/` only. Schemas live in `schemas/trading/`, config in
   `config/trading.paper.json` and fixtures in `examples/trading/`.
-- **Storage:** `runtime/trading/` only: the journal, the kill-switch file and the paper
-  accounts (`runtime/trading/accounts/`).
+- **Storage:** `runtime/trading/` only: the journal, the kill-switch file, the paper
+  accounts (`runtime/trading/accounts/`) and market data (`runtime/trading/market/`).
+- **Market-data boundary:** `vicekrack/trading/market/` (Step 25) never imports the
+  account state, risk engine, order or journal modules. Replay can't authorize anything
+  or change an account.
 - **Imports:** only the shared core: `vicekrack.errors` and `vicekrack.persistence`. It
   never imports content modules, and content modules never import it.
-- **CLI:** only the `trading-*` commands, routed by `vicekrack/__main__.py` to
-  `vicekrack.trading.cli`.
-- **Scope today:** paper only. There are no market feeds, broker connections, live
+- **CLI:** only the `trading-*` and `market-*` commands, routed by `vicekrack/__main__.py`
+  to `vicekrack.trading.cli` and `vicekrack.trading.market.cli`.
+- **Scope today:** paper only, with offline market data. There are no live market feeds, broker connections, live
   orders, AI trading decisions or background loops.
 
 ## Shared core infrastructure

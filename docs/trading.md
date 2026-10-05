@@ -1,8 +1,10 @@
-# Trading subsystem (Steps 23–24): paper only
+# Trading subsystem (Steps 23–25): paper only
 
 > **SIMULATED.** Nothing in this subsystem connects to a broker, sends an order or
 > executes a trade. An `authorized_paper` intent only means the risk rules would have
 > allowed it on paper. All market data in the demo is a labelled synthetic fixture.
+> Step 25's offline market datasets and replay ([Market data](market-data.md)) are kept
+> separate, so they can't feed paper authorization.
 
 ## Commands
 

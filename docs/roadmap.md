@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data and replay | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -37,7 +37,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 21 | Content | Controlled production pipeline with checkpointed resume | #21 |
 | 22 | Content | Production quality report (pass / needs_review / fail) | #22 |
 | 23 | Trading | Paper-only trading foundation: contracts, exact decimals, config limits, kill switch, risk engine, journal, synthetic demo | #23 |
-| 24 | Trading | Persistent paper risk state: processed signals, authorized intents, daily counters, pending exposure reservations, one locked operation, crash recovery, cancellation, roadmap | this PR |
+| 24 | Trading | Persistent paper risk state: processed signals, authorized intents, daily counters, pending exposure reservations, one locked operation, crash recovery, cancellation, roadmap | #24 |
+| 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | this PR |
 
 ## Deferred work
 
@@ -55,7 +56,12 @@ built. A future content step would:
 
 ### Trading: not started, and out of scope until explicitly requested
 
-- Market data feeds and indicators.
+- Live, delayed or vendor market-data feeds. Step 25 has only offline synthetic and local
+  CSV adapters.
+- Market calendars, corporate actions and multi-symbol datasets.
+- Indicators.
+- Connecting replayed or imported data to paper authorization. This would need a
+  separate, freshness-safe design.
 - Strategy or AI-generated signals.
 - Broker connections and order submission.
 - Simulated or real fills, positions and realized P&L.

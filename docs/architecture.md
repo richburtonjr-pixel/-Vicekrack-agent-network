@@ -520,3 +520,38 @@ sequenceDiagram
 - **Dependency:** `tzdata` is added so IANA timezones work on Windows.
 
 See [Roadmap](roadmap.md).
+
+## Step 25: market-data ingestion and offline replay
+
+`vicekrack/trading/market/` is a sub-package of the trading subsystem with no live
+feeds:
+
+```mermaid
+flowchart LR
+    F[Synthetic fixture JSON] --> A1[SyntheticFixtureAdapter]
+    C[Local CSV, read-only] --> A2[LocalCsvAdapter]
+    A1 --> V[bars.build_dataset: timestamps, DST, OHLC, order, duplicates, alignment, gaps]
+    A2 --> V
+    V --> D[(runtime/trading/market/datasets: market_dataset 1.0)]
+    D --> R[replay.run_replay: SimulationClock + ReplayView of closed bars only]
+    R --> P[(runtime/trading/market/replays: market_replay_report 1.0)]
+    R -. no import, no access .- X[PaperAccount / risk engine / orders / journal]
+```
+
+- `adapters.py`: the `MarketDataAdapter` interface. Each adapter returns raw rows plus
+  provenance (file SHA-256, size, rows and sanitized file name).
+- `bars.py`: shared validation and the dataset contract. `expand_bar` produces
+  `ohlcv_bar` 1.0. A bar becomes available at its close (start + interval, or the next
+  local midnight for `1d`).
+- `store.py`: `MarketStore` publishes datasets and replay reports with temp file + fsync +
+  exclusive link and re-validates on read. `load_market_config` reads
+  `config/market-data.json`.
+- `replay.py`: `SimulationClock` (never reads real time), `ReplayView` (a slice of closed
+  bars only; later sequence numbers raise `future_bar_access`) and the observing
+  consumers `bar_recorder` and `future_probe`.
+- `cli.py`: `market-import`, `market-inspect`, `market-list` and `market-replay`.
+
+**Boundary:** the market package never imports `state`, `risk`, `orders` or `journal`
+(a test enforces this). `market_snapshot` still accepts only `synthetic_fixture` sources,
+so imported or replayed data can't reach paper-account authorization. See
+[Market data](market-data.md).

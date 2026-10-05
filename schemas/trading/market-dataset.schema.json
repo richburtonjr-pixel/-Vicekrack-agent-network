@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/market-dataset.schema.json",
+  "title": "Market dataset 1.0",
+  "description": "Validated OHLCV bars with provenance and explicit gaps. Not verified as authentic, current or licensed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "dataset_id",
+    "symbol",
+    "interval",
+    "timezone",
+    "currency",
+    "data_label",
+    "source",
+    "import_settings",
+    "imported_at",
+    "bar_count",
+    "first_start_utc",
+    "last_start_utc",
+    "last_available_utc",
+    "gaps",
+    "verification",
+    "bars",
+    "bars_sha256"
+  ],
+  "properties": {
+    "contract": {
+      "const": "market_dataset"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/dataset_id"
+    },
+    "symbol": {
+      "$ref": "#/$defs/symbol"
+    },
+    "interval": {
+      "$ref": "#/$defs/interval"
+    },
+    "timezone": {
+      "$ref": "#/$defs/timezone"
+    },
+    "currency": {
+      "$ref": "#/$defs/currency"
+    },
+    "data_label": {
+      "$ref": "#/$defs/label"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name",
+        "file_name",
+        "file_sha256",
+        "file_bytes",
+        "rows"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        },
+        "file_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "file_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        }
+      }
+    },
+    "import_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "symbol",
+        "interval",
+        "timezone",
+        "naive_timezone",
+        "currency",
+        "data_label",
+        "config_sha256"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "timezone": {
+          "$ref": "#/$defs/timezone"
+        },
+        "naive_timezone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timezone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "data_label": {
+          "$ref": "#/$defs/label"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "imported_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "bar_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000
+    },
+    "first_start_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "last_start_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "last_available_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "gaps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gap_count",
+        "missing_intervals",
+        "truncated",
+        "calendar",
+        "entries"
+      ],
+      "properties": {
+        "gap_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "missing_intervals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "calendar": {
+          "const": "none"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "after_start_utc",
+              "before_start_utc",
+              "missing_intervals"
+            ],
+            "properties": {
+              "after_start_utc": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "before_start_utc": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "missing_intervals": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000000
+              }
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authentic",
+        "current",
+        "licensed",
+        "statement"
+      ],
+      "properties": {
+        "authentic": {
+          "const": "not_verified"
+        },
+        "current": {
+          "const": "not_verified"
+        },
+        "licensed": {
+          "const": "not_verified"
+        },
+        "statement": {
+          "const": "A successful import only means the file passed format and consistency checks. It does not show that the data is authentic, current, complete or licensed for any use."
+        }
+      }
+    },
+    "bars": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "start_utc",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "properties": {
+          "start_utc": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "open": {
+            "$ref": "#/$defs/decimal"
+          },
+          "high": {
+            "$ref": "#/$defs/decimal"
+          },
+          "low": {
+            "$ref": "#/$defs/decimal"
+          },
+          "close": {
+            "$ref": "#/$defs/decimal"
+          },
+          "volume": {
+            "$ref": "#/$defs/decimal"
+          }
+        }
+      }
+    },
+    "bars_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    }
+  }
+}
