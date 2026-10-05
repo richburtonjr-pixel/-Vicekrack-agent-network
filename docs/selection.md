@@ -159,6 +159,24 @@ executed.
   new; two stories sharing many generic words may look similar.
 - Significance comes from keyword topics, not real-world impact.
 - Audience interest is unavailable by design until a real, auditable data source exists.
-- An official date change currently verifies as `disputed` when the old official statement
-  is still in the evidence pool (Verification has no notion of a newer statement
-  superseding an older one), so a genuine delay may be held until that is added.
+- Official date changes rely on Step 19 supersession (see
+  [Verification](verification.md#step-19-dated-official-supersession)). When its strict
+  conditions aren't met (missing/close dates, reworded statements, different official
+  sources), the change stays `disputed` and is held or rejected.
+
+## Step 19: official updates
+
+- A newer official statement that supersedes an older conflicting one (Verification 1.1)
+  is ranked with the extra positive reason `supersedes_older_official`.
+- Novelty rule change: a story with a **new verified claim that carries new dates/numbers**
+  is classified as an `update`, even when its wording is at or above `duplicate_threshold`
+  similarity to a story in history. Before Step 19, such stories were rejected as duplicates.
+- Unchanged:
+  - stories whose verified claims were all made before are still `duplicate`
+  - highly similar stories without new verified facts are still `duplicate`
+  - every other gate (verified-claim, dispute, rumor, relevance, age, injection, in-run
+    duplicates, selection limit) applies as before.
+- The superseded older story, when re-verified, is `disputed` and is not selected again.
+- A return to an earlier value (A → B → A) is classified against all history entries.
+  Its claim matches the first story, so it is rejected as a duplicate even though it is a
+  real change. This is a known limitation.

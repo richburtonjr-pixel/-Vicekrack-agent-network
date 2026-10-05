@@ -379,3 +379,13 @@ the current history, then reuses `build_verified_brief`) -> Story Brief with an 
 History is written only at handoff, atomically and with a conflict check. Audience data is
 recorded as unavailable. Earlier stages are unchanged apart from that additive, optional
 Story Brief block. See [Story Selection](selection.md).
+
+## Step 19: dated official supersession
+
+Inside `verify_candidate`, after evidence is collected and capped, `supersessions()` marks
+older first-hand primary statements that a newer, conflicting, same-source, same-fact
+statement with trustworthy publication dates replaces. `decide()` excludes only superseded
+contradictions. Records are version 1.1 (1.0 remains readable and replays with Step 17
+rules). Selection treats a new verified claim with new facts as an `update` even above the
+duplicate-similarity threshold. No new commands, stages, network access or publishing.
+See [Verification](verification.md#step-19-dated-official-supersession).

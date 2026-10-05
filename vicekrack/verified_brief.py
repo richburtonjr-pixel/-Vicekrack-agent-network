@@ -60,6 +60,9 @@ def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=No
             else:
                 backing = [e for e in claim["evidence"]
                            if e["relation"] == "supports" and e["tier"] in ("primary", "secondary")]
+            # Step 19: never cite a statement that a newer official statement superseded.
+            current = [e for e in backing if "superseded_by" not in e]
+            backing = current or backing
             source_ids = []
             for item in backing:
                 source_id = "src-" + item["candidate_id"][5:17]

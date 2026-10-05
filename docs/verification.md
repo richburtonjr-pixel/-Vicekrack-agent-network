@@ -73,9 +73,9 @@ Applied in order (`decide()` in `vicekrack/verification.py`):
 
 | Status | When |
 | --- | --- |
-| `verified` | A primary source states it **first-hand**, and no first-hand primary statement contradicts it |
+| `verified` | A primary source states it **first-hand**, and no first-hand primary statement contradicts it (contradictions superseded under Step 19 rules are not counted) |
 | `rejected` | A first-hand primary statement contradicts it and none supports it, or ≥ 2 independent reputable origins contradict it with no reputable support |
-| `disputed` | First-hand primary statements conflict, or reputable sources both support and contradict it |
+| `disputed` | First-hand primary statements conflict (unless the conflict is resolved by Step 19 supersession), or reputable sources both support and contradict it |
 | `corroborated` | ≥ 2 independent reputable secondary origins support it, nothing reputable contradicts it, no primary confirmation. **Draft-only** |
 | `insufficient_evidence` | Everything else: single origin, unrated sources only, a secondhand report of an official statement, or no matching evidence |
 
@@ -181,3 +181,74 @@ doubt the result is `insufficient_evidence`.
 `select-stories` ranks Verification Records and `brief-from-selection` builds briefs from
 the chosen ones using the same verified-only builder described above. Selection never
 changes a verification status. See [Story Selection](selection.md).
+
+## Step 19: dated official supersession
+
+Official sources sometimes change a fact, for example a release date. Before Step 19, the
+old and new official statements contradicted each other and both claims were `disputed`.
+Now a newer first-hand official statement can **supersede** an older conflicting one. The
+conditions are deliberately strict, and when any is missing the Step 17 behavior stays.
+
+An older evidence item is superseded only when **all** of these hold (`supersessions()`):
+
+| Condition | Rule |
+| --- | --- |
+| Same official source | Both are `primary` tier with the same policy `source_id` and publisher. Different official sources (e.g. Rockstar vs Take-Two) never supersede each other |
+| First-hand | Both are first-hand. Press reports quoting officials, and "reportedly"/attributed statements, never take part |
+| Same fact | Each statement shares ≥ 75% of the other's subject words (`SAME_FACT_MIN_OVERLAP`). A newer "pre-orders open Nov 1" cannot supersede an older "launches Nov 19" |
+| Clear conflict | Both state dates/numbers, each has values the other lacks, and neither is negated (negation-only conflicts stay disputed) |
+| Trustworthy dates | Both have a feed **publication** date (never the Scout retrieval time), no later than their own retrieval time, and at least 1 hour apart (`SUPERSESSION_MIN_GAP`) |
+| No ambiguity | If **any** same-fact conflicting pair from that source has a missing, untrustworthy, equal or too-close date, nothing from that source is superseded |
+
+The superseding statement is the newest conflicting statement (ties broken by evidence
+order). With three dates A → B → C, both A and B point to C.
+
+**Effect on decisions.**
+- Superseded *contradictions* are excluded from contradiction counting. So "launches May
+  26, 2027" (newer) becomes `verified`, with codes `primary_first_hand_support` and
+  `older_official_contradiction_superseded`.
+- Superseded *support* is still counted, but flagged `official_support_superseded`. So the
+  old "launches November 19, 2026" stays `disputed`. It is never upgraded and never
+  silently dropped.
+- Nothing else in `decide()` changes.
+
+**Record contract.**
+- Verification Record version **1.1** is now written; 1.0 records stay valid.
+- New optional evidence field, written only by 1.1 records:
+
+```json
+"superseded_by": {
+  "evidence_index": 1,
+  "candidate_id": "cand-…",
+  "published_at": "2026-10-03T15:00:00Z",
+  "reason": "newer_first_hand_statement_same_source"
+}
+```
+
+- Both statements stay in `evidence` with their URLs, titles, statements, publication and
+  retrieval times.
+- New rationale codes: `older_official_contradiction_superseded`, `official_support_superseded`.
+- New record flag: `official_statement_superseded`. Flags `maxItems` goes from 5 to 6.
+
+**Replay.**
+- 1.1 records: every `superseded_by` mark is recomputed from the stored statements and
+  dates. Adding, removing or moving a mark, or editing a date, is rejected.
+- 1.0 records: replayed with Step 17 rules and must not contain marks.
+- 1.1 record IDs include the rules version, so an old 1.0 file never blocks
+  re-verification. Run `verify` again to get 1.1 records.
+
+**Duplicate evidence.** When the same publisher repeats the same statement, the copy with
+the latest publication date is now kept, so a restated fact keeps its newest date.
+
+**Brief handoff.** `brief-from-verified` / `brief-from-selection` never cite a superseded
+statement as a source when a current one exists.
+
+**Limitations.**
+- Matching is still lexical. If an official update is worded differently ("has been
+  delayed to May 2027" vs "launches November 19, 2026"), it is usually not the "same fact"
+  by the 75% rule, and both claims stay disputed.
+- Feed dates are trusted as published by the source. A feed that re-dates an old article
+  would make an old value look newest; the 1-hour gap and the ambiguity rule reduce, but
+  cannot remove, that risk.
+- Supersession is only between statements already in the stored evidence pool, after the
+  20-item evidence cap.

@@ -8,7 +8,7 @@
                "verified_at", "claims", "summary", "flags"],
   "properties": {
     "contract": { "const": "verification_record" },
-    "version": { "const": "1.0" },
+    "version": { "enum": ["1.0", "1.1"], "description": "1.0: Step 17 rules. 1.1: adds dated same-source official supersession (Step 19)." },
     "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
     "content_profile": { "$ref": "#/$defs/identifier" },
     "candidate": {
@@ -63,7 +63,8 @@
               "primary_first_hand_support", "primary_contradiction", "independent_secondary_origins",
               "secondary_contradiction", "single_origin_only", "repeated_single_origin",
               "secondhand_primary_report", "unrated_sources_only", "no_matching_evidence",
-              "claim_contains_instructions", "conflicting_secondary_reports", "circular_citation"
+              "claim_contains_instructions", "conflicting_secondary_reports", "circular_citation",
+              "older_official_contradiction_superseded", "official_support_superseded"
             ] }
           },
           "rationale": { "$ref": "#/$defs/text", "maxLength": 400 },
@@ -88,7 +89,19 @@
                 "first_hand": { "type": "boolean" },
                 "origin": { "type": "string", "minLength": 1, "maxLength": 120 },
                 "published_at": { "$ref": "#/$defs/optional_timestamp" },
-                "retrieved_at": { "$ref": "#/$defs/timestamp" }
+                "retrieved_at": { "$ref": "#/$defs/timestamp" },
+                "superseded_by": {
+                  "description": "Version 1.1 only. This first-hand official statement was replaced by a newer conflicting one from the same source.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["evidence_index", "candidate_id", "published_at", "reason"],
+                  "properties": {
+                    "evidence_index": { "type": "integer", "minimum": 0, "maximum": 19 },
+                    "candidate_id": { "$ref": "#/$defs/candidate_id" },
+                    "published_at": { "$ref": "#/$defs/timestamp" },
+                    "reason": { "const": "newer_first_hand_statement_same_source" }
+                  }
+                }
               }
             }
           }
@@ -108,9 +121,9 @@
       }
     },
     "flags": {
-      "type": "array", "maxItems": 5, "uniqueItems": true,
+      "type": "array", "maxItems": 6, "uniqueItems": true,
       "items": { "enum": ["instruction_like_text_excluded", "circular_citation", "duplicate_evidence_collapsed",
-                          "evidence_truncated", "pool_truncated"] }
+                          "evidence_truncated", "pool_truncated", "official_statement_superseded"] }
     }
   },
   "$defs": {
