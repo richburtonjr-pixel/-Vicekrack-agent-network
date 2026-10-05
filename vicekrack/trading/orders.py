@@ -31,4 +31,3 @@ def build_intent(signal, decision, snapshot, created_at):
     }
     validate_order_intent(intent)
     return intent
-
