@@ -389,3 +389,25 @@ contradictions. Records are version 1.1 (1.0 remains readable and replays with S
 rules). Selection treats a new verified claim with new facts as an `update` even above the
 duplicate-similarity threshold. No new commands, stages, network access or publishing.
 See [Verification](verification.md#step-19-dated-official-supersession).
+
+## Step 20: bounded article fetching
+
+`articles.py` adds an opt-in stage between Scout and Verification:
+- **Input:** a stored candidate plus an explicit article policy (hosts, path prefixes,
+  limits).
+- **Fetcher:** `FixtureArticleFetcher` offline, or `HttpArticleFetcher` with `--live`.
+  The HTTP fetcher checks the URL, requires public-only DNS and connects through
+  `PinnedHTTPSConnection` (IP pinned, TLS verified for the hostname). Redirects are capped
+  and re-validated, and size and deadline are bounded, with no retries.
+- **Extraction:** an `HTMLParser` keeps article-region text only, with an
+  instruction-sentence filter and a publication date with its origin (never the fetch
+  time).
+- **Output:** Article Evidence (always `unverified`) in `runtime/articles`.
+
+`articles_cli.py` adds `fetch-articles` and `article-list`. `verify --with-articles`
+passes the latest valid evidence per candidate to `verify_candidate`. There, article
+sentences are additional statements under the unchanged Step 17–19 rules.
+
+Verification Record 1.1 gains optional `article_id` evidence fields and
+`evidence_pool.articles_*` fields. The shared injection pattern was tightened. No
+crawling, scheduling or publishing. See [Article fetching](articles.md).

@@ -1,0 +1,22 @@
+{
+  "config_version": "1.0",
+  "profile": "gta",
+  "description": "Offline article fixtures for the synthetic Scout feeds. Not real news.",
+  "fetch_mode": "fixture",
+  "limits": {
+    "max_articles_per_run": 10,
+    "max_bytes_per_article": 1500000,
+    "timeout_seconds": 10,
+    "max_redirects": 3,
+    "max_sentences_per_article": 60,
+    "max_text_chars": 20000
+  },
+  "sources": [
+    { "source_id": "fixture-official", "enabled": true, "hosts": ["official.example.com"], "path_prefixes": ["/news/"] },
+    { "source_id": "fixture-press", "enabled": true, "hosts": ["press.example.org"], "path_prefixes": ["/2026/"] }
+  ],
+  "fixtures": {
+    "https://official.example.com/news/gta-vi-trailer-event": "examples/articles/official-trailer-event.html",
+    "https://press.example.org/2026/10/gta-6-launch-window": "examples/articles/press-launch-window.html"
+  }
+}

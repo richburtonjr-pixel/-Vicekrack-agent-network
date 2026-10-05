@@ -689,3 +689,47 @@ Verification Records are now version 1.1; older 1.0 records stay valid. Re-run
 `verify` to apply the new rules. No new commands. See
 [Verification](docs/verification.md#step-19-dated-official-supersession) and
 [Story Selection](docs/selection.md#step-19-official-updates).
+
+## Step 20: bounded article fetching for richer evidence
+
+Scout only stores short feed excerpts. Step 20 can fetch the article page behind a stored
+candidate and give its text to the Verifier as **extra evidence**. It is never treated as
+verified on its own.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout
+.\.venv\Scripts\python.exe -m vicekrack fetch-articles --all
+.\.venv\Scripts\python.exe -m vicekrack article-list
+.\.venv\Scripts\python.exe -m vicekrack verify --all --with-articles
+```
+
+GTA VI, live (explicit opt-in, no API keys):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout --sources config/scout-sources.gta.json --live
+.\.venv\Scripts\python.exe -m vicekrack fetch-articles --all --sources config/article-sources.gta.json --live
+.\.venv\Scripts\python.exe -m vicekrack verify --all --with-articles --policy config/verification.gta.json
+```
+
+On Linux/macOS use `.venv/bin/python`.
+
+- **Explicit opt-in.** The default policy uses offline fixtures. The GTA policy refuses
+  to run without `--live`.
+- **Only approved pages.** Only each candidate's own link is fetched, and only on approved
+  HTTPS hosts and path prefixes (no query strings).
+- **No private networks.** Private and local network addresses are blocked, and every
+  redirect is re-checked (max 3).
+- **Hard limits.** Timeouts, a byte cap and at most 10 articles per run (policy maximum
+  20). No retries, cookies or auth headers.
+- **Clean text.** Scripts, navigation, hidden text, headings and instruction-like
+  sentences are dropped.
+- **Provenance.** Each Article Evidence file records the requested/final URL, redirects,
+  source, fetch time, content hash, and the publication date with its origin. It never
+  uses the fetch time as the publication date. Files go to ignored `runtime/articles/`.
+- **Same rules for evidence.** `verify --with-articles` adds article sentences under the
+  same first-hand, contradiction and Step 19 supersession rules. Without the flag,
+  verification is unchanged.
+
+Limitations: live mode was only tested with simulated network connections; the GTA path
+prefixes should be confirmed on the first live run; pages that need JavaScript, cookies
+or compressed responses are not supported. See [Article fetching](docs/articles.md).
