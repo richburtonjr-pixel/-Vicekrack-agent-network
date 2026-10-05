@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/market-replay-report.schema.json",
+  "title": "Market replay report 1.0",
+  "description": "Bounded offline replay of a stored dataset on a simulation clock. Historical replay never touches paper accounts or authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "replay_id",
+    "mode",
+    "account_access",
+    "authorization_possible",
+    "dataset_id",
+    "dataset_bars_sha256",
+    "symbol",
+    "interval",
+    "data_label",
+    "simulation",
+    "consumers",
+    "summary",
+    "steps",
+    "steps_truncated",
+    "results_sha256",
+    "created_at",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "market_replay_report"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "replay_id": {
+      "type": "string",
+      "pattern": "^rpl-[0-9a-f]{24}$"
+    },
+    "mode": {
+      "const": "historical_replay"
+    },
+    "account_access": {
+      "const": false
+    },
+    "authorization_possible": {
+      "const": false
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/dataset_id"
+    },
+    "dataset_bars_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "symbol": {
+      "$ref": "#/$defs/symbol"
+    },
+    "interval": {
+      "$ref": "#/$defs/interval"
+    },
+    "data_label": {
+      "$ref": "#/$defs/label"
+    },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_utc",
+        "end_utc",
+        "step_seconds",
+        "steps",
+        "clock"
+      ],
+      "properties": {
+        "start_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "end_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "step_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31622400
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "clock": {
+          "const": "simulation"
+        }
+      }
+    },
+    "consumers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "final"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$"
+          },
+          "final": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": {
+              "type": [
+                "string",
+                "integer",
+                "boolean",
+                "null"
+              ],
+              "maxLength": 120
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bars_delivered",
+        "steps_without_new_bar",
+        "future_access_attempts",
+        "max_visible_bars"
+      ],
+      "properties": {
+        "bars_delivered": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "steps_without_new_bar": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "future_access_attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "max_visible_bars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sim_time_utc",
+          "visible_bars",
+          "new_bars",
+          "latest_start_utc"
+        ],
+        "properties": {
+          "sim_time_utc": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "visible_bars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "new_bars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "latest_start_utc": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "steps_truncated": {
+      "type": "boolean"
+    },
+    "results_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "notice": {
+      "const": "Offline historical replay of stored data on a simulation clock. Not current data, not a signal, no orders, no account access."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    }
+  }
+}

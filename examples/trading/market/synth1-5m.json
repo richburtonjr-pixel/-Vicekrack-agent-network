@@ -1,0 +1,108 @@
+{
+  "fixture": "synthetic_market_bars",
+  "version": "1.0",
+  "synthetic": true,
+  "description": "SYNTHETIC FIXTURE - invented 5-minute bars for SYNTH1 on 2026-01-15 (New York). The 10:00 bar is deliberately missing to show gap reporting. Not market data.",
+  "symbol": "SYNTH1",
+  "interval": "5m",
+  "timezone": "America/New_York",
+  "currency": "USD",
+  "bars": [
+    {
+      "timestamp": "2026-01-15T09:30:00-05:00",
+      "open": "50.00",
+      "high": "50.15",
+      "low": "49.98",
+      "close": "50.12",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-15T09:35:00-05:00",
+      "open": "50.12",
+      "high": "50.15",
+      "low": "50.02",
+      "close": "50.04",
+      "volume": "1037"
+    },
+    {
+      "timestamp": "2026-01-15T09:40:00-05:00",
+      "open": "50.04",
+      "high": "50.12",
+      "low": "50.02",
+      "close": "50.09",
+      "volume": "1074"
+    },
+    {
+      "timestamp": "2026-01-15T09:45:00-05:00",
+      "open": "50.09",
+      "high": "50.22",
+      "low": "50.07",
+      "close": "50.19",
+      "volume": "1111"
+    },
+    {
+      "timestamp": "2026-01-15T09:50:00-05:00",
+      "open": "50.19",
+      "high": "50.22",
+      "low": "50.13",
+      "close": "50.15",
+      "volume": "1148"
+    },
+    {
+      "timestamp": "2026-01-15T09:55:00-05:00",
+      "open": "50.15",
+      "high": "50.25",
+      "low": "50.13",
+      "close": "50.22",
+      "volume": "1185"
+    },
+    {
+      "timestamp": "2026-01-15T10:05:00-05:00",
+      "open": "50.22",
+      "high": "50.25",
+      "low": "50.09",
+      "close": "50.11",
+      "volume": "1222"
+    },
+    {
+      "timestamp": "2026-01-15T10:10:00-05:00",
+      "open": "50.11",
+      "high": "50.17",
+      "low": "50.09",
+      "close": "50.14",
+      "volume": "1259"
+    },
+    {
+      "timestamp": "2026-01-15T10:15:00-05:00",
+      "open": "50.14",
+      "high": "50.23",
+      "low": "50.12",
+      "close": "50.20",
+      "volume": "1296"
+    },
+    {
+      "timestamp": "2026-01-15T10:20:00-05:00",
+      "open": "50.20",
+      "high": "50.23",
+      "low": "50.16",
+      "close": "50.18",
+      "volume": "1333"
+    },
+    {
+      "timestamp": "2026-01-15T10:25:00-05:00",
+      "open": "50.18",
+      "high": "50.30",
+      "low": "50.16",
+      "close": "50.27",
+      "volume": "1370"
+    },
+    {
+      "timestamp": "2026-01-15T10:30:00-05:00",
+      "open": "50.27",
+      "high": "50.30",
+      "low": "50.20",
+      "close": "50.22",
+      "volume": "1407"
+    }
+  ]
+}

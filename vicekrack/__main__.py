@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"market-import", "market-inspect", "market-list", "market-replay"}:
+        from .trading.market.cli import main as market_main
+        return market_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"trading-demo", "trading-journal", "trading-config-check", "trading-kill-switch", "trading-state"}:
         from .trading.cli import main as trading_main
         return trading_main()

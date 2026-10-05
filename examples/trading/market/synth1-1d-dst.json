@@ -1,0 +1,52 @@
+{
+  "fixture": "synthetic_market_bars",
+  "version": "1.0",
+  "synthetic": true,
+  "description": "SYNTHETIC FIXTURE - invented daily bars for SYNTH1 across the 2026-03-08 New York daylight-saving change. The weekend appears as a 2-day gap because no market calendar is applied. Not market data.",
+  "symbol": "SYNTH1",
+  "interval": "1d",
+  "timezone": "America/New_York",
+  "currency": "USD",
+  "bars": [
+    {
+      "timestamp": "2026-03-05T00:00:00-05:00",
+      "open": "80.00",
+      "high": "80.15",
+      "low": "79.98",
+      "close": "80.12",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-03-06T00:00:00-05:00",
+      "open": "80.12",
+      "high": "80.15",
+      "low": "80.02",
+      "close": "80.04",
+      "volume": "1037"
+    },
+    {
+      "timestamp": "2026-03-09T00:00:00-04:00",
+      "open": "80.04",
+      "high": "80.12",
+      "low": "80.02",
+      "close": "80.09",
+      "volume": "1074"
+    },
+    {
+      "timestamp": "2026-03-10T00:00:00-04:00",
+      "open": "80.09",
+      "high": "80.22",
+      "low": "80.07",
+      "close": "80.19",
+      "volume": "1111"
+    },
+    {
+      "timestamp": "2026-03-11T00:00:00-04:00",
+      "open": "80.19",
+      "high": "80.22",
+      "low": "80.13",
+      "close": "80.15",
+      "volume": "1148"
+    }
+  ]
+}

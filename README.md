@@ -931,3 +931,43 @@ or `state_incompatible`. Because the paper state is disposable demo data, start 
 account with `trading-state init --account NAME`.
 
 See [Trading](docs/trading.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 25: offline market data and replay (no live feeds)
+
+Import OHLCV bars from labelled synthetic fixtures or your own local CSV file, validate
+them, and replay them on a simulation clock. **An import is not proof that data is
+authentic, current or licensed.** Every dataset records `not_verified`. Nothing here
+connects to a feed, creates signals or trades, or touches paper accounts.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter csv --file examples\trading\market\synthetic-synth2-5m.csv --symbol SYNTH2 --interval 5m --timezone America/New_York --label synthetic
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack market-inspect DATASET_ID --bars 5
+.\.venv\Scripts\python.exe -m vicekrack market-replay DATASET_ID --show-steps
+.\.venv\Scripts\python.exe -m vicekrack market-list --replays
+```
+
+On Linux/macOS use `.venv/bin/python` and `/`. Expected with `synth1-5m`: 12 bars and one
+reported gap (the deliberately missing 10:00 bar). The replay has 14 simulated steps and
+delivers 12 bars, and `future_probe` shows `refused: 14, leaked: 0`.
+
+- **Contracts:** `ohlcv_bar` 1.0 (timezone-aware timestamp, close time, exact decimals,
+  source, currency, label), `market_dataset` 1.0 (provenance with the source SHA-256 and
+  import settings, explicit gaps) and `market_replay_report` 1.0.
+- **Validation:** CSV structure, UTF-8, timezone-aware timestamps (and daylight-saving
+  gaps and overlaps when `--naive-timezone` is used), OHLC relationships, non-negative
+  volume, strict order, duplicates, interval alignment, and the size, row and field
+  limits in `config/market-data.json`.
+- **Gaps:** missing intervals are reported and never filled. No market calendar is
+  applied.
+- **Labels:** `synthetic`, `historical`, `delayed` or `unknown` (the CSV default). These
+  are declared by you and never verified.
+- **Storage:** ignored `runtime/trading/market/`, with atomic writes and no overwrite. The
+  same source bytes for the same symbol and interval are always rejected as
+  `dataset_exists`. Source files are never modified.
+- **Replay:** bounded and deterministic. Consumers see only bars that have closed by the
+  simulated time. Replay is separate from paper accounts (`account_access: false`), so
+  old data can't bypass freshness checks.
+
+See [Market data](docs/market-data.md) and the [Roadmap](docs/roadmap.md).
