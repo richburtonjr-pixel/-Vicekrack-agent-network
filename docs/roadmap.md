@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay and descriptive indicators | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -39,7 +39,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 23 | Trading | Paper-only trading foundation: contracts, exact decimals, config limits, kill switch, risk engine, journal, synthetic demo | #23 |
 | 24 | Trading | Persistent paper risk state: processed signals, authorized intents, daily counters, pending exposure reservations, one locked operation, crash recovery, cancellation, roadmap | #24 |
 | 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | #25 |
-| 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | this PR |
+| 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | #26 |
+| 27 | Trading | Rule-based research signals (VWAP reclaim, EMA crossover, breakout with optional volume filter) on closed bars and indicators: exact comparisons, not-ready handling, cooldown, deterministic IDs, bounded evaluations; research only, `authorization_possible: false` | this PR |
 
 ## Deferred work
 
@@ -65,7 +66,7 @@ Other content work that is deferred and not scheduled:
   above first.
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
-The content track has had no new steps since Step 22, while Steps 23–26 built the trading
+The content track has had no new steps since Step 22, while Steps 23–27 built the trading
 foundation. Nothing in the trading track changed content behaviour; all content tests
 still pass.
 
@@ -76,11 +77,14 @@ still pass.
 - Market calendars, corporate actions and multi-symbol datasets.
 - More indicators, price sources (for example open or typical price for EMA) and adjusted
   data. Step 26 has EMA, Wilder RSI, the volume average and session VWAP only.
-- Signals or strategies built on indicators, and any connection from indicators to the
-  risk engine or paper accounts.
+- Turning research signals (Step 27) into order-type `trading_signal` proposals or paper
+  intents, and any connection from indicators or research signals to the risk engine or
+  paper accounts.
+- More research rules (short or exit rules, rule combinations), backtests, performance
+  statistics or P&L of research signals.
 - Connecting replayed or imported data to paper authorization. This would need a
   separate, freshness-safe design.
-- Strategy or AI-generated signals.
+- AI-generated signals or AI trading agents.
 - Broker connections and order submission.
 - Simulated or real fills, positions and realized P&L.
 - Background or scheduled execution.

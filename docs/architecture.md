@@ -588,3 +588,44 @@ flowchart LR
 **Boundary:** the indicator package never imports account, risk, order, journal or signal
 code (a test enforces this). Results always say `account_access: false` and
 `authorization_possible: false`. See [Indicators](indicators.md).
+
+## Step 27: rule-based research signals
+
+`vicekrack/trading/signals/` evaluates research-only rules in the same bounded replay:
+
+```mermaid
+flowchart LR
+    D[(market_dataset)] --> R[market.replay.drive: closed bars only]
+    R --> S[SignalConsumer]
+    S --> I[IndicatorConsumer, gap policy reset]
+    I --> S
+    S --> E[strategies: vwap_reclaim, ema_crossover, breakout - pure rules]
+    E --> V[evaluations: triggered / not_triggered / not_ready + reasons + values]
+    E --> G[research_signal 1.0, rsig- deterministic ID, authorization_possible false]
+    V --> U[(runtime/trading/signals/runs)]
+    G --> K[(runtime/trading/signals/records, stored once)]
+    S -. no import .- X[PaperAccount / risk / orders / journal / trading_signal]
+```
+
+- `strategies.py`: pure rule functions over a short history of processed bars. Each
+  history item holds exact prices, the Step 26 points published for that bar, the
+  consecutive-bar count since the last gap, and the VWAP session.
+- `engine.py`:
+  - `load_strategies` validates the named configurations (fast < slow, multiplier > 0,
+    one VWAP session per run);
+  - `indicator_settings_for` derives the Step 26 settings, which may be empty for a plain
+    breakout (`build_settings(..., allow_empty=True)`, a new opt-in flag);
+  - `SignalConsumer` applies cooldown, builds records and enforces the evaluation limit;
+  - `run_signals` and `validate_run` produce and check the run.
+- `store.py`: `SignalStore` publishes records before runs with exclusive links, keeps the
+  first stored record on duplicates (`already_recorded`) and reports `signal_conflict` for
+  any other difference.
+- `cli.py`: `signal-run`, `signal-inspect` and `signal-list`.
+
+**Boundary:**
+- The signal package never imports account, risk, order or journal code (a test enforces
+  this).
+- `research_signal` IDs (`rsig-…`) don't match the `trading_signal` contract that paper
+  authorization requires, and research signals carry no order proposal.
+
+See [Research signals](research-signals.md).

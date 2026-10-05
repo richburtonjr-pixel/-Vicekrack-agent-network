@@ -1,0 +1,67 @@
+{
+  "config_version": "1.0",
+  "description": "Named research-only strategies (Step 27). Evaluated offline on closed bars; never authorize orders.",
+  "limits": {
+    "max_strategies": 6,
+    "max_evaluations": 200000,
+    "max_cli_entries": 50
+  },
+  "strategies": {
+    "vwap-reclaim": {
+      "strategy": "vwap_reclaim",
+      "version": "1.0",
+      "params": {
+        "cooldown_bars": 3,
+        "expiry_bars": 1,
+        "session": {
+          "timezone": "America/New_York",
+          "start": "09:30",
+          "end": "16:00"
+        }
+      }
+    },
+    "ema-cross-3-5": {
+      "strategy": "ema_crossover",
+      "version": "1.0",
+      "params": {
+        "fast": 3,
+        "slow": 5,
+        "cooldown_bars": 2,
+        "expiry_bars": 1
+      }
+    },
+    "ema-cross-9-21": {
+      "strategy": "ema_crossover",
+      "version": "1.0",
+      "params": {
+        "fast": 9,
+        "slow": 21,
+        "cooldown_bars": 5,
+        "expiry_bars": 1
+      }
+    },
+    "breakout-3": {
+      "strategy": "breakout",
+      "version": "1.0",
+      "params": {
+        "lookback": 3,
+        "volume_filter": null,
+        "cooldown_bars": 2,
+        "expiry_bars": 1
+      }
+    },
+    "breakout-20-volume": {
+      "strategy": "breakout",
+      "version": "1.0",
+      "params": {
+        "lookback": 20,
+        "volume_filter": {
+          "period": 20,
+          "multiplier": "1.5"
+        },
+        "cooldown_bars": 5,
+        "expiry_bars": 2
+      }
+    }
+  }
+}

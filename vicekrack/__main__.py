@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"signal-run", "signal-inspect", "signal-list"}:
+        from .trading.signals.cli import main as signal_main
+        return signal_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"indicator-calc", "indicator-inspect", "indicator-list"}:
         from .trading.indicators.cli import main as indicator_main
         return indicator_main()

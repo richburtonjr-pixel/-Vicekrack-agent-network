@@ -14,10 +14,11 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-26]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-27]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
         T2[market/: offline datasets + replay, no account access]
         T3[indicators/: descriptive values on closed bars, no account access]
+        T4[signals/: research-only rule evaluations, no account access]
     end
     CC[Future Command Center: read-only views]
     Content --> Core
@@ -38,19 +39,23 @@ flowchart TB
 - **Code:** `vicekrack/trading/` only. Schemas live in `schemas/trading/`, config in
   `config/trading.paper.json` and fixtures in `examples/trading/`.
 - **Storage:** `runtime/trading/` only: the journal, the kill-switch file, the paper
-  accounts (`runtime/trading/accounts/`), market data (`runtime/trading/market/`) and
-  indicator results (`runtime/trading/indicators/`).
+  accounts (`runtime/trading/accounts/`), market data (`runtime/trading/market/`),
+  indicator results (`runtime/trading/indicators/`) and research signals
+  (`runtime/trading/signals/`).
 - **Market-data boundary:** `vicekrack/trading/market/` (Step 25) never imports the
   account state, risk engine, order or journal modules. Replay can't authorize anything
   or change an account.
 - **Indicator boundary:** `vicekrack/trading/indicators/` (Step 26) uses only the market
   package and shared money/contract helpers. Results are descriptive and are not wired
   into risk checks or accounts.
+- **Research-signal boundary:** `vicekrack/trading/signals/` (Step 27) uses market data and
+  indicators only. A research signal (`rsig-…`, `authorization_possible: false`) is a
+  different contract from the order-type `trading_signal`, and it never reaches risk
+  checks, accounts or intents.
 - **Imports:** only the shared core: `vicekrack.errors` and `vicekrack.persistence`. It
   never imports content modules, and content modules never import it.
-- **CLI:** only the `trading-*`, `market-*` and `indicator-*` commands, routed by
-  `vicekrack/__main__.py` to `vicekrack.trading.cli`, `vicekrack.trading.market.cli` and
-  `vicekrack.trading.indicators.cli`.
+- **CLI:** only the `trading-*`, `market-*`, `indicator-*` and `signal-*` commands, routed
+  by `vicekrack/__main__.py` to the matching `cli` module in `vicekrack.trading`.
 - **Scope today:** paper only, with offline market data. There are no live market feeds, broker connections, live
   orders, AI trading decisions or background loops.
 
@@ -72,8 +77,9 @@ Changes to the shared core must keep both subsystems' tests passing.
 
 A future dashboard should be a **read-only** consumer.
 
-- **Trading:** the journal events (`trading_journal_event` 1.1) and the account state
-  (`trading-state show`) are designed for it. Each event says which `agent` acted, what
+- **Trading:** the journal events (`trading_journal_event` 1.1), the account state
+  (`trading-state show`) and the research-signal evaluations (`signal-inspect`) are
+  designed for it. Each event says which `agent` acted, what
   `document` it saw or produced (with a hash), the key `observed` figures and its
   `reason_codes`. Each `risk_check` event carries every
   check with its limit and observed value. `python -m vicekrack trading-journal RUN_ID`

@@ -1012,3 +1012,41 @@ restart warm-up after it, and VWAP shows `session_gap` for the rest of that sess
   to ignored `runtime/trading/indicators/`.
 
 See [Indicators](docs/indicators.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 27: rule-based research signals (research only)
+
+Evaluate fixed rules on closed bars and indicators during a bounded offline replay. A
+research signal is **not** advice, a profitability claim or an order. Every record says
+`authorization_possible: false`, has no order proposal and never touches paper accounts.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack signal-list --strategies
+.\.venv\Scripts\python.exe -m vicekrack signal-run DATASET_ID --strategy vwap-reclaim --strategy ema-cross-3-5 --strategy breakout-3 --save
+.\.venv\Scripts\python.exe -m vicekrack signal-list --signals
+.\.venv\Scripts\python.exe -m vicekrack signal-inspect RUN_ID --strategy breakout-3 --outcome not_ready
+```
+
+On Linux/macOS use `.venv/bin/python`. With `synth1-5m`, `vwap-reclaim` triggers on bar 3
+and `breakout-3` on bar 11. Bars after the deliberately missing 10:00 bar are `not_ready`
+while their inputs warm up again.
+
+- **Rules:**
+  - **VWAP reclaim:** close(t−1) ≤ VWAP(t−1) and close(t) > VWAP(t), in the same session.
+  - **EMA crossover:** fast(t−1) ≤ slow(t−1) and fast(t) > slow(t).
+  - **Breakout(N):** close(t) > the highest high of the previous N bars, and the previous
+    close wasn't already above its own level. The optional volume filter needs
+    volume(t) ≥ multiplier × the volume average up to t−1.
+
+  Named configurations live in `config/research-signals.json`.
+- **Outcomes:** every bar and strategy gets `triggered`, `not_triggered` or `not_ready`,
+  with reason codes and the values compared. Missing, unavailable or gap-invalidated
+  inputs are always `not_ready`, never a signal.
+- **Transitions, cooldown and IDs:** signals fire only on the transition. Cooldown counts
+  closed bars. The same strategy, configuration, dataset and bar always give the same
+  `rsig-…` ID, and a signal is stored only once (`already_recorded`).
+- **Storage:** atomic and never overwritten, in ignored `runtime/trading/signals/`.
+  Records and runs carry hashes, and tampering is rejected.
+
+See [Research signals](docs/research-signals.md) and the [Roadmap](docs/roadmap.md).
