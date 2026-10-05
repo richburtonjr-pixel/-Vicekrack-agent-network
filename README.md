@@ -733,3 +733,51 @@ On Linux/macOS use `.venv/bin/python`.
 Limitations: live mode was only tested with simulated network connections; the GTA path
 prefixes should be confirmed on the first live run; pages that need JavaScript, cookies
 or compressed responses are not supported. See [Article fetching](docs/articles.md).
+
+## Step 21: controlled production pipeline
+
+One command turns a selected story into a local, watermarked preview by running the
+existing stages in a fixed order:
+
+**brief → Creator → script validation → scene plan → local preview**
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack scout
+.\.venv\Scripts\python.exe -m vicekrack verify --all
+.\.venv\Scripts\python.exe -m vicekrack select-stories --all
+.\.venv\Scripts\python.exe -m vicekrack produce SELECTION_RUN_ID RECORD_ID
+.\.venv\Scripts\python.exe -m vicekrack production-list
+.\.venv\Scripts\python.exe -m vicekrack production-inspect PRODUCTION_ID
+.\.venv\Scripts\python.exe -m vicekrack production-resume PRODUCTION_ID
+```
+
+On Linux/macOS use `.venv/bin/python`. For GTA VI add
+`--policy config/verification.gta.json --profile config/editorial.gta.json` to `produce`.
+Optional flags:
+- `--narration voice.wav`: local WAV narration (Step 14).
+- `--creator-config config/creator.anthropic.json --allow-paid`: one paid Creator request,
+  with explicit consent.
+
+- **Safe defaults.** Before starting, it re-checks configuration, report and evidence
+  freshness, and story eligibility. It defaults to the mock Creator and local rendering.
+- **State.** Saved after every stage in ignored `runtime/productions/<id>/`: config file
+  hashes (no credentials), stage status, artifact paths and hashes, timestamps, and error
+  codes only.
+- **Duplicates.** One production per story, plus an OS lock. A second `produce` for the
+  same story returns `production_exists`.
+- **Story history.** The story is `reserved` when the brief is made, and `produced` only
+  after the preview is saved. A reservation never blocks the production's own resume.
+- **Stop and resume.** It stops on failure. `production-resume` re-validates config,
+  narration, evidence freshness and every artifact hash, then continues at the first
+  incomplete stage without repeating completed ones.
+- **Paid requests.** A paid request that may have completed needs
+  `--retry-uncertain --allow-paid`.
+- **Output.** The preview stays watermarked, `preview_only: true`, `publishable: false`.
+
+**Recovery example.** If `produce` stops with `{"stage": "preview", "code":
+"renderer_unavailable"}`:
+1. Install `requirements-render.txt`.
+2. Run `production-resume PRODUCTION_ID`. Only the preview stage runs.
+
+See [Production pipeline](docs/production.md) for all codes, the paid-request example
+and limitations.

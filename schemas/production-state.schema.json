@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack production run",
+  "description": "Saved state of one controlled production (Step 21), version 1.0. Holds configuration hashes, stage status, artifact paths and hashes, timestamps and sanitized error codes only: no prompts, credentials, environment values or raw exceptions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "production_id", "status", "created_at", "updated_at", "config", "stages", "trace", "result"],
+  "properties": {
+    "contract": { "const": "production_run" },
+    "version": { "const": "1.0" },
+    "production_id": { "$ref": "#/$defs/production_id" },
+    "status": { "enum": ["ready", "running", "failed", "uncertain", "completed"] },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "selection_run_id", "record_id", "candidate_id", "policy", "editorial_profile", "creator",
+                   "capabilities", "narration", "allow_draft_preview"],
+      "properties": {
+        "profile": { "$ref": "#/$defs/identifier" },
+        "selection_run_id": { "type": "string", "pattern": "^sel-[0-9a-f]{24}$" },
+        "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
+        "candidate_id": { "type": "string", "pattern": "^cand-[0-9a-f]{24}$" },
+        "policy": { "$ref": "#/$defs/config_file" },
+        "editorial_profile": { "$ref": "#/$defs/config_file" },
+        "capabilities": { "$ref": "#/$defs/config_file" },
+        "creator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "adapter", "model", "paid"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relative_path" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "adapter": { "enum": ["mock", "openai", "anthropic"] },
+            "model": { "type": ["string", "null"], "maxLength": 100 },
+            "paid": { "type": "boolean" }
+          }
+        },
+        "narration": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "sha256": { "$ref": "#/$defs/sha256" }
+              }
+            }
+          ]
+        },
+        "allow_draft_preview": { "type": "boolean" }
+      }
+    },
+    "stages": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "attempts", "started_at", "finished_at", "error_code", "artifacts"],
+        "properties": {
+          "name": { "enum": ["brief", "creator", "validate", "plan", "preview"] },
+          "status": { "enum": ["pending", "running", "completed", "failed", "uncertain"] },
+          "attempts": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "started_at": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+          "finished_at": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+          "error_code": { "anyOf": [{ "$ref": "#/$defs/code" }, { "type": "null" }] },
+          "artifacts": {
+            "type": "object",
+            "maxProperties": 12,
+            "propertyNames": { "pattern": "^[a-z0-9_]{1,40}$" },
+            "additionalProperties": { "type": ["string", "boolean", "integer", "null"], "maxLength": 1024 }
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "array", "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "event", "at", "error_code"],
+        "properties": {
+          "stage": { "enum": ["brief", "creator", "validate", "plan", "preview"] },
+          "event": { "enum": ["started", "completed", "failed", "uncertain", "interrupted"] },
+          "at": { "$ref": "#/$defs/timestamp" },
+          "error_code": { "anyOf": [{ "$ref": "#/$defs/code" }, { "type": "null" }] }
+        }
+      }
+    },
+    "result": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["preview_file", "manifest_file", "publishable", "preview_only", "blocked_for_production", "audio_present"],
+          "properties": {
+            "preview_file": { "type": "string", "maxLength": 1024 },
+            "manifest_file": { "type": "string", "maxLength": 1024 },
+            "publishable": { "const": false },
+            "preview_only": { "const": true },
+            "blocked_for_production": { "type": "boolean" },
+            "audio_present": { "type": "boolean" }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+    "production_id": { "type": "string", "pattern": "^prod-[0-9a-f]{24}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "code": { "type": "string", "pattern": "^[a-z_]{1,60}$" },
+    "relative_path": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$", "maxLength": 300 },
+    "config_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": { "path": { "$ref": "#/$defs/relative_path" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    }
+  }
+}

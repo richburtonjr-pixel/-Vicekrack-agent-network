@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"produce", "production-resume", "production-list", "production-inspect"}:
+        from .production_cli import main as production_main
+        return production_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"fetch-articles", "article-list"}:
         from .articles_cli import main as articles_main
         return articles_main()

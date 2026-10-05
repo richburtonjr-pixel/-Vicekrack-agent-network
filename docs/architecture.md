@@ -411,3 +411,31 @@ sentences are additional statements under the unchanged Step 17–19 rules.
 Verification Record 1.1 gains optional `article_id` evidence fields and
 `evidence_pool.articles_*` fields. The shared injection pattern was tightened. No
 crawling, scheduling or publishing. See [Article fetching](articles.md).
+
+## Step 21: controlled production
+
+`production.py` adds a `Pipeline` that executes a fixed list of five stages over existing
+implementations:
+- `select_brief` (Step 18)
+- `draft_short_script` (Step 15)
+- `validate_short_script` (Step 11)
+- `build_scene_plan` (Step 12)
+- `render_preview` (Steps 13/14)
+
+**State and checkpoints.** A `ProductionStore` keeps validated state
+(`schemas/production-state.schema.json`), exclusive creation per story, an OS lock and
+atomic writes. Each stage is checkpointed before (intent) and after (artifacts + SHA-256).
+
+**Resume.** Resume re-validates configuration hashes, narration, evidence freshness and
+the artifact chain, then continues at the first incomplete stage.
+
+**Paid failures.** Paid Creator failures that are not known pre-request errors, and
+crashes during the paid stage, become `uncertain` and need explicit retry consent.
+
+**History.** Story history entries gain optional `state` (`reserved`/`produced`) and
+`production_id`. A production ignores its own reservation when rechecking eligibility,
+and marks it `produced` only after the preview is saved.
+
+`production_cli.py` adds `produce`, `production-resume`, `production-list` and
+`production-inspect`. No publishing, scheduling or background execution. See
+[Production pipeline](production.md).

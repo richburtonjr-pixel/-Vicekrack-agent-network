@@ -182,7 +182,8 @@ def main():
         elif args.command == "selection-history":
             _, _, profile, _ = _configs(args.policy, args.profile)
             history, _ = load_history(profile)
-            result = {"entries": [{key: e[key] for key in ("selection_id", "brief_id", "record_id", "topics", "selected_at")}
+            result = {"entries": [{**{key: e[key] for key in ("selection_id", "brief_id", "record_id", "topics", "selected_at")},
+                                   "state": e.get("state", "briefed"), "production_id": e.get("production_id")}
                                   for e in history["entries"]],
                       "max_entries": profile["history"]["max_entries"], "window_days": profile["history"]["window_days"]}
         else:

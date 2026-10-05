@@ -162,6 +162,12 @@ def validate_history(history, profile):
     ids = [entry["selection_id"] for entry in history["entries"]]
     if len(ids) != len(set(ids)) or len(ids) > profile["history"]["max_entries"]:
         raise NetworkError("invalid_story_history", "Story history has duplicate or too many entries.")
+    # Step 21: production reservations carry both fields; plain briefs carry neither.
+    if any(("state" in entry) != ("production_id" in entry) for entry in history["entries"]):
+        raise NetworkError("invalid_story_history", "Story history production fields must appear together.")
+    owners = [entry["production_id"] for entry in history["entries"] if "production_id" in entry]
+    if len(owners) != len(set(owners)):
+        raise NetworkError("invalid_story_history", "A production may own only one history entry.")
 
 
 def history_digest(history):
