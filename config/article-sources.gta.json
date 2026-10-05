@@ -1,0 +1,42 @@
+{
+  "config_version": "1.0",
+  "profile": "gta",
+  "description": "GTA VI article fetching. Live requests need --live. Path prefixes are explicit; anything else is blocked.",
+  "fetch_mode": "http",
+  "limits": {
+    "max_articles_per_run": 10,
+    "max_bytes_per_article": 1500000,
+    "timeout_seconds": 10,
+    "max_redirects": 3,
+    "max_sentences_per_article": 60,
+    "max_text_chars": 20000
+  },
+  "sources": [
+    {
+      "source_id": "rockstar-newswire",
+      "enabled": false,
+      "hosts": ["www.rockstargames.com"],
+      "path_prefixes": ["/newswire/article/"],
+      "note": "Disabled like the Scout source until a Rockstar feed is confirmed."
+    },
+    {
+      "source_id": "take-two-ir",
+      "enabled": true,
+      "hosts": ["ir.take2games.com"],
+      "path_prefixes": ["/news-releases/"],
+      "note": "Take-Two news-release detail pages."
+    },
+    {
+      "source_id": "gamespot-news",
+      "enabled": true,
+      "hosts": ["www.gamespot.com", "gamespot.com"],
+      "path_prefixes": ["/articles/"]
+    },
+    {
+      "source_id": "ign-games",
+      "enabled": true,
+      "hosts": ["www.ign.com", "ign.com"],
+      "path_prefixes": ["/articles/"]
+    }
+  ]
+}

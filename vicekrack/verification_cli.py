@@ -44,7 +44,7 @@ def load_pool(root=None, limit=500):
     return pool, invalid
 
 
-def verify_stored(candidate_ids, policy_path, *, verify_all=False, root=None, clock=utc_now):
+def verify_stored(candidate_ids, policy_path, *, verify_all=False, root=None, clock=utc_now, with_articles=False):
     policy, policy_sha = load_policy(policy_path)
     pool, invalid = load_pool(root, policy["rules"]["max_candidates"])
     profile_pool = [c for c in pool if c["content_profile"] == policy["profile"]]
@@ -62,10 +62,14 @@ def verify_stored(candidate_ids, policy_path, *, verify_all=False, root=None, cl
         targets = list(dict.fromkeys(candidate_ids))
     truncated = len(targets) > MAX_TARGETS
     targets = targets[:MAX_TARGETS]
+    articles, invalid_articles = [], 0
+    if with_articles:
+        from .articles_cli import load_articles  # Opt-in only (Step 20).
+        articles, invalid_articles = load_articles(root)
     records_dir, _ = paths(root)
     rows, totals = [], {"verified": 0, "corroborated": 0, "disputed": 0, "insufficient_evidence": 0, "rejected": 0}
     for cid in targets:
-        record = verify_candidate(by_id[cid], profile_pool, policy, policy_sha, clock=clock)
+        record = verify_candidate(by_id[cid], profile_pool, policy, policy_sha, clock=clock, articles=articles)
         saved = _publish(record, records_dir, record["record_id"] + ".json")
         for status, count in record["summary"].items():
             totals[status] += count
@@ -74,6 +78,7 @@ def verify_stored(candidate_ids, policy_path, *, verify_all=False, root=None, cl
                      "flags": record["flags"], "saved": saved,
                      "record_file": str((records_dir / (record["record_id"] + ".json")).resolve())})
     return {"policy_profile": policy["profile"], "candidates_considered": len(profile_pool),
+            "articles_available": len(articles), "invalid_article_files": invalid_articles,
             "invalid_candidate_files": invalid, "records": rows, "claim_totals": totals,
             "truncated": truncated, "published": False}
 
@@ -134,6 +139,8 @@ def main():
     run.add_argument("candidate_ids", nargs="*", metavar="CANDIDATE_ID")
     run.add_argument("--all", action="store_true", help="Verify every stored candidate (at most 50 per run)")
     run.add_argument("--policy", default="config/verification.mock.json")
+    run.add_argument("--with-articles", action="store_true",
+                     help="Also use stored Article Evidence from fetch-articles as extra evidence")
     show = commands.add_parser("verify-list")
     show.add_argument("--policy", default="config/verification.mock.json")
     show.add_argument("--status", choices=["verified", "corroborated", "disputed", "insufficient_evidence", "rejected"])
@@ -150,7 +157,8 @@ def main():
         if args.command == "verify":
             if args.all and args.candidate_ids:
                 raise NetworkError("no_candidates_selected", "Use either candidate IDs or --all, not both.")
-            result = verify_stored(args.candidate_ids, args.policy, verify_all=args.all)
+            result = verify_stored(args.candidate_ids, args.policy, verify_all=args.all,
+                                   with_articles=args.with_articles)
         elif args.command == "verify-list":
             result = {"records": list_records(args.policy, status=args.status)}
         else:

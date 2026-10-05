@@ -252,3 +252,19 @@ statement as a source when a current one exists.
   cannot remove, that risk.
 - Supersession is only between statements already in the stored evidence pool, after the
   20-item evidence cap.
+
+## Step 20: article evidence
+
+With `verify --with-articles`, sentences from stored Article Evidence (see
+[Article fetching](articles.md)) are added to the evidence pool for their candidate.
+- **Rules unchanged:** they are matched, tiered, attribution-checked, de-duplicated and
+  origin-clustered by the same rules. Fetched text never verifies anything by itself.
+- **Provenance:** evidence items from articles carry `article_id`, the article's
+  publication date (page metadata or feed, never fetch time) and its fetch time as
+  `retrieved_at`.
+- **Supersession:** an article date marked `null` (ambiguous, imprecise, future or in
+  conflict with the feed) blocks Step 19 supersession for that source.
+- **Record IDs:** records that used articles include `evidence_pool.articles_considered`
+  and `articles_sha256`, and a distinct `record_id`.
+- **Injection filter:** the shared instruction filter also now catches "mark this
+  claim/statement/story as verified" forms.

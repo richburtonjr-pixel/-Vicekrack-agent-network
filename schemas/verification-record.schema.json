@@ -41,6 +41,8 @@
       "required": ["candidates_considered", "pool_sha256"],
       "properties": {
         "candidates_considered": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "articles_considered": { "type": "integer", "minimum": 1, "maximum": 500, "description": "Step 20, optional: fetched articles used as extra evidence." },
+        "articles_sha256": { "$ref": "#/$defs/sha256" },
         "pool_sha256": { "$ref": "#/$defs/sha256" }
       }
     },
@@ -90,6 +92,7 @@
                 "origin": { "type": "string", "minLength": 1, "maxLength": 120 },
                 "published_at": { "$ref": "#/$defs/optional_timestamp" },
                 "retrieved_at": { "$ref": "#/$defs/timestamp" },
+                "article_id": { "type": "string", "pattern": "^art-[0-9a-f]{24}$", "description": "Step 20, optional: the statement came from this fetched article (published_at/retrieved_at are the article's)." },
                 "superseded_by": {
                   "description": "Version 1.1 only. This first-hand official statement was replaced by a newer conflicting one from the same source.",
                   "type": "object",

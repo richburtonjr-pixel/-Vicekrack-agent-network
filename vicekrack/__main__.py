@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"fetch-articles", "article-list"}:
+        from .articles_cli import main as articles_main
+        return articles_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"select-stories", "selection-history", "brief-from-selection"}:
         from .selection_cli import main as selection_main
         return selection_main()

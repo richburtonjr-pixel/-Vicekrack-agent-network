@@ -44,6 +44,7 @@ RECORD_VERSION = "1.1"
 SAME_FACT_MIN_OVERLAP = 0.75             # Each statement must share >= 75% of the other's subject words.
 SUPERSESSION_MIN_GAP = timedelta(hours=1)  # Closer publication times are treated as ambiguous.
 SUPERSESSION_REASON = "newer_first_hand_statement_same_source"
+MAX_ARTICLE_STATEMENTS = 40              # Step 20: article sentences considered per candidate.
 
 STATEMENT_CHARS, MIN_STATEMENT_CHARS, MAX_STATEMENTS_PER_CANDIDATE = 300, 20, 12
 UNNAMED_ORIGIN = "unnamed sources"
@@ -65,7 +66,8 @@ INSTRUCTION_TEXT = re.compile(
     r"\b(ignore|disregard|forget|override)\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior|above|earlier|system)\s+"
     r"(instructions?|prompts?|rules|messages?)"
     r"|\bsystem\s+prompt\b"
-    r"|\b(mark|treat|label|classify|set)\s+(this|these|it|the\s+claims?|all\s+claims?|status)\s+(as\s+|to\s+)?"
+    r"|\b(mark|treat|label|classify|set)\s+(this|these|it|the|all|status)\s+"
+    r"(claims?\s+|statements?\s+|facts?\s+|stor(?:y|ies)\s+|evidence\s+)?(as\s+|to\s+)?"
     r"(verified|true|confirmed|approved)\b"
     r"|\byou\s+are\s+(now\s+)?(an?|the)\s+(ai|assistant|language\s+model|verifier)\b"
     r"|(^|\s)(assistant|system|developer)\s*:",
@@ -412,7 +414,7 @@ def _pool_digest(pool):
     return _sha256(_canonical(sorted((c["candidate_id"], _sha256(_canonical(c))) for c in pool)))
 
 
-def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
+def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now, articles=None):
     """Return a validated Verification Record for candidate, using pool as evidence.
 
     pool: stored Story Candidates (the target is added if missing). Invalid candidates
@@ -422,6 +424,7 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
     if candidate["content_profile"] != policy["profile"]:
         raise NetworkError("profile_mismatch", "Candidate and verification policy use different profiles.")
     rules, aliases = policy["rules"], policy["attribution_aliases"]
+    articles = _checked_articles(articles, pool + [candidate])
     for item in pool:
         validate_candidate(item)  # Every pool entry, before any deduplication.
     by_id = {c["candidate_id"]: c for c in pool if c["content_profile"] == policy["profile"]}
@@ -451,7 +454,19 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
             if source and source != publisher:
                 edges.add((publisher, source))
                 origins.union(publisher, source)
-            rows.append((text, features, source))
+            rows.append((text, features, source, None))
+        article = articles.get(member["candidate_id"])
+        for text in (article["sentences"][:MAX_ARTICLE_STATEMENTS] if article else ()):
+            # Step 20: fetched article text is more evidence under the same rules, never a verdict.
+            features = analyze(text)
+            source, _ = attribution(text, aliases)
+            if features["instructions"]:
+                flags.add("instruction_like_text_excluded")
+                continue
+            if source and source != publisher:
+                edges.add((publisher, source))
+                origins.union(publisher, source)
+            rows.append((text, features, source, article))
         analyzed[member["candidate_id"]] = (publisher, rows)
     cyclic = _cycle_nodes(edges)
 
@@ -462,17 +477,20 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
         for member in members:
             publisher, rows = analyzed[member["candidate_id"]]
             tier = tier_for(member["source"]["source_id"], member["url"], policy)
-            for text, features, source in rows:
+            for text, features, source, article in rows:
                 found = relation(target, features, rules["match_threshold"])
                 if not found:
                     continue
+                # Article statements carry the article's own publication date (page metadata or
+                # feed, never fetch time) and its fetch time as retrieval time.
+                published = article["published_at"] if article else member["published_at"]
+                retrieved = article["fetched_at"] if article else member["retrieved_at"]
                 key = (publisher, found, " ".join(sorted(features["content"])))
                 if key in seen:
                     flags.add("duplicate_evidence_collapsed")
                     kept = evidence[seen[key]]
                     # Keep the newest dated copy so a repeated statement keeps its latest date.
-                    if member["published_at"] and (kept["published_at"] is None
-                                                   or member["published_at"] > kept["published_at"]):
+                    if published and (kept["published_at"] is None or published > kept["published_at"]):
                         evidence[seen[key]] = None
                         seen[key] = len(evidence)
                     else:
@@ -485,8 +503,9 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
                     "title": member["title"], "tier": tier,
                     "relation": found, "statement": text,
                     "first_hand": is_first_hand(text, member["source"]["publisher"], aliases),
-                    "origin": source or publisher, "published_at": member["published_at"],
-                    "retrieved_at": member["retrieved_at"], "_features": features})
+                    "origin": source or publisher, "published_at": published,
+                    "retrieved_at": retrieved, "_features": features,
+                    **({"article_id": article["article_id"]} if article else {})})
         evidence = [item for item in evidence if item is not None]
         # Near-identical wording from different publishers is one origin (copied/syndicated).
         local = origins.copy()
@@ -522,9 +541,11 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
                        "primary_support": primary, "independent_origins": independent, "evidence": evidence})
 
     pool_sha = _pool_digest(members)
+    used = {cid: articles[cid] for cid in ordered if cid in articles}
+    articles_sha = _sha256(_canonical(sorted((a["article_id"], a["content_sha256"]) for a in used.values()))) if used else None
     record = {
         "contract": "verification_record", "version": RECORD_VERSION,
-        "record_id": record_id_for(candidate["candidate_id"], policy_sha256, pool_sha, RECORD_VERSION),
+        "record_id": record_id_for(candidate["candidate_id"], policy_sha256, pool_sha, RECORD_VERSION, articles_sha),
         "content_profile": candidate["content_profile"],
         "candidate": {"candidate_id": candidate["candidate_id"], "source_id": candidate["source"]["source_id"],
                       "publisher": candidate["source"]["publisher"], "url": candidate["url"],
@@ -532,7 +553,8 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
                       "retrieved_at": candidate["retrieved_at"],
                       "url_sha256": candidate["fingerprints"]["url_sha256"]},
         "policy": {"profile": policy["profile"], "policy_sha256": policy_sha256},
-        "evidence_pool": {"candidates_considered": len(members), "pool_sha256": pool_sha},
+        "evidence_pool": {"candidates_considered": len(members), "pool_sha256": pool_sha,
+                          **({"articles_considered": len(used), "articles_sha256": articles_sha} if used else {})},
         "verified_at": clock(),
         "claims": claims, "summary": summary, "flags": sorted(flags),
     }
@@ -540,13 +562,37 @@ def verify_candidate(candidate, pool, policy, policy_sha256, *, clock=utc_now):
     return record
 
 
-def record_id_for(candidate_id, policy_sha256, pool_sha256, version):
+def record_id_for(candidate_id, policy_sha256, pool_sha256, version, articles_sha256=None):
     """1.0 keeps its original formula; newer rule versions get distinct IDs so an existing
-    1.0 file never blocks re-verification under the new rules."""
+    1.0 file never blocks re-verification under the new rules. Records that used fetched
+    articles (Step 20) also include the article set, so they never collide with feed-only ones."""
     seed = f"{candidate_id}\n{policy_sha256}\n{pool_sha256}"
     if version != "1.0":
         seed += f"\nrules={version}"
+    if articles_sha256:
+        seed += f"\narticles={articles_sha256}"
     return "ver-" + _sha256(seed)[:24]
+
+
+def _checked_articles(articles, pool):
+    """Validate Article Evidence and match each to its pool candidate (Step 20, opt-in)."""
+    if not articles:
+        return {}
+    from .articles import validate_evidence  # Local import: articles imports this module.
+    by_id = {c["candidate_id"]: c for c in pool}
+    checked = {}
+    for article in articles:
+        validate_evidence(article)
+        candidate = by_id.get(article["candidate_id"])
+        if candidate is None:
+            continue  # Evidence for a candidate outside this pool is simply not used.
+        if (article["requested_url"] != candidate["url"] or article["source"] != candidate["source"]
+                or article["content_profile"] != candidate["content_profile"]):
+            raise NetworkError("invalid_article_evidence", "Article Evidence does not match its Scout candidate.")
+        current = checked.get(article["candidate_id"])
+        if current is None or (article["fetched_at"], article["article_id"]) > (current["fetched_at"], current["article_id"]):
+            checked[article["candidate_id"]] = article  # Latest fetch per candidate.
+    return checked
 
 
 def validate_record(record, policy, policy_sha256=None):
@@ -601,7 +647,13 @@ def validate_record(record, policy, policy_sha256=None):
         fail("summary counts do not match the claims")
     if any_superseded != ("official_statement_superseded" in record["flags"]):
         fail("supersession flag does not match the evidence")
+    pool_info = record["evidence_pool"]
+    if ("articles_sha256" in pool_info) != ("articles_considered" in pool_info):
+        fail("article pool fields must appear together")
+    if "articles_sha256" not in pool_info and any("article_id" in e for c in record["claims"] for e in c["evidence"]):
+        fail("article evidence requires the article pool fields")
     expected_id = record_id_for(record["candidate"]["candidate_id"], record["policy"]["policy_sha256"],
-                                record["evidence_pool"]["pool_sha256"], record["version"])
+                                record["evidence_pool"]["pool_sha256"], record["version"],
+                                record["evidence_pool"].get("articles_sha256"))
     if record["record_id"] != expected_id:
         fail("record_id does not match its inputs")
