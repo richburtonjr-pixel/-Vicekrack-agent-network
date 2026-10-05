@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/paper-state-pending.schema.json",
+  "title": "Paper account write-ahead marker (Step 24)",
+  "description": "Written before journal and state updates; removed after the state commit. If it remains, the account is blocked until explicit recovery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "account_id",
+    "operation_id",
+    "operation",
+    "revision_before",
+    "revision_after",
+    "state_sha256_after",
+    "signal_ids",
+    "intent_ids",
+    "run_id",
+    "created_at"
+  ],
+  "properties": {
+    "contract": {
+      "const": "paper_state_pending"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "account_id": {
+      "$ref": "#/$defs/account_id"
+    },
+    "operation_id": {
+      "$ref": "#/$defs/operation_id"
+    },
+    "operation": {
+      "enum": [
+        "authorize",
+        "cancel"
+      ]
+    },
+    "revision_before": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "revision_after": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "state_sha256_after": {
+      "$ref": "#/$defs/sha256"
+    },
+    "signal_ids": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/signal_id"
+      }
+    },
+    "intent_ids": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/intent_id"
+      }
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^run-[0-9a-f]{32}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^acct-[a-z0-9][a-z0-9-]{2,40}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^sig-[a-z0-9-]{4,64}$"
+    },
+    "intent_id": {
+      "type": "string",
+      "pattern": "^pint-[0-9a-f]{24}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^rdec-[0-9a-f]{24}$"
+    },
+    "operation_id": {
+      "type": "string",
+      "pattern": "^op-[0-9a-f]{32}$"
+    }
+  }
+}

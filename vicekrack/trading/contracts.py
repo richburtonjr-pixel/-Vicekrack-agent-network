@@ -25,6 +25,7 @@ SCHEMAS = {
     "market_snapshot": "market-snapshot", "trading_signal": "signal", "paper_portfolio_state": "paper-portfolio",
     "risk_decision": "risk-decision", "paper_order_intent": "paper-order-intent",
     "trading_journal_event": "journal-event", "paper_config": "paper-config",
+    "paper_account_state": "paper-account-state", "paper_state_pending": "paper-state-pending",
 }
 FUTURE_SKEW = timedelta(seconds=5)
 # Field names that must never appear in trading data (in addition to the shared core list).
@@ -49,6 +50,10 @@ def sha256(document):
     return hashlib.sha256(canonical(document).encode("utf-8")).hexdigest()
 
 
+def utc_now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def parse_time(stamp):
     return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
@@ -60,7 +65,7 @@ def reject_trading_secrets(document):
         encoded = json.dumps(document, allow_nan=False)
     except (TypeError, ValueError):
         raise TradingError("invalid_document", "Trading data must contain finite JSON values.") from None
-    except Exception as error:  # Shared core raises NetworkError('sensitive_state').
+    except Exception:  # Shared core raises NetworkError('sensitive_state').
         raise TradingError("sensitive_state", "Trading data contains a credential.") from None
 
     def walk(item):
@@ -175,8 +180,16 @@ def validate_order_intent(intent):
             _fail("paper_order_intent", "quantity must be greater than zero")
 
 
+V11_STAGES = {"state_initialized", "intent_cancelled", "state_recovery"}
+V11_STATUSES = {"cancelled", "committed", "rolled_back"}
+
+
 def validate_journal_event(event):
     validate_schema("trading_journal_event", event)
+    if event["version"] == "1.0" and (event["stage"] in V11_STAGES or event["status"] in V11_STATUSES
+                                     or event["agent"] == "paper_state"
+                                     or {"account_id", "operation_id"} & set(event["subject"])):
+        _fail("trading_journal_event", "version 1.0 events cannot use account-state fields")
     document = event["document"]
     if (document is None) != (event["document_sha256"] is None):
         _fail("trading_journal_event", "document and document hash must appear together")

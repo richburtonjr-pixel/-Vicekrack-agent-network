@@ -22,6 +22,7 @@ from vicekrack.trading.journal import TradingJournal, summarize
 from vicekrack.trading.money import fmt, multiply, parse
 from vicekrack.trading.orders import build_intent
 from vicekrack.trading.risk import evaluate
+from vicekrack.trading.state import PaperAccount
 
 AS_OF = "2026-01-15T15:00:00Z"
 
@@ -85,7 +86,8 @@ class ContractTests(Base):
     def test_schemas_are_versioned(self):
         for path in (ROOT / "schemas/trading").glob("*.schema.json"):
             schema = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(schema["properties"].get("version", schema["properties"].get("config_version"))["const"], "1.0")
+            version = schema["properties"].get("version", schema["properties"].get("config_version"))
+            self.assertIn("1.0", [version["const"]] if "const" in version else version["enum"])
             self.assertFalse(schema["additionalProperties"])
 
     def test_malformed_snapshots(self):
@@ -359,17 +361,23 @@ class JournalTests(Base):
 
 
 class DemoTests(Base):
+    def setUp(self):
+        super().setUp()
+        PaperAccount("paper-demo", root=self.root, clock=lambda: AS_OF).initialize()
+
     EXPECTED = {"allowed": [("authorized_paper", [])],
                 "exposure-breach": [("blocked", ["position_exposure_exceeded"])],
                 "daily-loss": [("blocked", ["daily_loss_limit_reached"])],
                 "stale-data": [("blocked", ["snapshot_stale"])],
                 "invalid-money": [("blocked", ["invalid_or_missing_inputs", "invalid_market_snapshot"])],
-                "duplicate-signal": [("authorized_paper", []), ("blocked", ["duplicate_signal"])]}
+                "duplicate-signal": [("authorized_paper", []), ("blocked", ["duplicate_signal"])],
+                "pending-exposure": [("authorized_paper", [])]}   # alone it fits; see StateTests for the reservation case
 
     def test_every_scenario(self):
         for name, expected in self.EXPECTED.items():
             with self.subTest(name):
-                result = demo.run_demo(name, root=self.root, clock=lambda: AS_OF)
+                PaperAccount(f"t-{name}", root=self.root, clock=lambda: AS_OF).initialize()   # fresh account each
+                result = demo.run_demo(name, account=f"t-{name}", root=self.root, clock=lambda: AS_OF)
                 self.assertEqual([(i["status"], i["reason_codes"]) for i in result["intents"]], expected)
                 self.assertFalse(result["executed"])
                 self.assertFalse(result["submitted"])
@@ -408,6 +416,8 @@ class DemoTests(Base):
             with redirect_stdout(output):
                 code = trading_main(list(argv), root=self.root)
             return code, json.loads(output.getvalue())
+        code, error = run("trading-demo", "--scenario", "allowed", "--account", "nobody")
+        self.assertEqual((code, error["error"]["code"]), (1, "state_not_initialized"))
         code, result = run("trading-demo", "--scenario", "allowed")
         self.assertEqual(code, 0)
         self.assertFalse(result["executed"])

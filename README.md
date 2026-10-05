@@ -169,7 +169,7 @@ legacy invocations remain ephemeral; use the saved-run commands below for persis
 - `tests/test_workflow.py`: sequence, mixed providers, errors, budgets, and trace tests.
 
 The original provider and orchestration tests remain part of the complete suite.
-See [architecture details](docs/architecture.md) and the [Steps 1–6 audit](docs/step-7-audit.md).
+See [architecture details](docs/architecture.md) and the [Steps 1â€“6 audit](docs/step-7-audit.md).
 
 
 ## Step 6: saved workflows and explicit recovery
@@ -292,7 +292,7 @@ Optional policy inside a workflow registry:
 }
 ```
 
-`max_retries` defaults to 1, accepts integers 0–3, and counts additional attempts **per
+`max_retries` defaults to 1, accepts integers 0â€“3, and counts additional attempts **per
 stage across explicit resumes**. It does not enable automatic retries. `max_steps`
 limits distinct stages to three; total stage attempts cannot exceed
 `3 * (1 + max_retries)` (at most 12). Both SDKs still disable their own retries.
@@ -823,6 +823,7 @@ synthetic data:
 
 ```powershell
 .\.venv\Scripts\python.exe -m vicekrack trading-config-check
+.\.venv\Scripts\python.exe -m vicekrack trading-state init
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario allowed
 .\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario exposure-breach
 .\.venv\Scripts\python.exe -m vicekrack trading-journal
@@ -832,7 +833,8 @@ synthetic data:
 ```
 
 On Linux/macOS use `.venv/bin/python`. The other scenarios are `daily-loss`,
-`stale-data`, `invalid-money` and `duplicate-signal`.
+`stale-data`, `invalid-money`, `duplicate-signal` and `pending-exposure`. Since Step 24
+the demo needs an initialized paper account (see below).
 
 - **Contracts:** versioned 1.0 JSON contracts in `schemas/trading/` cover market
   snapshots, signals, paper portfolio, risk decisions, paper order intents and journal
@@ -849,6 +851,83 @@ On Linux/macOS use `.venv/bin/python`. The other scenarios are `daily-loss`,
 - **Output label:** every result says `SIMULATED`, with `submitted: false` and
   `executed: false`.
 
-Limitations: synthetic fixtures only, there is no persistent paper ledger, and there is
-no dashboard. See [Trading](docs/trading.md) and
+Limitations: synthetic fixtures only and no dashboard. Step 24 added persistent paper
+state. See [Trading](docs/trading.md) and
 [Subsystem boundaries](docs/subsystems.md).
+
+## Step 24: persistent paper risk state (paper only)
+
+Paper accounts now remember what they have done across restarts. **Nothing is submitted
+or executed.** An *authorized paper intent* is not a submitted order, not an executed
+trade and not realized profit or loss. Every account shows `submitted_orders: 0`,
+`executed_trades: 0` and `realized_pnl: null`.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack trading-state init
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario allowed
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario pending-exposure
+.\.venv\Scripts\python.exe -m vicekrack trading-demo --scenario allowed
+.\.venv\Scripts\python.exe -m vicekrack trading-state show
+.\.venv\Scripts\python.exe -m vicekrack trading-state cancel INTENT_ID --reason operator_request --note "Demo cancel"
+.\.venv\Scripts\python.exe -m vicekrack trading-state recover
+.\.venv\Scripts\python.exe -m vicekrack trading-state list
+```
+
+On Linux/macOS use `.venv/bin/python`. Expected results:
+1. The first `allowed` run authorizes a paper intent and reserves 10 SYNTH1.
+2. `pending-exposure` is blocked with `position_exposure_exceeded`, because the 10 units
+   still reserved push it over the limit.
+3. A second `allowed` run is blocked with `duplicate_signal`.
+4. `show` lists the intent (copy its `intent_id`). `cancel` releases its reservation and
+   records your reason; the history is kept.
+
+Use `--account NAME` on any command for a separate account, and `--timezone` on `init`
+(the default is `America/New_York`).
+
+- **Persistent state:** `runtime/trading/accounts/<account>/state.json` (ignored by git)
+  holds processed signal IDs, authorized intents with their reservations, daily counters
+  and past days. It is validated, self-hashed and revisioned.
+- **One locked operation:** the duplicate check, risk checks and reservation run as one
+  step while a shared OS lock on the account is held. Concurrent requests wait their
+  turn, and pending reservations count toward exposure.
+- **Trading day:** the trading day follows the account's timezone and rolls over at local
+  midnight. Daily counters reset; processed signals and active reservations never do. A
+  clock that goes backwards blocks authorization.
+- **Fail safe:** authorization is blocked by:
+  - a missing account (`state_not_initialized`, so use `init`);
+  - a missing state file (`state_missing`);
+  - a corrupted or tampered state (`state_corrupt`);
+  - an unknown version (`state_incompatible`);
+  - an unfinished operation (`state_recovery_required`).
+
+### Recovery examples
+
+Every change writes a pending-operation note (`pending.json`), then the journal, then the
+state, and only then removes the note. If a crash or disk error interrupts it, the note
+stays and every new authorization is refused:
+
+```
+{"error": {"code": "state_recovery_required", "message": "An unfinished paper account operation exists; run trading-state recover."}}
+```
+
+Run `trading-state recover`. It compares revisions and reports one of these:
+- `committed`: the state was saved before the crash. The note is cleared and nothing is
+  authorized twice.
+- `rolled_back`: the state was not saved. The signal is still marked as processed (as
+  `rolled_back`), so it can never be authorized later.
+- `discarded_unreadable`: the note itself was damaged. Any intent that the journal
+  recorded for this account but the state does not have is reconciled the same way.
+- `clean`: nothing needed recovering.
+
+Example after an interrupted authorization:
+
+```
+python -m vicekrack trading-state recover
+{"status": "rolled_back", "account_id": "acct-paper-demo", "revision": 3, ...}
+```
+
+Recovery never repairs a corrupted `state.json`. That stays blocked, with `state_corrupt`
+or `state_incompatible`. Because the paper state is disposable demo data, start a new
+account with `trading-state init --account NAME`.
+
+See [Trading](docs/trading.md) and the [Roadmap](docs/roadmap.md).

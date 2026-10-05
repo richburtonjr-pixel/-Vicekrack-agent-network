@@ -14,8 +14,8 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Step 23]
-        T1[Contracts -> Risk engine -> Paper order intent -> Journal]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-24]
+        T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
     end
     CC[Future Command Center: read-only views]
     Content --> Core
@@ -35,7 +35,8 @@ flowchart TB
 
 - **Code:** `vicekrack/trading/` only. Schemas live in `schemas/trading/`, config in
   `config/trading.paper.json` and fixtures in `examples/trading/`.
-- **Storage:** `runtime/trading/` only (journal and kill-switch file).
+- **Storage:** `runtime/trading/` only: the journal, the kill-switch file and the paper
+  accounts (`runtime/trading/accounts/`).
 - **Imports:** only the shared core: `vicekrack.errors` and `vicekrack.persistence`. It
   never imports content modules, and content modules never import it.
 - **CLI:** only the `trading-*` commands, routed by `vicekrack/__main__.py` to
@@ -61,11 +62,14 @@ Changes to the shared core must keep both subsystems' tests passing.
 
 A future dashboard should be a **read-only** consumer.
 
-- **Trading:** the journal events (`trading_journal_event` 1.0) are designed for it. Each
-  event says which `agent` acted, what `document` it saw or produced (with a hash), the
-  key `observed` figures and its `reason_codes`. Each `risk_check` event carries every
+- **Trading:** the journal events (`trading_journal_event` 1.1) and the account state
+  (`trading-state show`) are designed for it. Each event says which `agent` acted, what
+  `document` it saw or produced (with a hash), the key `observed` figures and its
+  `reason_codes`. Each `risk_check` event carries every
   check with its limit and observed value. `python -m vicekrack trading-journal RUN_ID`
   already prints that timeline.
 - **Content:** the production states and quality reports are its data source.
 - **Rule:** the Command Center must not authorize orders, change limits or release the
   kill switch without a separate, explicit design step.
+
+See also the [Roadmap](roadmap.md).

@@ -1,8 +1,8 @@
 {
   "fixture": "synthetic_trading_scenario",
   "version": "1.1",
-  "scenario": "allowed",
-  "description": "SYNTHETIC FIXTURE - fresh synthetic data within every paper limit; expect an authorized paper intent (not executed).",
+  "scenario": "pending-exposure",
+  "description": "SYNTHETIC FIXTURE - an existing 25-unit synthetic position plus a 10-unit buy fits alone (1750 of 2000), but not with another active 10-unit paper reservation; run after 'allowed' on the same account to see pending exposure block it.",
   "synthetic": true,
   "as_of": "2026-01-15T15:00:00Z",
   "snapshot": {
@@ -31,7 +31,7 @@
     {
       "contract": "trading_signal",
       "version": "1.0",
-      "signal_id": "sig-synth1-allowed",
+      "signal_id": "sig-synth1-pending-exposure",
       "strategy": {
         "strategy_id": "synthetic_demo_rule",
         "version": "1.0"
@@ -74,7 +74,13 @@
     "as_of": "2026-01-15T14:58:00Z",
     "currency": "USD",
     "equity": "25000.00",
-    "positions": [],
+    "positions": [
+      {
+        "symbol": "SYNTH1",
+        "quantity": "25",
+        "average_price": "48.00"
+      }
+    ],
     "day": {
       "trading_date": "2026-01-15",
       "pnl": "-50.00"

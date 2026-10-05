@@ -52,7 +52,7 @@ class TradingJournal:
             raise TradingError("journal_unknown_run", "Events can only be appended to a run started by this journal.")
         sequence = self._sequence[correlation_id] + 1
         event = {
-            "contract": "trading_journal_event", "version": "1.0",
+            "contract": "trading_journal_event", "version": "1.1",
             "event_id": event_id or "evt-" + uuid.uuid4().hex, "correlation_id": correlation_id,
             "causation_id": causation_id, "sequence": sequence, "recorded_at": recorded_at,
             "stage": stage, "status": status, "agent": agent, "subject": dict(subject or {}),
@@ -136,11 +136,11 @@ class TradingJournal:
         for name in names:
             try:
                 events = self.read_run(name)
-                first, last = events[0], events[-1]
+                first, last = (events[0], events[-1]) if events else ({"recorded_at": None, "subject": {}}, {"stage": None})
                 runs.append({"run_id": name, "started_at": first["recorded_at"],
                              "scenario": first["subject"].get("scenario"), "events": len(events),
                              "finished": last["stage"] == "run_finished", "readable": True})
-            except (TradingError, IndexError):
+            except TradingError:
                 runs.append({"run_id": name, "started_at": None, "scenario": None, "events": None,
                              "finished": False, "readable": False})
         return sorted(runs, key=lambda r: (r["started_at"] or "", r["run_id"]), reverse=True)
