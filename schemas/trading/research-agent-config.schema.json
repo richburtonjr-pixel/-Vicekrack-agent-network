@@ -1,0 +1,633 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/research-agent-config.schema.json",
+  "title": "Research agent workflow 1.0",
+  "description": "Deterministic four-stage research workflow settings (Step 28). Research only; no providers, no orders.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_version",
+    "limits",
+    "strategies",
+    "scout",
+    "trend"
+  ],
+  "properties": {
+    "config_version": {
+      "const": "1.0"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_stages",
+        "max_window_bars",
+        "max_signals",
+        "max_handoff_bytes",
+        "stage_timeout_seconds"
+      ],
+      "properties": {
+        "max_stages": {
+          "const": 4
+        },
+        "max_window_bars": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200
+        },
+        "max_signals": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_handoff_bytes": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 100000
+        },
+        "stage_timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        }
+      }
+    },
+    "strategies": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/strategy_name"
+      }
+    },
+    "scout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_bars",
+        "freshness_max_intervals",
+        "session"
+      ],
+      "properties": {
+        "min_bars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "freshness_max_intervals": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timezone",
+            "start",
+            "end"
+          ],
+          "properties": {
+            "timezone": {
+              "$ref": "#/$defs/timezone"
+            },
+            "start": {
+              "$ref": "#/$defs/hhmm"
+            },
+            "end": {
+              "$ref": "#/$defs/hhmm"
+            }
+          }
+        }
+      }
+    },
+    "trend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ema_fast",
+        "ema_slow",
+        "rsi",
+        "volume_sma",
+        "rsi_overbought",
+        "rsi_oversold",
+        "volume_elevated_multiple"
+      ],
+      "properties": {
+        "ema_fast": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "ema_slow": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 500
+        },
+        "rsi": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 500
+        },
+        "volume_sma": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "rsi_overbought": {
+          "$ref": "#/$defs/decimal"
+        },
+        "rsi_oversold": {
+          "$ref": "#/$defs/decimal"
+        },
+        "volume_elevated_multiple": {
+          "$ref": "#/$defs/decimal"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    },
+    "hhmm": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "indicator_key": {
+      "type": "string",
+      "pattern": "^(ema|rsi|volume_sma)_[0-9]{1,3}$|^vwap_session$"
+    },
+    "strategy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^rsig-[0-9a-f]{24}$"
+    },
+    "strategy_def": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "vwap_reclaim"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "session"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "session": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "timezone",
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "$ref": "#/$defs/timezone"
+                    },
+                    "start": {
+                      "$ref": "#/$defs/hhmm"
+                    },
+                    "end": {
+                      "$ref": "#/$defs/hhmm"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "ema_crossover"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "fast",
+                "slow"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "fast": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "slow": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "breakout"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "lookback",
+                "volume_filter"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "lookback": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "volume_filter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "period",
+                        "multiplier"
+                      ],
+                      "properties": {
+                        "period": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 500
+                        },
+                        "multiplier": {
+                          "$ref": "#/$defs/decimal"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "role": {
+      "enum": [
+        "market_scout",
+        "trend_agent",
+        "strategy_agent",
+        "risk_review"
+      ]
+    },
+    "findings": {
+      "type": "object",
+      "maxProperties": 40,
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]{1,40}$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 200
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "agent_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conclusion",
+        "summary",
+        "findings",
+        "reason_codes",
+        "limitations"
+      ],
+      "properties": {
+        "conclusion": {
+          "$ref": "#/$defs/code"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "findings": {
+          "$ref": "#/$defs/findings"
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "role",
+        "handler",
+        "status",
+        "conclusion",
+        "summary",
+        "findings",
+        "reason_codes",
+        "limitations",
+        "input_sha256",
+        "output_sha256",
+        "sim_time_utc"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "handler": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,40}@[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "conclusion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "findings": {
+          "$ref": "#/$defs/findings"
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "input_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sim_time_utc": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

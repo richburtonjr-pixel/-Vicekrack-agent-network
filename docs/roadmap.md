@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals and a deterministic research-agent workflow | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -40,7 +40,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 24 | Trading | Persistent paper risk state: processed signals, authorized intents, daily counters, pending exposure reservations, one locked operation, crash recovery, cancellation, roadmap | #24 |
 | 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | #25 |
 | 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | #26 |
-| 27 | Trading | Rule-based research signals (VWAP reclaim, EMA crossover, breakout with optional volume filter) on closed bars and indicators: exact comparisons, not-ready handling, cooldown, deterministic IDs, bounded evaluations; research only, `authorization_possible: false` | this PR |
+| 27 | Trading | Rule-based research signals (VWAP reclaim, EMA crossover, breakout with optional volume filter) on closed bars and indicators: exact comparisons, not-ready handling, cooldown, deterministic IDs, bounded evaluations; research only, `authorization_possible: false` | #27 |
+| 28 | Trading | Bounded deterministic research-agent workflow: Market Scout, Trend Agent, Strategy Agent and Risk Review stages with validated handoffs over evidence frozen at a simulated time; fixed four-stage controller, explicit failure states, interface for a future AI analysis layer; research only | this PR |
 
 ## Deferred work
 
@@ -66,7 +67,7 @@ Other content work that is deferred and not scheduled:
   above first.
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
-The content track has had no new steps since Step 22, while Steps 23–27 built the trading
+The content track has had no new steps since Step 22, while Steps 23–28 built the trading
 foundation. Nothing in the trading track changed content behaviour; all content tests
 still pass.
 
@@ -84,7 +85,9 @@ still pass.
   statistics or P&L of research signals.
 - Connecting replayed or imported data to paper authorization. This would need a
   separate, freshness-safe design.
-- AI-generated signals or AI trading agents.
+- AI-generated signals or AI trading agents. Step 28's agents are deterministic local
+  rules; only an interface for advisory AI commentary exists, with no provider calls.
+- Any path from the research-agent verdict to paper authorization or intents.
 - Broker connections and order submission.
 - Simulated or real fills, positions and realized P&L.
 - Background or scheduled execution.

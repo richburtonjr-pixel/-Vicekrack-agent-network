@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/research-agent-output.schema.json",
+  "title": "Research agent stage output 1.0",
+  "description": "What a role handler may return: no next stage, tasks, retries or commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "conclusion",
+    "summary",
+    "findings",
+    "reason_codes",
+    "limitations"
+  ],
+  "properties": {
+    "version": {
+      "const": "1.0"
+    },
+    "conclusion": {
+      "$ref": "#/$defs/code"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "findings": {
+      "$ref": "#/$defs/findings"
+    },
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/code"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      }
+    }
+  },
+  "$defs": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "findings": {
+      "type": "object",
+      "maxProperties": 40,
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]{1,40}$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 200
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

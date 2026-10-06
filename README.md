@@ -1050,3 +1050,45 @@ while their inputs warm up again.
   Records and runs carry hashes, and tampering is rejected.
 
 See [Research signals](docs/research-signals.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 28: research-agent workflow (deterministic, research only)
+
+Four local role handlers review the evidence available at a simulated time, in a fixed
+order: Market Scout → Trend Agent → Strategy Agent → Risk Review. The final output
+explains each role's conclusion and limitations. It says `research_only: true` and
+`authorization_possible: false`. No AI provider, broker, risk engine, intent or paper
+account is involved.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack agent-run DATASET_ID --save
+.\.venv\Scripts\python.exe -m vicekrack agent-run DATASET_ID --as-of 2026-01-20T15:00:00Z
+.\.venv\Scripts\python.exe -m vicekrack agent-list
+.\.venv\Scripts\python.exe -m vicekrack agent-inspect RUN_ID --role strategy_agent
+```
+
+On Linux/macOS use `.venv/bin/python`. With `synth1-5m-reclaim`, the default `--as-of`
+(the last bar close) gives `sufficient_for_future_paper_evaluation`. `--as-of
+2026-01-20T15:00:00Z` gives `insufficient_…`: six bars have closed and the trend is
+assessed, but no research signal is active yet.
+
+- **Evidence at T only:** the controller builds the evidence from replays that end at
+  `--as-of`. Agents never see the dataset, so later bars are invisible to them. Expired
+  research signals are listed as history and are never treated as active.
+- **Strict handoffs:**
+  - the stage order is fixed, with at most four stages;
+  - each stage gets its own evidence slice and read-only copies of earlier handoffs;
+  - outputs must match `research_agent_output` 1.0, with no next-stage, task or retry
+    fields, and are size- and credential-checked.
+- **Failure states:** an error, an invalid output or an exceeded time budget fails that
+  stage. Later stages are `not_run` and the run is `failed`. Nothing retries
+  automatically.
+- **Records:** dataset and config hashes, an evidence hash, the simulated time, every
+  handoff's input and output hashes, statuses and reason codes. Runs are deterministic and
+  saved atomically in ignored `runtime/trading/agents/`. Tampered runs and datasets are
+  rejected.
+- **AI layer:** `AnalysisLayer` is an interface for future advisory-only commentary. Only
+  `"none"` exists, and there are no provider calls.
+
+See [Research agents](docs/research-agents.md) and the [Roadmap](docs/roadmap.md).
