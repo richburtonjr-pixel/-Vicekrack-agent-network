@@ -1,0 +1,92 @@
+{
+  "fixture": "synthetic_market_bars",
+  "version": "1.0",
+  "synthetic": true,
+  "description": "SYNTHETIC FIXTURE - invented 5-minute bars for SYNTH1 on 2026-01-20 (New York) with no gaps, built so the research-agent demo reaches every stage with an active, non-conflicting research signal on the last bar. Not market data.",
+  "symbol": "SYNTH1",
+  "interval": "5m",
+  "timezone": "America/New_York",
+  "currency": "USD",
+  "bars": [
+    {
+      "timestamp": "2026-01-20T09:30:00-05:00",
+      "open": "49.90",
+      "high": "49.90",
+      "low": "49.90",
+      "close": "49.90",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T09:35:00-05:00",
+      "open": "49.90",
+      "high": "49.90",
+      "low": "49.85",
+      "close": "49.85",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T09:40:00-05:00",
+      "open": "49.85",
+      "high": "49.85",
+      "low": "49.75",
+      "close": "49.75",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T09:45:00-05:00",
+      "open": "49.75",
+      "high": "49.80",
+      "low": "49.75",
+      "close": "49.80",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T09:50:00-05:00",
+      "open": "49.80",
+      "high": "49.85",
+      "low": "49.80",
+      "close": "49.85",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T09:55:00-05:00",
+      "open": "49.85",
+      "high": "49.85",
+      "low": "49.70",
+      "close": "49.70",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T10:00:00-05:00",
+      "open": "49.70",
+      "high": "49.85",
+      "low": "49.70",
+      "close": "49.85",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T10:05:00-05:00",
+      "open": "49.85",
+      "high": "49.85",
+      "low": "49.70",
+      "close": "49.70",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T10:10:00-05:00",
+      "open": "49.70",
+      "high": "49.80",
+      "low": "49.70",
+      "close": "49.80",
+      "volume": "1000"
+    },
+    {
+      "timestamp": "2026-01-20T10:15:00-05:00",
+      "open": "49.80",
+      "high": "49.90",
+      "low": "49.80",
+      "close": "49.90",
+      "volume": "1000"
+    }
+  ]
+}

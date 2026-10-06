@@ -31,6 +31,8 @@ SCHEMAS = {
     "indicator_config": "indicator-config", "indicator_result": "indicator-result",
     "research_signal_config": "research-signal-config", "research_signal": "research-signal",
     "research_signal_run": "research-signal-run",
+    "research_agent_config": "research-agent-config", "research_agent_run": "research-agent-run",
+    "research_agent_output": "research-agent-output",
 }
 FUTURE_SKEW = timedelta(seconds=5)
 # Field names that must never appear in trading data (in addition to the shared core list).

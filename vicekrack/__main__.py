@@ -49,6 +49,10 @@ def main():
         from .preview import main as preview_main
         return preview_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"agent-run", "agent-inspect", "agent-list"}:
+        from .trading.agents.cli import main as agent_main
+        return agent_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"signal-run", "signal-inspect", "signal-list"}:
         from .trading.signals.cli import main as signal_main
         return signal_main()

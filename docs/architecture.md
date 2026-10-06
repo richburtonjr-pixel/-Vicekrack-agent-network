@@ -629,3 +629,39 @@ flowchart LR
   authorization requires, and research signals carry no order proposal.
 
 See [Research signals](research-signals.md).
+
+## Step 28: research-agent workflow
+
+`vicekrack/trading/agents/` adds a bounded, deterministic four-stage controller:
+
+```mermaid
+flowchart LR
+    D[(market_dataset, validated)] --> EV[evidence.build_evidence: drive + calculate + run_signals, all ending at T]
+    EV --> C[controller.run_workflow]
+    C --> MS[market_scout] --> TA[trend_agent] --> SA[strategy_agent] --> RR[risk_review]
+    C --> RUN[research_agent_run 1.0]
+    RUN --> ST[(runtime/trading/agents)]
+    C -. never imports .- X[PaperAccount / risk engine / orders / journal / providers]
+```
+
+- `evidence.py`: the only code that touches the dataset. It replays to T (Steps 25–27)
+  and freezes per-role slices, then hashes them.
+- `handlers.py`: pure role rules, plus `Handler(role, function, version)` and
+  `default_handlers()`.
+- `controller.py`: `run_workflow` checks:
+  - the fixed order and the four-stage limit;
+  - each stage's input and output hashes;
+  - output validation (`research_agent_output` schema, size limit, credential check);
+  - the time budget, failure handling (stop, `not_run`, no retries) and the final
+    explanation.
+
+  `validate_run` re-checks hashes, the stage order, failure consistency and the
+  research-only flags.
+- `analysis.py`: the `AnalysisLayer` interface and `NoAnalysisLayer`. Other layers are
+  refused today.
+- `store.py` and `cli.py`: atomic storage (exclusive links), plus `agent-run`,
+  `agent-inspect` and `agent-list`.
+
+**Boundary:** the agents package never imports account, risk-engine, order, journal or
+provider code, and never reads environment variables (a test enforces this). See
+[Research agents](research-agents.md).

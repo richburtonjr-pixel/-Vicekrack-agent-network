@@ -1,0 +1,34 @@
+{
+  "config_version": "1.0",
+  "description": "Deterministic four-stage research workflow (Step 28). Local handlers only; research only; never authorizes orders.",
+  "limits": {
+    "max_stages": 4,
+    "max_window_bars": 50,
+    "max_signals": 200,
+    "max_handoff_bytes": 20000,
+    "stage_timeout_seconds": 5
+  },
+  "strategies": [
+    "vwap-reclaim",
+    "ema-cross-3-5",
+    "breakout-3"
+  ],
+  "scout": {
+    "min_bars": 5,
+    "freshness_max_intervals": 2,
+    "session": {
+      "timezone": "America/New_York",
+      "start": "09:30",
+      "end": "16:00"
+    }
+  },
+  "trend": {
+    "ema_fast": 3,
+    "ema_slow": 5,
+    "rsi": 3,
+    "volume_sma": 3,
+    "rsi_overbought": "70",
+    "rsi_oversold": "30",
+    "volume_elevated_multiple": "1.5"
+  }
+}

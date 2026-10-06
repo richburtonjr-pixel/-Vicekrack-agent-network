@@ -1,0 +1,752 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/research-agent-run.schema.json",
+  "title": "Research agent run 1.0",
+  "description": "A bounded four-stage research workflow (Market Scout, Trend, Strategy, Risk Review). Research only; never authorizes orders.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "run_id",
+    "mode",
+    "research_only",
+    "authorization_possible",
+    "account_access",
+    "sim_time_utc",
+    "dataset",
+    "hashes",
+    "analysis_layer",
+    "status",
+    "failure",
+    "stages",
+    "final",
+    "results_sha256",
+    "created_at",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "research_agent_run"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^rar-[0-9a-f]{24}$"
+    },
+    "mode": {
+      "const": "historical_replay"
+    },
+    "research_only": {
+      "const": true
+    },
+    "authorization_possible": {
+      "const": false
+    },
+    "account_access": {
+      "const": false
+    },
+    "sim_time_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "bars_sha256",
+        "source_file_sha256",
+        "symbol",
+        "interval",
+        "timezone",
+        "data_label"
+      ],
+      "properties": {
+        "dataset_id": {
+          "$ref": "#/$defs/dataset_id"
+        },
+        "bars_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "timezone": {
+          "$ref": "#/$defs/timezone"
+        },
+        "data_label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_config_sha256",
+        "indicator_settings_sha256",
+        "signal_run_results_sha256",
+        "strategies",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "workflow_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "indicator_settings_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signal_run_results_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "strategies": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "config_sha256"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/strategy_name"
+              },
+              "config_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "analysis_layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "advisory_only"
+      ],
+      "properties": {
+        "name": {
+          "const": "none"
+        },
+        "advisory_only": {
+          "const": true
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed"
+      ]
+    },
+    "failure": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "code"
+          ],
+          "properties": {
+            "role": {
+              "$ref": "#/$defs/role"
+            },
+            "code": {
+              "$ref": "#/$defs/code"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/handoff"
+      }
+    },
+    "final": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "explanation",
+        "research_only",
+        "authorization_possible"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "sufficient_for_future_paper_evaluation",
+            "insufficient_for_future_paper_evaluation",
+            "workflow_failed"
+          ]
+        },
+        "explanation": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "status",
+              "conclusion",
+              "summary",
+              "limitations"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "#/$defs/role"
+              },
+              "status": {
+                "enum": [
+                  "completed",
+                  "failed",
+                  "not_run"
+                ]
+              },
+              "conclusion": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/code"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 600
+              },
+              "limitations": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "maxLength": 240
+                }
+              }
+            }
+          }
+        },
+        "research_only": {
+          "const": true
+        },
+        "authorization_possible": {
+          "const": false
+        }
+      }
+    },
+    "results_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "notice": {
+      "const": "Research-only workflow output from deterministic local handlers on historical data at a simulated time. Not advice, not a profitability claim, not an order authorization; no account access."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    },
+    "hhmm": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "indicator_key": {
+      "type": "string",
+      "pattern": "^(ema|rsi|volume_sma)_[0-9]{1,3}$|^vwap_session$"
+    },
+    "strategy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^rsig-[0-9a-f]{24}$"
+    },
+    "strategy_def": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "vwap_reclaim"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "session"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "session": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "timezone",
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "$ref": "#/$defs/timezone"
+                    },
+                    "start": {
+                      "$ref": "#/$defs/hhmm"
+                    },
+                    "end": {
+                      "$ref": "#/$defs/hhmm"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "ema_crossover"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "fast",
+                "slow"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "fast": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "slow": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "breakout"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "lookback",
+                "volume_filter"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "lookback": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "volume_filter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "period",
+                        "multiplier"
+                      ],
+                      "properties": {
+                        "period": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 500
+                        },
+                        "multiplier": {
+                          "$ref": "#/$defs/decimal"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "role": {
+      "enum": [
+        "market_scout",
+        "trend_agent",
+        "strategy_agent",
+        "risk_review"
+      ]
+    },
+    "findings": {
+      "type": "object",
+      "maxProperties": 40,
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]{1,40}$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 200
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "agent_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conclusion",
+        "summary",
+        "findings",
+        "reason_codes",
+        "limitations"
+      ],
+      "properties": {
+        "conclusion": {
+          "$ref": "#/$defs/code"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "findings": {
+          "$ref": "#/$defs/findings"
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "role",
+        "handler",
+        "status",
+        "conclusion",
+        "summary",
+        "findings",
+        "reason_codes",
+        "limitations",
+        "input_sha256",
+        "output_sha256",
+        "sim_time_utc"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "handler": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,40}@[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "conclusion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "findings": {
+          "$ref": "#/$defs/findings"
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "input_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sim_time_utc": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

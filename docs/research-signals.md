@@ -154,3 +154,5 @@ Everything is stored in ignored `runtime/trading/signals/`.
   intents. Turning research signals into paper order intents would need its own design
   step.
 - **No performance claims:** there is no backtest, P&L or performance statistic.
+- **Step 28** reviews these signals in a deterministic research-agent workflow
+  ([Research agents](research-agents.md)), which is still research only.
