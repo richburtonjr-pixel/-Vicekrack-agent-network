@@ -1,0 +1,1283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/simulation-order.schema.json",
+  "title": "Simulation order 1.0",
+  "description": "A simulated market order (long-only, whole shares). Never sent anywhere.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "order_id",
+    "simulated",
+    "run_id",
+    "side",
+    "order_type",
+    "purpose",
+    "symbol",
+    "quantity",
+    "source",
+    "not_before_utc",
+    "expires_at_utc",
+    "estimate",
+    "status",
+    "fill_id",
+    "history"
+  ],
+  "properties": {
+    "contract": {
+      "const": "simulation_order"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "order_id": {
+      "$ref": "#/$defs/order_id"
+    },
+    "simulated": {
+      "const": true
+    },
+    "run_id": {
+      "$ref": "#/$defs/run_id"
+    },
+    "side": {
+      "enum": [
+        "buy",
+        "sell"
+      ]
+    },
+    "order_type": {
+      "const": "market"
+    },
+    "purpose": {
+      "enum": [
+        "entry",
+        "exit"
+      ]
+    },
+    "symbol": {
+      "$ref": "#/$defs/symbol"
+    },
+    "quantity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/shares"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "signal_id",
+        "strategy",
+        "rule",
+        "decision_bar_sequence",
+        "decision_at_utc"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "research_signal",
+            "exit_rule"
+          ]
+        },
+        "signal_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/signal_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/strategy_name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule": {
+          "anyOf": [
+            {
+              "enum": [
+                "opposite_ema_crossover",
+                "max_holding_bars"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_bar_sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "decision_at_utc": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "not_before_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "expires_at_utc": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_price",
+        "notional"
+      ],
+      "properties": {
+        "reference_price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notional": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "filled",
+        "rejected",
+        "pending_at_end_of_data"
+      ]
+    },
+    "fill_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/fill_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at_utc",
+          "status",
+          "reason_codes"
+        ],
+        "properties": {
+          "at_utc": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "status": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "filled",
+              "pending_at_end_of_data"
+            ]
+          },
+          "reason_codes": {
+            "$ref": "#/$defs/reasons"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    },
+    "hhmm": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "indicator_key": {
+      "type": "string",
+      "pattern": "^(ema|rsi|volume_sma)_[0-9]{1,3}$|^vwap_session$"
+    },
+    "strategy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^rsig-[0-9a-f]{24}$"
+    },
+    "strategy_def": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "vwap_reclaim"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "session"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "session": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "timezone",
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "$ref": "#/$defs/timezone"
+                    },
+                    "start": {
+                      "$ref": "#/$defs/hhmm"
+                    },
+                    "end": {
+                      "$ref": "#/$defs/hhmm"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "ema_crossover"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "fast",
+                "slow"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "fast": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "slow": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "breakout"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "lookback",
+                "volume_filter"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "lookback": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "volume_filter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "period",
+                        "multiplier"
+                      ],
+                      "properties": {
+                        "period": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 500
+                        },
+                        "multiplier": {
+                          "$ref": "#/$defs/decimal"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^srun-[0-9a-f]{24}$"
+    },
+    "order_id": {
+      "type": "string",
+      "pattern": "^sord-[0-9a-f]{24}$"
+    },
+    "fill_id": {
+      "type": "string",
+      "pattern": "^sfil-[0-9a-f]{24}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^simacct-[0-9a-f]{24}$"
+    },
+    "shares": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/code"
+      }
+    },
+    "simulation_order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "order_id",
+        "simulated",
+        "run_id",
+        "side",
+        "order_type",
+        "purpose",
+        "symbol",
+        "quantity",
+        "source",
+        "not_before_utc",
+        "expires_at_utc",
+        "estimate",
+        "status",
+        "fill_id",
+        "history"
+      ],
+      "properties": {
+        "contract": {
+          "const": "simulation_order"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "order_id": {
+          "$ref": "#/$defs/order_id"
+        },
+        "simulated": {
+          "const": true
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "order_type": {
+          "const": "market"
+        },
+        "purpose": {
+          "enum": [
+            "entry",
+            "exit"
+          ]
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/shares"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "signal_id",
+            "strategy",
+            "rule",
+            "decision_bar_sequence",
+            "decision_at_utc"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "research_signal",
+                "exit_rule"
+              ]
+            },
+            "signal_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/signal_id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strategy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/strategy_name"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rule": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "opposite_ema_crossover",
+                    "max_holding_bars"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "decision_bar_sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "decision_at_utc": {
+              "$ref": "#/$defs/timestamp"
+            }
+          }
+        },
+        "not_before_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expires_at_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "estimate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference_price",
+            "notional"
+          ],
+          "properties": {
+            "reference_price": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/decimal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "notional": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/decimal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "filled",
+            "rejected",
+            "pending_at_end_of_data"
+          ]
+        },
+        "fill_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fill_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "history": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "at_utc",
+              "status",
+              "reason_codes"
+            ],
+            "properties": {
+              "at_utc": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "filled",
+                  "pending_at_end_of_data"
+                ]
+              },
+              "reason_codes": {
+                "$ref": "#/$defs/reasons"
+              }
+            }
+          }
+        }
+      }
+    },
+    "simulation_fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "fill_id",
+        "simulated",
+        "order_id",
+        "side",
+        "symbol",
+        "quantity",
+        "bar_sequence",
+        "bar_open_utc",
+        "open_price",
+        "slippage_bps",
+        "fill_price",
+        "notional",
+        "fee",
+        "cash_change",
+        "gap_before_fill",
+        "reason_codes"
+      ],
+      "properties": {
+        "contract": {
+          "const": "simulation_fill"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "fill_id": {
+          "$ref": "#/$defs/fill_id"
+        },
+        "simulated": {
+          "const": true
+        },
+        "order_id": {
+          "$ref": "#/$defs/order_id"
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "quantity": {
+          "$ref": "#/$defs/shares"
+        },
+        "bar_sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "bar_open_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "open_price": {
+          "$ref": "#/$defs/decimal"
+        },
+        "slippage_bps": {
+          "$ref": "#/$defs/decimal"
+        },
+        "fill_price": {
+          "$ref": "#/$defs/decimal"
+        },
+        "notional": {
+          "$ref": "#/$defs/decimal"
+        },
+        "fee": {
+          "$ref": "#/$defs/decimal"
+        },
+        "cash_change": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "gap_before_fill": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "reason_codes": {
+          "$ref": "#/$defs/reasons"
+        }
+      }
+    },
+    "simulation_position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "simulated",
+        "symbol",
+        "status",
+        "quantity",
+        "entry_fill_id",
+        "exit_fill_id",
+        "opened_at_utc",
+        "closed_at_utc",
+        "cost_basis",
+        "average_cost",
+        "proceeds",
+        "exit_fee",
+        "realized_pnl",
+        "mark_price",
+        "marked_at_utc",
+        "market_value",
+        "unrealized_pnl",
+        "bars_held"
+      ],
+      "properties": {
+        "contract": {
+          "const": "simulation_position"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "simulated": {
+          "const": true
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "quantity": {
+          "$ref": "#/$defs/shares"
+        },
+        "entry_fill_id": {
+          "$ref": "#/$defs/fill_id"
+        },
+        "exit_fill_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fill_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "opened_at_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "closed_at_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cost_basis": {
+          "$ref": "#/$defs/decimal"
+        },
+        "average_cost": {
+          "$ref": "#/$defs/decimal"
+        },
+        "proceeds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exit_fee": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "realized_pnl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/signed_decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mark_price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "marked_at_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "market_value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unrealized_pnl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/signed_decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bars_held": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "cash_ledger_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "simulated",
+        "entry",
+        "at_utc",
+        "kind",
+        "amount",
+        "balance_after",
+        "fill_id"
+      ],
+      "properties": {
+        "contract": {
+          "const": "cash_ledger_entry"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "simulated": {
+          "const": true
+        },
+        "entry": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "at_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "kind": {
+          "enum": [
+            "initial_cash",
+            "buy",
+            "sell",
+            "fee"
+          ]
+        },
+        "amount": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "balance_after": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "fill_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fill_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_version",
+        "mode",
+        "account",
+        "entry",
+        "sizing",
+        "exits",
+        "costs",
+        "limits",
+        "kill_switch"
+      ],
+      "properties": {
+        "config_version": {
+          "const": "1.0"
+        },
+        "mode": {
+          "const": "simulation"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "account": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "initial_cash",
+            "currency"
+          ],
+          "properties": {
+            "initial_cash": {
+              "$ref": "#/$defs/money"
+            },
+            "currency": {
+              "const": "USD"
+            }
+          }
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategies",
+            "reject_across_gaps"
+          ],
+          "properties": {
+            "strategies": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 6,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/strategy_name"
+              }
+            },
+            "reject_across_gaps": {
+              "const": true
+            }
+          }
+        },
+        "sizing": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "quantity"
+              ],
+              "properties": {
+                "method": {
+                  "const": "fixed_quantity"
+                },
+                "quantity": {
+                  "$ref": "#/$defs/shares"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "notional"
+              ],
+              "properties": {
+                "method": {
+                  "const": "fixed_notional"
+                },
+                "notional": {
+                  "$ref": "#/$defs/money"
+                }
+              }
+            }
+          ]
+        },
+        "exits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "opposite_ema_crossover",
+            "max_holding_bars"
+          ],
+          "properties": {
+            "opposite_ema_crossover": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "fast",
+                    "slow"
+                  ],
+                  "properties": {
+                    "fast": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 500
+                    },
+                    "slow": {
+                      "type": "integer",
+                      "minimum": 2,
+                      "maximum": 500
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max_holding_bars": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "costs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "slippage_bps",
+            "fee_per_order",
+            "fee_bps"
+          ],
+          "properties": {
+            "slippage_bps": {
+              "$ref": "#/$defs/decimal"
+            },
+            "fee_per_order": {
+              "$ref": "#/$defs/money"
+            },
+            "fee_bps": {
+              "$ref": "#/$defs/decimal"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_order_notional",
+            "max_position_notional",
+            "max_orders",
+            "max_bars"
+          ],
+          "properties": {
+            "max_order_notional": {
+              "$ref": "#/$defs/money"
+            },
+            "max_position_notional": {
+              "$ref": "#/$defs/money"
+            },
+            "max_orders": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          }
+        },
+        "kill_switch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "engaged",
+            "note"
+          ],
+          "properties": {
+            "engaged": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "config_version": "1.0",
+  "mode": "simulation",
+  "description": "Offline paper-execution simulation policy (Step 29). Only this simulator may act on research signals, and only in simulation.",
+  "account": {
+    "initial_cash": "10000.00",
+    "currency": "USD"
+  },
+  "entry": {
+    "strategies": [
+      "ema-cross-3-5"
+    ],
+    "reject_across_gaps": true
+  },
+  "sizing": {
+    "method": "fixed_quantity",
+    "quantity": 10
+  },
+  "exits": {
+    "opposite_ema_crossover": {
+      "fast": 3,
+      "slow": 5
+    },
+    "max_holding_bars": 6
+  },
+  "costs": {
+    "slippage_bps": "5",
+    "fee_per_order": "1.00",
+    "fee_bps": "0"
+  },
+  "limits": {
+    "max_order_notional": "1000.00",
+    "max_position_notional": "2000.00",
+    "max_orders": 20,
+    "max_bars": 5000
+  },
+  "kill_switch": {
+    "engaged": false,
+    "note": "Set true, or run sim-kill-switch engage, to block new simulated entries."
+  }
+}

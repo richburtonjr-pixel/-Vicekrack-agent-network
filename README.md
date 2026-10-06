@@ -1092,3 +1092,49 @@ assessed, but no research signal is active yet.
   `"none"` exists, and there are no provider calls.
 
 See [Research agents](docs/research-agents.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 29: offline paper-execution simulation (SIMULATED)
+
+Simulate what an explicit policy would have done with Step 27 research signals on stored
+historical bars, in a separate in-run simulation account. **Everything is simulated**:
+there is no broker, live order or Step 24 paper account, and no Step 28 verdict is
+consulted. Research signals still grant no permission anywhere else.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save
+.\.venv\Scripts\python.exe -m vicekrack sim-list
+.\.venv\Scripts\python.exe -m vicekrack sim-inspect RUN_ID --section ledger
+.\.venv\Scripts\python.exe -m vicekrack sim-kill-switch engage
+.\.venv\Scripts\python.exe -m vicekrack sim-kill-switch release
+```
+
+On Linux/macOS use `.venv/bin/python`. With the shipped policy you should see:
+- an EMA-crossover entry filled at the next bar's open;
+- an opposite-crossover exit filled at the following open;
+- a final entry left `pending_at_end_of_data`.
+
+- **Policy (`config/simulation.paper.json`):** initial cash, the entry strategies,
+  whole-share sizing, exits (opposite EMA crossover and/or maximum bars held),
+  slippage and fees, order, position and order-count limits, and a kill switch. There is
+  also a separate `sim-kill-switch` file.
+- **Timing:**
+  - signals fill no earlier than the next available bar's open;
+  - exits are checked on closed bars and also fill at the next open;
+  - expired signals, and entries across gaps, are rejected;
+  - no intrabar prices are used.
+- **Accounting:** exact decimals. The buy price is open × (1 + slippage), the sell price is
+  open × (1 − slippage), and fees are a fixed amount plus a percentage, rounded to cents.
+  - Buy fees go into the cost basis.
+  - Realized P&L = proceeds − sell fee − cost basis.
+  - Open positions are marked to the last close and never liquidated.
+- **Explicit outcomes:** every order records why it was accepted, rejected, filled or left
+  pending. Cash and exposure are checked again at the fill price, and orders are never
+  resized.
+- **Contracts and storage:** versioned `simulation_order`, `simulation_fill`,
+  `simulation_position`, `cash_ledger_entry` and `simulation_run`, all `simulated: true`.
+  Runs are deterministic, saved atomically in ignored `runtime/trading/simulation/`, and
+  fully re-validated on read.
+
+See [Simulation](docs/simulation.md) and the [Roadmap](docs/roadmap.md).
