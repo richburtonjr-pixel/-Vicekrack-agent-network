@@ -44,7 +44,7 @@ def _minutes(text, name):
 
 
 def build_settings(dataset, *, config, ema=(), rsi=(), volume_sma=(), vwap=False, gap_policy=None,
-                   vwap_session=None):
+                   vwap_session=None, allow_empty=False):
     """Validated, canonical settings for one calculation."""
     limits = config["limits"]
     specs = []
@@ -66,7 +66,7 @@ def build_settings(dataset, *, config, ema=(), rsi=(), volume_sma=(), vwap=False
         if _minutes(session["start"], "start") >= _minutes(session["end"], "end"):
             raise TradingError("invalid_indicator_settings", "VWAP session start must be before its end (same day).")
         specs.append({"key": "vwap_session", "kind": "vwap", "period": None})
-    if not specs:
+    if not specs and not allow_empty:          # Step 27 rules may need no indicators (bars only)
         raise TradingError("invalid_indicator_settings", "Choose at least one indicator.")
     keys = [s["key"] for s in specs]
     if len(keys) != len(set(keys)):

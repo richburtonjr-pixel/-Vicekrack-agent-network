@@ -119,5 +119,6 @@ atomically to ignored storage and re-validated on read, so tampered values give
   closes or volumes. There are no other indicators or price sources.
 - **No calendar or adjustments:** no exchange calendar, holidays or corporate-action
   adjustments, and VWAP uses the typical-price approximation.
-- **Offline replay only:** no live or streaming updates, and results are not fed into any
-  signal, strategy, risk check or paper account.
+- **Offline replay only:** no live or streaming updates. Step 27's research signals read
+  these values, but nothing feeds them into risk checks or paper accounts
+  ([Research signals](research-signals.md)).

@@ -1,0 +1,789 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/research-signal-run.schema.json",
+  "title": "Research signal run 1.0",
+  "description": "Bounded evaluation of research strategies over a stored dataset on a simulation clock.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "run_id",
+    "mode",
+    "purpose",
+    "authorization_possible",
+    "account_access",
+    "dataset",
+    "strategies",
+    "indicator_settings_sha256",
+    "replay",
+    "evaluations",
+    "signals",
+    "summary",
+    "results_sha256",
+    "created_at",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "research_signal_run"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^rsr-[0-9a-f]{24}$"
+    },
+    "mode": {
+      "const": "historical_replay"
+    },
+    "purpose": {
+      "const": "research_only"
+    },
+    "authorization_possible": {
+      "const": false
+    },
+    "account_access": {
+      "const": false
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "bars_sha256",
+        "source_file_sha256",
+        "symbol",
+        "interval",
+        "timezone",
+        "data_label"
+      ],
+      "properties": {
+        "dataset_id": {
+          "$ref": "#/$defs/dataset_id"
+        },
+        "bars_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "timezone": {
+          "$ref": "#/$defs/timezone"
+        },
+        "data_label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "strategies": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "strategy",
+          "version",
+          "params",
+          "config_sha256"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/strategy_name"
+          },
+          "strategy": {
+            "enum": [
+              "vwap_reclaim",
+              "ema_crossover",
+              "breakout"
+            ]
+          },
+          "version": {
+            "const": "1.0"
+          },
+          "params": {
+            "type": "object"
+          },
+          "config_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "indicator_settings_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_utc",
+        "end_utc",
+        "step_seconds",
+        "steps",
+        "clock"
+      ],
+      "properties": {
+        "start_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "end_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "step_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31622400
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "clock": {
+          "const": "simulation"
+        }
+      }
+    },
+    "evaluations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy",
+          "entries"
+        ],
+        "properties": {
+          "strategy": {
+            "$ref": "#/$defs/strategy_name"
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 1000000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sequence",
+                "timestamp_utc",
+                "computed_at_sim_utc",
+                "outcome",
+                "reason_codes",
+                "values",
+                "signal_id"
+              ],
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "timestamp_utc": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "computed_at_sim_utc": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "outcome": {
+                  "enum": [
+                    "triggered",
+                    "not_triggered",
+                    "not_ready"
+                  ]
+                },
+                "reason_codes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/$defs/code"
+                  }
+                },
+                "values": {
+                  "type": "object",
+                  "maxProperties": 20,
+                  "propertyNames": {
+                    "pattern": "^[a-z0-9_]{1,40}$"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/decimal"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "signal_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/signal_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "$ref": "#/$defs/signal_obj"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bars_evaluated",
+        "triggered",
+        "not_triggered",
+        "not_ready",
+        "cooldown_suppressed",
+        "future_access_attempts"
+      ],
+      "properties": {
+        "bars_evaluated": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "triggered": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "not_triggered": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "not_ready": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "cooldown_suppressed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "future_access_attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    },
+    "results_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "notice": {
+      "const": "Research-only rule evaluations on closed historical bars (simulation clock). Not advice, not a profitability claim, no orders, no account access."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "signed_money": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "local_timestamp": {
+      "type": "string",
+      "description": "RFC 3339 local time with explicit UTC offset.",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "name"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "synthetic_fixture",
+            "local_csv"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$"
+        }
+      }
+    },
+    "hhmm": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "indicator_key": {
+      "type": "string",
+      "pattern": "^(ema|rsi|volume_sma)_[0-9]{1,3}$|^vwap_session$"
+    },
+    "strategy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^rsig-[0-9a-f]{24}$"
+    },
+    "strategy_def": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "vwap_reclaim"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "session"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "session": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "timezone",
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "$ref": "#/$defs/timezone"
+                    },
+                    "start": {
+                      "$ref": "#/$defs/hhmm"
+                    },
+                    "end": {
+                      "$ref": "#/$defs/hhmm"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "ema_crossover"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "fast",
+                "slow"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "fast": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "slow": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "version",
+            "params"
+          ],
+          "properties": {
+            "strategy": {
+              "const": "breakout"
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cooldown_bars",
+                "expiry_bars",
+                "lookback",
+                "volume_filter"
+              ],
+              "properties": {
+                "cooldown_bars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expiry_bars": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "lookback": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "volume_filter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "period",
+                        "multiplier"
+                      ],
+                      "properties": {
+                        "period": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 500
+                        },
+                        "multiplier": {
+                          "$ref": "#/$defs/decimal"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "signal_obj": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "signal_id",
+        "purpose",
+        "authorization_possible",
+        "account_access",
+        "strategy",
+        "dataset",
+        "bar",
+        "event",
+        "detected_at_sim_utc",
+        "expires_at_utc",
+        "supporting_values",
+        "reason_codes",
+        "notice",
+        "content_sha256",
+        "expired_when_detected"
+      ],
+      "properties": {
+        "contract": {
+          "const": "research_signal"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "signal_id": {
+          "$ref": "#/$defs/signal_id"
+        },
+        "purpose": {
+          "const": "research_only"
+        },
+        "authorization_possible": {
+          "const": false
+        },
+        "account_access": {
+          "const": false
+        },
+        "strategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "strategy",
+            "version",
+            "params",
+            "config_sha256"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/strategy_name"
+            },
+            "strategy": {
+              "enum": [
+                "vwap_reclaim",
+                "ema_crossover",
+                "breakout"
+              ]
+            },
+            "version": {
+              "const": "1.0"
+            },
+            "params": {
+              "type": "object"
+            },
+            "config_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset_id",
+            "bars_sha256",
+            "source_file_sha256",
+            "symbol",
+            "interval",
+            "timezone",
+            "data_label"
+          ],
+          "properties": {
+            "dataset_id": {
+              "$ref": "#/$defs/dataset_id"
+            },
+            "bars_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "source_file_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "symbol": {
+              "$ref": "#/$defs/symbol"
+            },
+            "interval": {
+              "$ref": "#/$defs/interval"
+            },
+            "timezone": {
+              "$ref": "#/$defs/timezone"
+            },
+            "data_label": {
+              "$ref": "#/$defs/label"
+            }
+          }
+        },
+        "bar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sequence",
+            "timestamp",
+            "timestamp_utc",
+            "available_at_utc"
+          ],
+          "properties": {
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "timestamp": {
+              "$ref": "#/$defs/local_timestamp"
+            },
+            "timestamp_utc": {
+              "$ref": "#/$defs/timestamp"
+            },
+            "available_at_utc": {
+              "$ref": "#/$defs/timestamp"
+            }
+          }
+        },
+        "event": {
+          "enum": [
+            "vwap_reclaim",
+            "ema_cross_above",
+            "breakout_above"
+          ]
+        },
+        "detected_at_sim_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expires_at_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "supporting_values": {
+          "type": "object",
+          "maxProperties": 20,
+          "propertyNames": {
+            "pattern": "^[a-z0-9_]{1,40}$"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/decimal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "notice": {
+          "const": "Research signal from historical bars: a rule matched on closed data. Not advice, not a prediction or profitability claim, not an order, and it cannot authorize anything."
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "expired_when_detected": {
+          "type": "boolean",
+          "description": "True when a coarse replay step first saw the bar after the signal's expiry had passed."
+        }
+      }
+    }
+  }
+}
