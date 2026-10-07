@@ -17,6 +17,8 @@ Transition rules (anything else is rejected as `invalid_event_transition`):
   stage_failed       working -> failed
   stage_blocked      idle -> blocked                     (not run, e.g. an earlier stage failed)
   stage_interrupted  working -> unknown                  (outcome not known, e.g. interrupted)
+  stage_reused       idle -> completed                   (Step 33: finished in an earlier attempt of the
+                                                          same run; it is NOT executed again)
   order_decision     working -> working                  (only while the component is working)
   simulated_fill     working -> working
 `completed` and `blocked` are terminal. A viewer shows `working` ONLY for a recorded
@@ -45,12 +47,13 @@ TRANSITIONS = {
     "stage_failed": ({"working"}, "failed"),
     "stage_blocked": ({"idle"}, "blocked"),
     "stage_interrupted": ({"working"}, "unknown"),
+    "stage_reused": ({"idle"}, "completed"),
     "order_decision": ({"working"}, None),
     "simulated_fill": ({"working"}, None),
 }
 STATUSES = {
     "stage_started": {"started"}, "stage_completed": {"completed"}, "stage_failed": {"failed"},
-    "stage_blocked": {"blocked"}, "stage_interrupted": {"interrupted", "uncertain"},
+    "stage_blocked": {"blocked"}, "stage_interrupted": {"interrupted", "uncertain"}, "stage_reused": {"completed"},
     "order_decision": {"accepted", "rejected", "pending_at_end_of_data"}, "simulated_fill": {"filled"},
 }
 NOTICE = ("Display data only. Recorded timelines were captured while a command ran; reconstructed timelines are "

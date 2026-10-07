@@ -36,13 +36,16 @@ from vicekrack.trading.timeline import AGENT_COMPONENTS, from_agent_run
 STATIC = ROOT / "vicekrack/hq/static"
 PORT = 8765
 HOST = {"host": f"127.0.0.1:{PORT}"}
-EXPECTED_MAP = {
+EXPECTED_MAP = {                                     # Step 33: rooms show only their actual roles
     "trading.research.market_scout": "market_scout", "trading.research.trend_agent": "trend_agent",
     "trading.research.strategy_agent": "strategy_agent", "trading.research.risk_review": "risk_review",
-    "content.production.brief": "researcher", "content.production.plan": "analyst",
-    "content.production.validate": "reviewer", "content.production.creator": "creator",
+    "content.workflow.researcher": "researcher", "content.workflow.analyst": "analyst",
+    "content.workflow.reviewer": "reviewer", "content.production.creator": "creator",
     "trading.research.controller": "operations", "trading.simulation.engine": "operations",
-    "content.production.preview": "operations"}
+    "content.workflow.orchestrator": "operations", "content.production.pipeline": "operations",
+    "content.production.brief": "operations", "content.production.validate": "operations",
+    "content.production.plan": "operations", "content.production.preview": "operations",
+    "content.production.quality": "operations"}
 UPSTAIRS = ["market_scout", "trend_agent", "strategy_agent", "risk_review"]
 DOWNSTAIRS = ["researcher", "analyst", "reviewer", "creator"]
 
@@ -79,13 +82,14 @@ class DemoTests(unittest.TestCase):
         self.assertEqual((first["mode"], first["timeline"]["origin"], first["timeline"]["time_basis"], first["current"]),
                          ("demo", "demo", "synthetic", None))
         shown = {state for frame in first["frames"] for state in frame["room_states"].values()}
-        self.assertEqual(shown, {"idle", "working", "waiting", "blocked", "completed", "failed", "unknown"})
+        self.assertEqual(shown, {"idle", "working", "waiting", "blocked", "completed", "failed"})
         self.assertTrue(all(room["has_activity"] for room in first["rooms"] if room["components"]))
         self.assertTrue(all(e["run_id"] is None for e in demo_events()))     # demo never points at real runs
 
     def test_demo_follows_real_workflow_order(self):
         orders = (["trading.research.market_scout", "trading.research.trend_agent", "trading.research.strategy_agent",
                    "trading.research.risk_review"],
+                  ["content.workflow.researcher", "content.workflow.analyst", "content.workflow.reviewer"],
                   ["content.production.brief", "content.production.creator", "content.production.validate",
                    "content.production.plan", "content.production.preview"])
         events = demo_events()
@@ -217,12 +221,16 @@ class _Content(ProductionBase):
         production_id = result["production_id"]
         scene = scene_from_view(load_timeline(production_id, self.root))
         outer.assertEqual(scene["mode"], "reconstructed")
-        outer.assertEqual({r["room"] for r in scene["rooms"] if r["has_activity"]}, set(DOWNSTAIRS) | {"operations"})
-        handoffs = [(f["handoff"]["from"], f["handoff"]["to"]) for f in scene["frames"] if f["handoff"]]
-        outer.assertEqual(handoffs, [("researcher", "creator"), ("creator", "reviewer"), ("reviewer", "analyst"),
-                                     ("analyst", "operations")])
+        # Step 33: an (older) production lights only the Creator room and the labelled stations.
+        outer.assertEqual({r["room"] for r in scene["rooms"] if r["has_activity"]}, {"creator", "operations"})
+        outer.assertEqual({s["station"] for s in scene["stations"] if s["has_activity"]},
+                          {"brief_builder", "script_validator", "scene_planner", "preview_renderer"})
+        handoffs = [(f["handoff"]["from_station"], f["handoff"]["to"], f["handoff"]["to_station"])
+                    for f in scene["frames"] if f["handoff"]]
+        outer.assertEqual(handoffs, [("brief_builder", "creator", None), (None, "operations", "script_validator")])
         outer.assertTrue(all(f["event"]["recorded_at"] == CONTENT_NOW for f in scene["frames"]))
-        outer.assertEqual([scene["current"]["room_states"][r] for r in DOWNSTAIRS], ["completed"] * 4)
+        outer.assertEqual(scene["current"]["room_states"]["creator"], "completed")
+        outer.assertEqual([scene["current"]["room_states"][r] for r in ("researcher", "analyst", "reviewer")], ["idle"] * 3)
         # Upstairs stays empty for a content timeline.
         outer.assertFalse(any(r["has_activity"] for r in scene["rooms"] if r["room"] in UPSTAIRS))
         Pipeline(root=self.root, clock=lambda: CONTENT_NOW, renderer=FakeRenderer())  # constructing it runs nothing
@@ -376,7 +384,7 @@ class StaticSafetyTests(unittest.TestCase):
     def test_client_logic_in_node(self):
         result = subprocess.run(["node", str(ROOT / "tests/hq_client_test.js")], capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 9})
+        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 11})
 
 
 @unittest.skipUnless(os.environ.get("RUN_LOCAL_BROWSER_TESTS") == "1", "set RUN_LOCAL_BROWSER_TESTS=1 (needs Playwright + Chromium)")
@@ -401,9 +409,9 @@ class BrowserTests(EventBase):
                     self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
                     page.click("#btn-play")
                     page.keyboard.press("End")
-                    self.assertEqual(page.inner_text("#position"), "28 / 28")
+                    self.assertEqual(page.inner_text("#position"), "36 / 36")
                     page.keyboard.press("Home")
-                    self.assertEqual(page.inner_text("#position"), "0 / 28")
+                    self.assertEqual(page.inner_text("#position"), "0 / 36")
                     page.click("#btn-motion")
                     for _ in range(14):
                         page.click("#btn-forward")

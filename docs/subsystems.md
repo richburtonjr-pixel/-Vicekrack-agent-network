@@ -84,6 +84,9 @@ flowchart TB
   `*_SECRET` and `*_PASSWORD` environment values) without changing the shared function.
 - The `runtime/` convention: ignored by git, written atomically, and inspected only by
   explicit CLI commands.
+- `vicekrack/content_events.py` (Step 33): optional, fail-closed event recording for the
+  content commands (Step 5 workflow, production, quality report). It imports no trading
+  code.
 - `vicekrack/events/` (Step 31): the execution-event contract, sinks, per-department
   timeline storage (`runtime/events/<department>/`) and the read-only timeline CLI. Its
   core modules import neither department. Department adapters live with their
@@ -107,8 +110,9 @@ consumer of Step 31 timelines. Its data sources:
   already prints that timeline.
 - **Content:** the production states and quality reports are its data source.
 - **Both (Step 31):** `execution_event` timelines with display states. Recorded ones come
-  from `agent-run`/`sim-run --record-events`; reconstructed ones come from saved runs and
-  productions. `events-inspect` and `events-replay` already show them in a terminal.
+  from `agent-run`/`sim-run --record-events` and, since Step 33, from `run`/`resume`,
+  `produce`/`production-resume` and `quality-report --record-events`. Reconstructed ones
+  come from saved runs, workflow runs and productions. `events-inspect` and `events-replay` already show them in a terminal.
 - **Rule:** the Command Center must not authorize orders, change limits, release the kill
   switch, publish or run anything without a separate, explicit design step. The Living HQ
   has GET-only routes on 127.0.0.1 and no controls of that kind.

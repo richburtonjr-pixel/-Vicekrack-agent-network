@@ -1,16 +1,20 @@
-"""HQ scenes (Step 32): Step 31 timelines turned into per-event frames for the Living HQ.
+"""HQ scenes (Steps 32-33): Step 31 timelines turned into per-event frames for the Living HQ.
+
+Version 1.1 (Step 33) adds labelled operations `stations`, handoff station endpoints, the
+timeline's correlation ID (attempts of one run share it) and role-accurate room mapping.
 
 A scene is display data. For every event, in recorded order, it holds:
 - the component and display states after that event, using Step 31's own transition rules
   (an invalid transition ends the frames there);
-- "waiting": a member of a fixed workflow (research stages; content-production stages)
+- "waiting": a member of a fixed workflow (research stages; Step 5 roles; production stages)
   that is still idle while that workflow is actively working: its controller is working,
   or a member is working and an earlier member has already started. It is derived only
   from recorded states;
 - a handoff (from room -> to room) ONLY when the recorded order supports it:
     stage B started right after the previous member A was recorded `completed`;
-    the first research stage started while the research controller was working;
-    the research controller completed right after the last stage completed.
+    the first member started while its workflow controller was working;
+    a workflow controller completed right after its last member completed.
+  Handoffs inside the operations lobby (station to station) are not animated.
 
 `current` holds Step 31's honest display states for the timeline as loaded (liveness and
 partial rules applied). Historical frame states are "as recorded at that event", never a
@@ -25,7 +29,7 @@ from jsonschema import Draft202012Validator
 
 from ..errors import NetworkError
 from ..events.contract import ROOT, apply
-from .layout import COMPONENT_ROOM, GROUPS, ROOMS
+from .layout import COMPONENT_ROOM, COMPONENT_STATION, GROUPS, ROOMS, STATIONS
 
 PRIORITY = ("failed", "blocked", "working", "unknown", "waiting", "completed", "idle")
 EVENT_FIELDS = ("sequence", "event_type", "status", "component", "stage", "department", "sim_time_utc", "recorded_at",
@@ -91,7 +95,9 @@ def handoff(event, before):
 
 def _pair(source, target):
     a, b = COMPONENT_ROOM.get(source), COMPONENT_ROOM.get(target)
-    return {"from": a, "to": b} if a and b and a != b else None
+    if not (a and b and a != b):
+        return None
+    return {"from": a, "to": b, "from_station": COMPONENT_STATION.get(source), "to_station": COMPONENT_STATION.get(target)}
 
 
 def build_frames(events, components):
@@ -122,6 +128,14 @@ def _rooms(events):
             for room in ROOMS]
 
 
+def _stations(events):
+    counts = {}
+    for event in events:
+        counts[event["component"]] = counts.get(event["component"], 0) + 1
+    return [{**{k: s[k] for k in ("station", "label", "short", "department", "component", "role")},
+             "has_activity": s["component"] in counts, "event_count": counts.get(s["component"], 0)} for s in STATIONS]
+
+
 def assemble(*, mode, timeline, components, events, current_rows=None, issues=()):
     frames, stopped = build_frames(events, components)
     issues = list(dict.fromkeys(list(issues) + ([stopped] if stopped else [])))
@@ -135,8 +149,9 @@ def assemble(*, mode, timeline, components, events, current_rows=None, issues=()
         shown = with_waiting(states) if timeline["live"] else states
         current = {"component_states": shown, "room_states": room_states(shown),
                    "notes": {k: v for k, v in notes.items() if v}}
-    scene = {"contract": "hq_scene", "version": "1.0", "mode": mode, "mode_label": MODES[mode], "timeline": timeline,
-             "rooms": _rooms(events[:len(frames)]), "frames": frames, "current": current,
+    scene = {"contract": "hq_scene", "version": "1.1", "mode": mode, "mode_label": MODES[mode], "timeline": timeline,
+             "rooms": _rooms(events[:len(frames)]), "stations": _stations(events[:len(frames)]), "frames": frames,
+             "current": current,
              "unmapped_components": sorted(c for c in components if c not in COMPONENT_ROOM),
              "issues": issues[:20], "notice": NOTICE}
     if next(_validator().iter_errors(scene), None) is not None:
@@ -151,7 +166,7 @@ def scene_from_view(view):
     else:
         mode = "observed" if view["live"] else "recorded_replay"
     timeline = {k: view[k] for k in ("timeline_id", "origin", "department", "kind", "completeness", "outcome", "live",
-                                      "time_basis", "started_at", "event_count", "run_id", "source")}
+                                      "time_basis", "started_at", "event_count", "run_id", "source", "correlation_id")}
     timeline["issues"] = view["issues"]
     components = [row["component"] for row in view["components"]]
     return assemble(mode=mode, timeline=timeline, components=components, events=view["events"],

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from .content_events import EventFailure
 from .errors import NetworkError
 from .manager import AgentManager
 from .providers import default_providers
@@ -164,6 +165,8 @@ class Orchestrator:
                 return self._transition(current, "completed", result=result)
             except NetworkError:
                 raise NetworkError("invalid_agent_result", "Agent returned a result that does not match the task schema.") from None
+        except EventFailure:
+            raise                                   # Step 33: recording failed before new work; not a task failure
         except NetworkError as error:
             return self._transition(current, "failed", error=error.as_dict())
         except Exception:

@@ -77,7 +77,7 @@
   var S = {
     scene: null, replay: null, view: "house", source: "replay", selected: null, labels: true,
     reduced: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    presenting: false, list: false, timelines: [], timelineId: "demo", focusRoom: null,
+    presenting: false, list: false, timelines: [], timelineId: "demo", focusRoom: null, filter: "all",
     following: false, polls: 0, pollTimer: null, lastIndex: -1, completedAt: {}, layers: {}, roomNodes: {},
     bots: {}, tokens: [], viewBox: [0, 0, 1500, 660], viewTarget: null, error: null
   };
@@ -103,23 +103,32 @@
   }
   node("land", 49.8, -0.9, FH); node("sb", 58.4, -0.9, 0); node("cor_w", -1.2, -1.2, 0); node("cor_e", 52.5, -1.2, 0);
   node("l_entry", 6, -4.0, 0); node("l_sofa1", 2.8, -6.6, 0); node("l_sofa2", 9.8, -9.2, 0);
+  node("l_sofa3", 2.8, -8.8, 0); node("l_chair", 11.8, -6.4, 0);
   node("o_entry", 24, -4.0, 0); node("o_left", 17.2, -6.6, 0); node("o_right", 32.6, -6.6, 0);
   node("o_fl", 18.0, -11.6, 0); node("o_front", 24.8, -11.6, 0); node("o_fr", 31.4, -11.6, 0);
   node("k_gate", 44.2, -3.9, 0); node("k_entry", 41, -6.6, 0); node("k_coffee", 38.0, -5.6, 0);
-  node("k_fridge", 46.2, -6.2, 0); node("k_table", 41.6, -11.4, 0);
+  node("k_fridge", 46.2, -6.2, 0); node("k_table", 41.6, -11.4, 0); node("k_counter", 41.2, -5.8, 0);
+  node("k_stool1", 38.8, -11.9, 0); node("k_stool2", 44.8, -11.9, 0);
   edges.push(["bal_3", "land"], ["land", "sb"], ["cor_w", "cor_0"], ["cor_3", "cor_e"], ["cor_e", "sb"],
     ["cor_0", "l_entry"], ["cor_1", "o_entry"], ["cor_2", "o_entry"], ["cor_3", "k_gate"], ["k_gate", "k_entry"],
     ["l_entry", "l_sofa1"], ["l_entry", "l_sofa2"], ["l_sofa1", "l_sofa2"], ["o_entry", "o_left"], ["o_entry", "o_right"],
     ["o_left", "o_fl"], ["o_fl", "o_front"], ["o_front", "o_fr"], ["o_fr", "o_right"], ["k_entry", "k_coffee"],
-    ["k_entry", "k_fridge"], ["k_entry", "k_table"], ["k_coffee", "k_table"], ["l_sofa2", "o_fl"], ["o_fr", "k_table"]);
+    ["k_entry", "k_fridge"], ["k_entry", "k_table"], ["k_coffee", "k_table"], ["l_sofa2", "o_fl"], ["o_fr", "k_table"],
+    ["l_entry", "l_sofa3"], ["l_sofa1", "l_sofa3"], ["l_entry", "l_chair"], ["k_entry", "k_counter"],
+    ["k_table", "k_stool1"], ["k_table", "k_stool2"]);
   var graph = new C.Graph(nodes, edges);
 
+  /* Idle destinations (decoration). The first two are the bot's own; shared spots hold one bot at a
+   * time (occupancy is checked in targetFor), so idle bots spread out instead of piling up. */
   function spotsFor(room) {
     var spots = [
       { node: "seat_" + room, weight: 3, activity: "sit" }, { node: "nook_" + room, weight: 2, activity: "idle" },
       { node: "l_sofa1", weight: 1, activity: "relax" }, { node: "l_sofa2", weight: 1, activity: "relax" },
-      { node: "k_coffee", weight: 2, activity: "coffee" }, { node: "k_table", weight: 1, activity: "chat" },
-      { node: "k_fridge", weight: 1, activity: "snack" }, { node: "o_front", weight: 1, activity: "browse" }];
+      { node: "l_sofa3", weight: 1, activity: "relax" }, { node: "l_chair", weight: 1, activity: "relax" },
+      { node: "k_coffee", weight: 2, activity: "coffee" }, { node: "k_counter", weight: 1, activity: "coffee" },
+      { node: "k_stool1", weight: 1, activity: "chat" }, { node: "k_stool2", weight: 1, activity: "chat" },
+      { node: "k_fridge", weight: 1, activity: "snack" }, { node: "o_fl", weight: 1, activity: "browse" },
+      { node: "o_fr", weight: 1, activity: "browse" }];
     if (ROOM_SLOTS[room].z > 0) { spots.push({ node: "bal_" + ROOM_SLOTS[room].i, weight: 2, activity: "view" }); }
     return spots;
   }
@@ -525,20 +534,19 @@
       S.chips[room] = { g: g, dot: dot, text: text, placard: placard };
     });
     // operations console board
-    var at = P(18.6, -8.4, 4.05);
+    var at = P(18.6, -8.4, 4.35);
     var board = el("g", { class: "ops-board", transform: "translate(" + at[0].toFixed(1) + "," + at[1].toFixed(1) + ")" }, layer);
-    el("rect", { x: 0, y: 0, width: 12.8 * U, height: 3.8 * U, rx: 4, class: "board-bg" }, board);
-    svgText(board, 10, 15, "OPERATIONS", { class: "sign" });
+    el("rect", { x: -1 * U, y: 0, width: 15 * U, height: 4.1 * U, rx: 4, class: "board-bg" }, board);
+    svgText(board, -8, 14, "OPERATIONS STATIONS", { class: "sign" });
     S.ops = {};
-    [["trading.research.controller", "Research controller"], ["trading.simulation.engine", "Simulator"],
-      ["content.production.preview", "Preview render"]].forEach(function (row, n) {
-      var line = el("g", { transform: "translate(12," + (30 + n * 12.5) + ")" }, board);
-      var dot = el("circle", { r: 4, cy: -4 }, line);
-      svgText(line, 9, 0, row[1], { class: "ops-name" });
-      var state = svgText(line, 128, 0, "", { class: "room-state" });
-      S.ops[row[0]] = { dot: dot, text: state };
+    S.scene.stations.forEach(function (station, n) {           // 3 x 3 lights; full labels in the station strip
+      var cell = el("g", { transform: "translate(" + (-8 + (n % 3) * 98) + "," + (32 + Math.floor(n / 3) * 15) + ")" }, board);
+      var dot = el("circle", { r: 4, cy: -4 }, cell);
+      svgText(cell, 8, 0, station.short, { class: "ops-name" });
+      var title = el("title", {}, cell);
+      S.ops[station.component] = { dot: dot, title: title, label: station.label };
     });
-    S.opsCounters = svgText(board, 12, 70, "", { class: "ops-name counters" });
+    S.opsCounters = svgText(board, -8, 79, "", { class: "ops-name counters" });
     [["Lounge", -1.5, -TD + 0.4], ["Kitchen", 34.5, -TD + 0.4]].forEach(function (lbl) {
       var p = P(lbl[1], lbl[2], 0);
       var g2 = el("g", { class: "room-label area", transform: "translate(" + p[0].toFixed(1) + "," + (p[1] - 30).toFixed(1) + ")" }, layer);
@@ -582,10 +590,14 @@
       var meta = roomMeta(room), state = states[room] || "idle", style = C.stateStyle(state), chip = S.chips[room];
       var active = meta.has_activity;
       chip.dot.setAttribute("fill", active ? style.color : "#4b5563");
-      chip.text.textContent = active ? style.label : "No recorded activity";
+      chip.text.textContent = active ? style.label : "No activity";
       chip.placard.setAttribute("visibility", active ? "hidden" : "visible");
       var bot = S.bots[room];
-      if (bot.state !== state && state === "completed") { S.completedAt[room] = now; }
+      var latest = C.lastEventFor(S.scene, S.source === "now" ? S.scene.frames.length - 1 : S.replay.index, meta.components);
+      if (bot.state !== state && state === "completed") {
+        // Finished in an earlier attempt: no visit to the station, it did not run now.
+        S.completedAt[room] = latest && latest.event.event_type === "stage_reused" ? -1e12 : now;
+      }
       bot.state = state;
       bot.g.setAttribute("data-state", state);
       bot.bubble.querySelector(".dot").setAttribute("fill", style.color);
@@ -598,11 +610,12 @@
       var state = components[component] || "idle", style = C.stateStyle(state);
       var seen = S.scene.frames.some(function (f) { return f.event.component === component; });
       S.ops[component].dot.setAttribute("fill", seen ? style.color : "#4b5563");
-      S.ops[component].text.textContent = seen ? style.label : "No recorded activity";
+      S.ops[component].title.textContent = S.ops[component].label + ": " + (seen ? style.label : "No recorded activity");
     });
     var counts = C.counters(S.scene, S.source === "now" ? S.scene.frames.length - 1 : S.replay.index);
     S.opsCounters.textContent = "Simulated orders: " + counts.accepted + " accepted · " + counts.rejected + " rejected · " +
       counts.fills + " fills";
+    renderStations(components);
     renderReplay();
     renderList();
     renderButtons(states);
@@ -623,9 +636,21 @@
     });
   }
 
+  function endpoint(room, station) {
+    var named = station && S.scene.stations.filter(function (s) { return s.station === station; })[0];
+    return named ? named.label : roomMeta(room).label;
+  }
+  /* Where an event happened: the room, or the named operations station. */
+  function whereLabel(frame) {
+    if (!frame || !frame.room) { return frame ? "(not mapped)" : null; }
+    if (frame.room === "operations") {
+      var station = S.scene.stations.filter(function (s) { return s.component === frame.event.component; })[0];
+      if (station) { return station.label; }
+    }
+    return roomMeta(frame.room).label;
+  }
   function frameLabel(frame) {
-    var meta = frame && frame.room ? roomMeta(frame.room) : null;
-    return C.describeEvent(frame ? frame.event : null, meta ? meta.label : null);
+    return C.describeEvent(frame ? frame.event : null, whereLabel(frame));
   }
 
   function renderReplay() {
@@ -643,7 +668,8 @@
       (frame ? "Event " + (index + 1) + "/" + count + " · " + frameLabel(frame) +
         " · recorded " + C.formatTime(frame.event.recorded_at) +
         (frame.event.sim_time_utc ? " · simulated " + C.formatTime(frame.event.sim_time_utc) : "") +
-        (frame.handoff ? " · handoff " + roomMeta(frame.handoff.from).label + " → " + roomMeta(frame.handoff.to).label : "")
+        (frame.handoff ? " · handoff " + endpoint(frame.handoff.from, frame.handoff.from_station) + " → " +
+          endpoint(frame.handoff.to, frame.handoff.to_station) : "")
         : (count ? "Before the first recorded event: press Play" : "This timeline has no events"));
     $("caption").textContent = caption;
     $("src-now").disabled = !S.scene.current;
@@ -721,6 +747,19 @@
         b.addEventListener("click", function () { select(meta.room); });
         li.appendChild(meta.has_activity ? stateChip(states[meta.room] || "idle") : h("span", { class: "muted" }, null, "No recorded activity"));
       });
+      if (dept) {
+        h("h3", {}, body, "Timelines in this department");
+        var picks = h("ul", { class: "mini-list" }, body);
+        var mine = S.timelines.filter(function (t) { return t.department === dept; }).slice(0, 6);
+        mine.forEach(function (t) {
+          var li = h("li", {}, picks);
+          var b = h("button", { type: "button", class: "link" }, li, timelineName(t));
+          b.disabled = t.readable === false;
+          b.addEventListener("click", function () { loadScene(t.id); });
+          h("span", { class: "muted small" }, li, t.origin);
+        });
+        if (!mine.length) { h("li", { class: "muted" }, picks, "None saved yet. See the Timeline view for how to record one."); }
+      }
       h("p", { class: "muted small" }, body, "Select a bot or room to inspect it. " + scene.notice);
       return;
     }
@@ -733,6 +772,8 @@
     h("p", { class: "role" }, body, meta.role);
     row(body, "Driven by", meta.components.length ? meta.components.join(", ") : "Nothing (decorative space)");
     row(body, "Mapping", meta.mapping);
+    if (S.selected === "operations") { renderStationDetails(body); return; }
+    if (S.bots[S.selected]) { row(body, "Movement", C.movementFor(S.bots[S.selected].intent)); }
     var frameStates = C.roomStatesAt(scene, S.replay.index, ALL_ROOMS);
     if (!meta.has_activity) {
       row(body, "Recorded status", "No recorded activity in this timeline");
@@ -771,6 +812,42 @@
     row(body, "Outputs", meta.outputs);
   }
 
+  /* Operations stations: automated stages and workflow controllers, each with a text status. */
+  function renderStations(components) {
+    var list = $("stations");
+    clear(list);
+    S.scene.stations.forEach(function (station) {
+      var state = components[station.component] || "idle", style = C.stateStyle(state);
+      var li = h("li", {}, list);
+      var b = h("button", { type: "button", class: "station-btn " + station.department }, li);
+      var dot = h("span", { class: "dot", "aria-hidden": "true" }, b);
+      dot.style.background = station.has_activity ? style.color : "#4b5563";
+      h("span", { class: "station-name" }, b, station.label);
+      h("span", { class: "station-state" }, b, station.has_activity ? style.label : "No recorded activity");
+      b.setAttribute("aria-label", station.label + " station, " + (station.has_activity ? style.label : "no recorded activity"));
+      b.addEventListener("click", function () { select("operations"); });
+    });
+  }
+  function renderStationDetails(body) {
+    var scene = S.scene, index = S.source === "now" ? scene.frames.length - 1 : S.replay.index;
+    var states = S.source === "now" && scene.current ? scene.current.component_states :
+      (scene.frames[index] ? scene.frames[index].component_states : {});
+    h("h3", {}, body, "Stations");
+    scene.stations.forEach(function (station) {
+      var box = h("div", { class: "station-card" }, body);
+      h("strong", {}, box, station.label);
+      h("p", { class: "muted small" }, box, station.role);
+      if (!station.has_activity) { h("p", { class: "muted small" }, box, "No recorded activity in this timeline"); return; }
+      row(box, "Status", stateChip(states[station.component] || "idle"));
+      var last = C.lastEventFor(scene, index, [station.component]);
+      if (last) {
+        row(box, "Last event", "#" + last.event.sequence + " " + C.words(last.event.event_type));
+        row(box, "Recorded at", C.formatTime(last.event.recorded_at));
+        if (last.event.reason_codes.length) { row(box, "Reason codes", last.event.reason_codes.join(", ")); }
+      }
+    });
+  }
+
   /* Recent events up to the replay position (newest first): a readable companion to the house. */
   function renderFeed() {
     var list = $("feed");
@@ -790,7 +867,7 @@
   }
   function stateForEvent(event) {
     var map = { stage_started: "working", stage_completed: "completed", stage_failed: "failed", stage_blocked: "blocked",
-      stage_interrupted: "unknown", order_decision: event.status === "rejected" ? "blocked" : "working", simulated_fill: "completed" };
+      stage_interrupted: "unknown", stage_reused: "completed", order_decision: event.status === "rejected" ? "blocked" : "working", simulated_fill: "completed" };
     return map[event.event_type] || "unknown";
   }
 
@@ -823,7 +900,7 @@
       S.scene.frames.forEach(function (frame, n) {
         var tr = h("tr", { "data-index": n }, body);
         h("td", {}, tr, String(frame.event.sequence));
-        h("td", {}, tr, frame.room ? roomMeta(frame.room).label : "(not mapped)");
+        h("td", {}, tr, whereLabel(frame));
         h("td", {}, tr, C.words(frame.event.event_type));
         h("td", {}, tr, C.words(frame.event.status));
         h("td", {}, tr, frame.event.sim_time_utc ? C.formatTime(frame.event.sim_time_utc) : "-");
@@ -840,17 +917,28 @@
     });
   }
 
+  function timelineName(item) {
+    if (item.id === "demo") { return item.label; }
+    return C.words(item.kind || "timeline") + (item.attempts > 1 ? " · attempt " + item.attempt + " of " + item.attempts : "") +
+      " · " + item.id;
+  }
   function renderTimelines() {
     var list = $("timeline-list");
     clear(list);
-    S.timelines.forEach(function (item) {
+    Array.prototype.forEach.call(document.querySelectorAll(".filter-btn"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-filter") === S.filter ? "true" : "false");
+    });
+    S.timelines.filter(function (item) {
+      return S.filter === "all" || item.department === S.filter || item.id === "demo";
+    }).forEach(function (item) {
       var li = h("li", {}, list);
       var button = h("button", { type: "button", class: "timeline-item" + (item.id === S.timelineId ? " active" : ""),
         "aria-pressed": item.id === S.timelineId ? "true" : "false" }, li);
       h("span", { class: "tl-origin origin-" + item.origin }, button, item.origin === "demo" ? "demo" : item.origin);
-      h("span", { class: "tl-label" }, button, item.id === "demo" ? item.label : C.words(item.kind || "timeline") + " · " + item.id);
+      h("span", { class: "tl-label" }, button, timelineName(item));
       h("span", { class: "tl-meta" }, button, [item.department, item.completeness ? C.words(item.completeness) : null,
         item.live ? "live" : null, item.event_count !== undefined && item.event_count !== null ? item.event_count + " events" : null,
+        item.correlation_id ? "run " + item.correlation_id.slice(4, 12) : null,
         item.readable === false ? "unreadable" : null].filter(Boolean).join(" · "));
       button.disabled = item.readable === false || !C.ID_PATTERN.test(item.id);
       button.addEventListener("click", function () { loadScene(item.id); });
@@ -927,6 +1015,7 @@
   function targetFor(bot, now) {
     var linger = !S.completedAt[bot.room] || now - S.completedAt[bot.room] > 3500;
     var intent = C.intentFor(bot.state, linger);
+    bot.intent = intent;
     if (intent === "station") { return { node: "st_" + bot.room, activity: "work" }; }
     if (intent === "seat") { return { node: "seat_" + bot.room, activity: "wait" }; }
     if (intent === "door") { return { node: "door_" + bot.room, activity: "blocked" }; }
@@ -934,7 +1023,11 @@
     if (S.reduced) { return { node: "seat_" + bot.room, activity: "sit" }; }
     if (now >= bot.dwellUntil || !bot.decor) {
       bot.cycle += 1;
-      var choice = C.wanderChoice(bot.room, bot.cycle, spotsFor(bot.room));
+      var taken = {};
+      Object.keys(S.bots).forEach(function (other) {           // occupancy: one bot per shared idle spot
+        if (other !== bot.room && S.bots[other].goal) { taken[S.bots[other].goal] = true; }
+      });
+      var choice = C.wanderChoice(bot.room, bot.cycle, spotsFor(bot.room), taken);
       bot.decor = choice;
       bot.dwellUntil = now + choice.dwellMs + 4000;
     }
@@ -958,8 +1051,8 @@
     }
     var speed = 3.6 * dt / 1000;
     while (bot.path.length && speed > 0) {
-      var next = nodes[bot.path[0]], jitter = bot.path.length === 1 && !/^st_|^door_/.test(bot.path[0]) ? bot.jitter : 0;
-      var tx = next.x + jitter, ty = next.y + jitter * 0.4, tz = next.z;
+      var next = nodes[bot.path[0]];
+      var tx = next.x, ty = next.y, tz = next.z;
       var dx = tx - bot.pos.x, dy = ty - bot.pos.y, dz = tz - bot.pos.z;
       var dist = Math.sqrt(dx * dx + dy * dy + dz * dz * 0.25);
       if (dist <= speed) {
@@ -1132,6 +1225,9 @@
     $("btn-present").addEventListener("click", function () { setPresenting(!S.presenting); });
     $("present-exit").addEventListener("click", function () { setPresenting(false); });
     $("btn-refresh").addEventListener("click", loadTimelines);
+    Array.prototype.forEach.call(document.querySelectorAll(".filter-btn"), function (b) {
+      b.addEventListener("click", function () { S.filter = b.getAttribute("data-filter"); renderTimelines(); });
+    });
     document.addEventListener("keydown", function (e) {
       var tag = (e.target && e.target.tagName) || "";
       if (/INPUT|SELECT|TEXTAREA/.test(tag) || e.ctrlKey || e.metaKey || e.altKey) { return; }

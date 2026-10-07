@@ -1257,3 +1257,42 @@ the house is explorable immediately without credentials or saved runs.
   keyboard control.
 
 See [Living HQ](docs/hq.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 33: accurate agent activity in the Living HQ
+
+Each room now shows activity only from its own role:
+- **Researcher, Analyst and Reviewer** show the real Step 5 workflow roles.
+- **Creator** shows the production Creator stage.
+- **Automated stages** (brief builder, script validator, scene planner, preview renderer,
+  quality checker) and the workflow controllers appear as clearly labelled **operations
+  stations**.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack run examples/workflow-task.json --registry config/agents.workflow.json --record-events
+.\.venv\Scripts\python.exe -m vicekrack resume RUN_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack produce SELECTION_RUN_ID RECORD_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack production-resume PRODUCTION_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack quality-report PRODUCTION_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+- **Recording is optional.** Without `--record-events`, outputs, saved runs and hashes are
+  unchanged; provider selection, recovery and paid-call consent behave exactly as before.
+- **Resumed runs are explicit.**
+  - Each start or resume is its own timeline, and all attempts of a run share one run ID
+    in the HQ.
+  - Work finished earlier is shown as "stage reused" (not run again).
+  - Retries show their attempt number and reason.
+- **If events can't be saved,** the command stops before starting new work. Finished
+  results stay saved, no further (paid) request is made, and the run can be resumed. It
+  reports `event_persistence_failed`.
+- **House behaviour:**
+  - you can pick timelines from either department;
+  - live, replay, reconstructed and demo stay distinct;
+  - the inspector says when movement is decorative idle roaming rather than evidence of
+    work;
+  - idle bots claim separate spots.
+
+![Recorded Step 5 workflow, resumed attempt](docs/images/hq/hq-step33-recorded-workflow-resume.png)
+
+See [Living HQ](docs/hq.md), [Execution events](docs/events.md) and the [Roadmap](docs/roadmap.md).

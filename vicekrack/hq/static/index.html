@@ -77,7 +77,12 @@
           <h2>Timelines</h2>
           <button type="button" id="btn-refresh">Refresh list</button>
         </div>
-        <p class="hint">Demo data is synthetic. Recorded timelines were captured while a command ran. Reconstructed timelines are rebuilt from saved records.</p>
+        <p class="hint">Demo data is synthetic. Recorded timelines were captured while a command ran (each start or resume is its own attempt; attempts of one run share a run ID). Reconstructed timelines are rebuilt from saved records.</p>
+        <div class="filters" role="group" aria-label="Department filter">
+          <button type="button" class="filter-btn" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" class="filter-btn" data-filter="trading" aria-pressed="false">Trading</button>
+          <button type="button" class="filter-btn" data-filter="content" aria-pressed="false">Content</button>
+        </div>
         <ul class="timeline-list" id="timeline-list"></ul>
         <h2>Events in this timeline</h2>
         <table class="table events">
@@ -106,6 +111,10 @@
           <span class="live" id="live-indicator" hidden></span>
         </div>
         <p class="caption" id="caption">-</p>
+        <section class="stations-wrap" aria-labelledby="stations-heading">
+          <h2 id="stations-heading">Operations stations (automated stages and controllers, not agents)</h2>
+          <ul class="stations" id="stations"></ul>
+        </section>
         <section class="feed-wrap" aria-labelledby="feed-heading">
           <h2 id="feed-heading">Recent events at this position</h2>
           <ol class="feed" id="feed"></ol>
