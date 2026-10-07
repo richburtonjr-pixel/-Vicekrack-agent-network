@@ -121,6 +121,14 @@ evidence_slice, deterministic_output) -> str | None`. Any future layer:
 Today only `NoAnalysisLayer` (`name: "none"`) exists. Any other layer is refused with
 `analysis_layer_unavailable`, and no provider is called.
 
+## Execution events (Step 31)
+
+`agent-run DATASET_ID --record-events` records the controller's and each stage's start,
+completion, failure, and `stage_blocked` for stages not run after a failure, under ignored
+`runtime/events/trading/`. A saved run can also be shown as a reconstructed timeline:
+`events-inspect RUN_ID`. Recording never changes the run or its hashes. See
+[Execution events](events.md).
+
 ## Limitations
 
 - **Fixed rules:** deterministic local rules on stored historical data at a simulated

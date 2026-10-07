@@ -70,7 +70,7 @@ flowchart TB
   simulation or touches paper accounts, kill switches or intents.
 - **Imports:** only the shared core: `vicekrack.errors` and `vicekrack.persistence`. It
   never imports content modules, and content modules never import it.
-- **CLI:** only the `trading-*`, `market-*`, `indicator-*`, `signal-*`, `agent-*`, `sim-*` and `analytics-*` commands, routed
+- **CLI:** only the `trading-*`, `market-*`, `indicator-*`, `signal-*`, `agent-*`, `sim-*` and `analytics-*` commands (and the shared `events-*` commands), routed
   by `vicekrack/__main__.py` to the matching `cli` module in `vicekrack.trading`.
 - **Scope today:** paper only, with offline market data. There are no live market feeds, broker connections, live
   orders, AI trading decisions or background loops.
@@ -84,6 +84,10 @@ flowchart TB
   `*_SECRET` and `*_PASSWORD` environment values) without changing the shared function.
 - The `runtime/` convention: ignored by git, written atomically, and inspected only by
   explicit CLI commands.
+- `vicekrack/events/` (Step 31): the execution-event contract, sinks, per-department
+  timeline storage (`runtime/events/<department>/`) and the read-only timeline CLI. Its
+  core modules import neither department. Department adapters live with their
+  department (`vicekrack/trading/timeline.py`, `vicekrack/production_timeline.py`).
 - Test harness and checks: `scripts/run_tests.py` (network blocked),
   `scripts/audit_credentials.py` and CI.
 
@@ -101,6 +105,9 @@ A future dashboard should be a **read-only** consumer.
   check with its limit and observed value. `python -m vicekrack trading-journal RUN_ID`
   already prints that timeline.
 - **Content:** the production states and quality reports are its data source.
+- **Both (Step 31):** `execution_event` timelines with display states. Recorded ones come
+  from `agent-run`/`sim-run --record-events`; reconstructed ones come from saved runs and
+  productions. `events-inspect` and `events-replay` already show them in a terminal.
 - **Rule:** the Command Center must not authorize orders, change limits or release the
   kill switch without a separate, explicit design step.
 

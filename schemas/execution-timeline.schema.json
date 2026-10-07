@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "execution_timeline",
+  "description": "A recorded or reconstructed execution timeline with derived display states (Step 31).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "timeline_id",
+    "origin",
+    "department",
+    "kind",
+    "correlation_id",
+    "run_id",
+    "source",
+    "time_basis",
+    "completeness",
+    "outcome",
+    "live",
+    "issues",
+    "event_count",
+    "components",
+    "events",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "execution_timeline"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "timeline_id": {
+      "$ref": "#/$defs/timeline_id"
+    },
+    "origin": {
+      "enum": [
+        "recorded",
+        "reconstructed"
+      ]
+    },
+    "department": {
+      "enum": [
+        "trading",
+        "content"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "research_agent_workflow",
+        "simulation",
+        "content_production"
+      ]
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^cor-[0-9a-f]{24}$"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/run_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "saved_at",
+            "saved_at_meaning"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "research_agent_run",
+                "simulation_run",
+                "production"
+              ]
+            },
+            "id": {
+              "$ref": "#/$defs/run_id"
+            },
+            "saved_at": {
+              "$ref": "#/$defs/nullable_timestamp"
+            },
+            "saved_at_meaning": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      ]
+    },
+    "time_basis": {
+      "enum": [
+        "recorded_at_emission",
+        "source_recorded",
+        "simulated_only"
+      ]
+    },
+    "started_at": {
+      "$ref": "#/$defs/nullable_timestamp"
+    },
+    "completeness": {
+      "enum": [
+        "complete",
+        "partial",
+        "open",
+        "interrupted"
+      ]
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "completed",
+            "failed",
+            "aborted",
+            "persistence_failed",
+            "event_limit_reached"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "live": {
+      "type": "boolean"
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "components": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "display_state",
+          "last_sequence",
+          "note"
+        ],
+        "properties": {
+          "component": {
+            "$ref": "#/$defs/component"
+          },
+          "display_state": {
+            "enum": [
+              "idle",
+              "working",
+              "blocked",
+              "completed",
+              "failed",
+              "unknown"
+            ]
+          },
+          "last_sequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object"
+      }
+    },
+    "notice": {
+      "type": "string",
+      "maxLength": 400
+    }
+  },
+  "$defs": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "nullable_timestamp": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "timeline_id": {
+      "type": "string",
+      "pattern": "^r?tl-[0-9a-f]{24}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^(rar|srun|prod)-[0-9a-f]{24}$"
+    },
+    "component": {
+      "type": "string",
+      "pattern": "^(trading|content)\\.[a-z][a-z0-9_]{0,30}(\\.[a-z][a-z0-9_]{0,30}){0,2}$"
+    },
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "dataset",
+            "research_agent_run",
+            "simulation_run",
+            "order",
+            "fill",
+            "research_signal",
+            "production"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^(mds|rar|srun|sord|sfil|rsig|prod)-[0-9a-f]{12,64}$"
+        }
+      }
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 8,
+      "properties": {
+        "purpose": {
+          "enum": [
+            "entry",
+            "exit"
+          ]
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bar_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "conclusion": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verdict": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      }
+    }
+  }
+}

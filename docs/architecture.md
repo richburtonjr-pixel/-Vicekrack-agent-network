@@ -726,3 +726,36 @@ flowchart LR
 shared helpers. It never imports paper accounts, the risk engine, intents, the journal,
 agents, signals or indicators, and never runs a simulation (a test enforces this). See
 [Simulation analytics](analytics.md).
+
+## Step 31: execution events and timelines
+
+`vicekrack/events/` is shared core, used by both departments and importing neither:
+
+```mermaid
+flowchart LR
+    A[agent-run --record-events] --> C[research-agent controller]
+    S[sim-run --record-events] --> E[simulator engine]
+    C -- emit --> R[Recorder: sequence, contract, transitions, duplicates]
+    E -- emit --> R
+    R --> ST[(runtime/events/trading/timelines)]
+    RA[(saved rar- / srun- runs)] --> TT[trading/timeline.py: reconstruct]
+    PS[(saved production state)] --> PT[production_timeline.py: reconstruct]
+    ST --> CLI[events-list / inspect / replay]
+    TT --> CLI
+    PT --> CLI
+    CLI -. never runs .- X[agents / simulator / productions / orders]
+```
+
+- `contract.py`: event validation, the display-state transition table, `fold`/`display` and
+  timeline views.
+- `sink.py`: `NullSink` (the default, no-op) and `Recorder` (numbering, validation,
+  transitions, duplicate refusal, persistence, explicit failure without retry).
+- `store.py`: per-department atomic storage, the writer lock, close markers, retention,
+  and loading with completeness checks.
+- `cli.py`: `events-list`, `events-inspect` and `events-replay`. It is the only place that
+  imports both department adapters, lazily.
+
+Instrumentation adds an optional `events` argument to `run_workflow` and `run_simulation`
+(via `trading/timeline.py` `TradingEvents`). Events never enter run bodies or hashes. A
+sink failure is raised as a `TradingError` with the event code, which the simulator passes
+through `drive()`. See [Execution events](events.md).

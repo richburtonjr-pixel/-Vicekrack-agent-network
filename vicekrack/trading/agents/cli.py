@@ -1,6 +1,6 @@
 """Research-agent CLI (Step 28): deterministic, offline, research only.
 
-python -m vicekrack agent-run DATASET_ID [--as-of 2026-01-15T15:30:00Z] [--save]
+python -m vicekrack agent-run DATASET_ID [--as-of 2026-01-15T15:30:00Z] [--save] [--record-events]
 python -m vicekrack agent-inspect RUN_ID [--role trend_agent]
 python -m vicekrack agent-list
 """
@@ -14,6 +14,7 @@ from ..errors import TradingError
 from ..indicators.store import load_indicator_config
 from ..market.store import MarketStore, load_market_config
 from ..signals.store import load_signal_config
+from ..timeline import close_recorder, open_recorder
 from .controller import STAGES, run_workflow
 from .store import AgentRunStore, load_agent_config
 
@@ -28,6 +29,8 @@ def parser():
     run.add_argument("--as-of", help="Simulated time, UTC (default: the dataset's last bar close)")
     run.add_argument("--strategy", action="append", help="Research strategy name (repeatable); overrides the config list")
     run.add_argument("--save", action="store_true", help="Save the run under runtime/trading/agents/")
+    run.add_argument("--record-events", action="store_true",
+                     help="Record execution events under runtime/events/trading/ (Step 31); fails explicitly if they cannot be saved")
     inspect = commands.add_parser("agent-inspect", help="Show a saved research-agent run")
     inspect.add_argument("run_id")
     inspect.add_argument("--role", choices=STAGES)
@@ -47,6 +50,7 @@ def view(run, role=None):
 def main(argv=None, root=None):
     args = parser().parse_args(sys.argv[1:] if argv is None else argv)
     store = AgentRunStore(root)
+    recorder = None
     try:
         if args.command == "agent-run":
             workflow_config, _ = load_agent_config()
@@ -54,12 +58,16 @@ def main(argv=None, root=None):
             indicator_config, _ = load_indicator_config()
             signal_config, _ = load_signal_config()
             dataset = MarketStore(root).load(args.dataset_id)          # tampered datasets are rejected here
+            recorder = open_recorder("research_agent_workflow", root) if args.record_events else None
             run = run_workflow(dataset, workflow_config=workflow_config, market_config=market_config,
                                indicator_config=indicator_config, signal_config=signal_config, created_at=utc_now(),
-                               sim_time=args.as_of, strategies=args.strategy)
+                               sim_time=args.as_of, strategies=args.strategy, events=recorder)
+            close_recorder(recorder, run["status"])                     # before saving: a failed close saves nothing
             if args.save:
                 store.save(run)
             output = {**view(run), "saved": bool(args.save)}
+            if recorder is not None:
+                output["events"] = recorder.summary()
         elif args.command == "agent-inspect":
             output = view(store.load(args.run_id), args.role)
         else:
@@ -67,6 +75,9 @@ def main(argv=None, root=None):
         code = 0
     except TradingError as error:
         output, code = {"error": error.as_dict()}, 1
+        if recorder is not None:
+            recorder.abort(error.code)
+            output["events"] = recorder.summary()
     except (OSError, ValueError, UnicodeError):
         output, code = {"error": {"code": "agent_storage_error", "message": "Cannot read or write local research-agent data."}}, 1
     print(json.dumps(output, indent=2, allow_nan=False))
