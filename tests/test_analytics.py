@@ -344,16 +344,16 @@ class CliTests(AnalyticsBase):
         self.assertEqual(self.cli(analytics_main, "analytics-inspect", saved["report_id"])[1]["error"]["code"], "report_corrupt")
         self.assertFalse(self.cli(analytics_main, "analytics-list")[1]["reports"][0]["readable"])
         run_path = SimulationStore(self.root).runs / f"{run_id}.json"
-        original = run_path.read_text(encoding="utf-8")
-        run_path.write_text(original.replace('"ending_cash": "', '"ending_cash": "1', 1), encoding="utf-8")
+        original = run_path.read_bytes()                      # raw bytes: Windows writes CRLF line endings
+        run_path.write_bytes(original.replace(b'"ending_cash": "', b'"ending_cash": "1', 1))
         self.assertEqual(self.cli(analytics_main, "analytics-generate", run_id)[1]["error"]["code"], "sim_run_corrupt")
-        run_path.write_text(original, encoding="utf-8")
+        run_path.write_bytes(original)
         data_path = self.root / "runtime/trading/market/datasets" / f"{dataset['dataset_id']}.json"
         payload = json.loads(data_path.read_text(encoding="utf-8"))
         payload["bars"][3]["open"] = "1"
         data_path.write_text(json.dumps(payload), encoding="utf-8")
         self.assertEqual(self.cli(analytics_main, "analytics-generate", run_id)[1]["error"]["code"], "dataset_corrupt")
-        self.assertEqual(hashlib.sha256(original.encode()).hexdigest(), hashlib.sha256(run_path.read_bytes()).hexdigest())
+        self.assertEqual(hashlib.sha256(original).hexdigest(), hashlib.sha256(run_path.read_bytes()).hexdigest())
 
 
 if __name__ == "__main__":
