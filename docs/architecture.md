@@ -796,3 +796,39 @@ flowchart LR
   - `styles.css` and `index.html`: no inline script or style, and no external resources.
 
 See [Living HQ](hq.md).
+
+## Step 33: accurate agent activity
+
+```mermaid
+flowchart LR
+    W[run / resume / one-shot: Step 5 workflow] -- ContentEvents --> R[(runtime/events/content)]
+    P[produce / production-resume] -- ContentEvents --> R
+    Q[quality-report] -- ContentEvents --> R
+    S[(saved runs runtime/runs)] --> WT[workflow_timeline.py: wfr- reconstruction]
+    R --> HQ[Living HQ: role rooms + operations stations]
+    WT --> HQ
+```
+
+- `vicekrack/content_events.py` (`ContentEvents`) is an optional sink:
+  - it opens its timeline lazily, once the run or production ID is known;
+  - it captures recording errors instead of raising them mid-stage;
+  - `check()` raises `EventFailure`, deliberately not a `NetworkError`, so existing
+    catch-alls can't turn it into a failed task. It is called only before new work
+    starts.
+- **Instrumentation:**
+  - `workflow.run_workflow` reads `runner.events`; `SavedRuns` binds the run ID and closes
+    the timeline; `Orchestrator.run` re-raises `EventFailure`.
+  - `production.Pipeline(events=...)` and `quality.QualityChecker(events=...)` take an
+    optional sink.
+  - "Started" is emitted before each intent checkpoint, and results only after they are
+    saved.
+- **Attempts:** each invocation is a timeline. Correlation IDs are derived from the run or
+  production ID. `stage_reused` marks work finished earlier.
+- **Living HQ:**
+  - `hq/layout.py` maps rooms to roles only and defines nine `STATIONS`;
+  - `hq_scene` is now 1.1: stations, station handoff endpoints, correlation IDs;
+  - `/api/timelines` numbers attempts per run and kind;
+  - the client adds a station strip, department filters, a movement explanation and
+    occupancy for idle spots.
+- **Step 31 contracts are extended additively:** `stage_reused`, `details.attempt`, `wfr-`
+  and `qr-` references, two timeline kinds, and the `none_saved` time basis.

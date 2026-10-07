@@ -22,6 +22,11 @@ Safety model
   `produced` only after the preview is saved.
 - State and traces contain stage names, timestamps, hashes, paths and fixed error codes:
   no prompts, credentials, environment values or raw exceptions.
+- Step 33: optional execution events (ContentEvents). The pipeline controller and each
+  stage record start, completion and failure; stages finished in an earlier attempt are
+  `stage_reused`. "started" is recorded before the intent checkpoint, results after they
+  are saved, and a recording failure stops before the next stage (so before any paid
+  request); the production stays resumable.
 """
 
 import hashlib
@@ -38,6 +43,7 @@ from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 
+from .content_events import DISABLED, PIPELINE, REUSED, STAGE_COMPONENTS, EventFailure, retry_reason
 from .creator import draft_short_script, drafter_for, load_creator_config
 from .errors import NetworkError
 from .orchestrator import ROOT, read_json
@@ -308,8 +314,9 @@ def _write_reservation(profile, production_id, entry, root, now):
 class Pipeline:
     """Executes/resumes one production. Injection points exist only for tests."""
 
-    def __init__(self, root=None, clock=None, drafter=None, renderer=None, providers=None):
+    def __init__(self, root=None, clock=None, drafter=None, renderer=None, providers=None, events=None):
         self.root = root
+        self.events = events or DISABLED
         self.store = ProductionStore(root)
         # Late-bound default so the module clock can be patched (keeps CLI tests date-independent).
         self.clock = clock if clock is not None else (lambda: utc_now())
@@ -342,6 +349,7 @@ class Pipeline:
         report = load_report(selection_run_id, self.root)
         record = load_record(record_id, loaded["policy"], loaded["policy_sha"], self.root)
         production_id = production_id_for(loaded["profile"]["profile"], record["candidate"]["candidate_id"])
+        self.events.bind(production_id, production_id)
         if self.store.state_path(production_id).exists():
             raise NetworkError("production_exists", "This story already has a production; inspect or resume it.")
         history, _ = load_history(loaded["profile"], self.root)
@@ -367,7 +375,16 @@ class Pipeline:
         return self._run(production_id, allow_paid=allow_paid, retry_uncertain=False)
 
     def resume(self, production_id, *, allow_paid=False, retry_uncertain=False):
+        self.events.bind(production_id, production_id)
         return self._run(production_id, allow_paid=allow_paid, retry_uncertain=retry_uncertain)
+
+    def _event_stop(self, state, failure, stage=None):
+        """Recording failed before new work: nothing else runs; saved state is untouched."""
+        self.events.abort(failure.code)
+        summary = self._summary(state)
+        summary["error"] = {"stage": stage["name"] if stage else None, "code": failure.code}
+        summary["events"] = self.events.summary()
+        return summary
 
     # -- execution
 
@@ -385,8 +402,17 @@ class Pipeline:
                 raise NetworkError("production_completed", "This production already finished; nothing to resume.")
             loaded = _check_saved_config(state)
             self._verify_artifacts(state, loaded)
+            events, refs = self.events, [{"kind": "production", "id": production_id}]
+            try:
+                events.check()
+            except EventFailure as failure:
+                return self._event_stop(state, failure)
+            events.emit(PIPELINE, "pipeline", "stage_started", "started", refs=refs)
             index = next(i for i, s in enumerate(state["stages"]) if s["status"] != "completed") \
                 if any(s["status"] != "completed" for s in state["stages"]) else len(STAGES)
+            for done in state["stages"][:index]:
+                events.emit(STAGE_COMPONENTS[done["name"]], done["name"], "stage_reused", "completed",
+                            reason_codes=REUSED, details={"attempt": max(1, done["attempts"])})
             if index < len(STAGES):
                 stage = state["stages"][index]
                 paid_stage = stage["name"] == "creator" and state["config"]["creator"]["paid"]
@@ -398,18 +424,34 @@ class Pipeline:
                     self._trace(state, stage["name"], "interrupted", "interrupted")
                     self._save(state)
                 if stage["status"] == "uncertain" and not retry_uncertain:
+                    events.emit(PIPELINE, "pipeline", "stage_failed", "failed", reason_codes=["uncertain_stage"], refs=refs)
                     raise NetworkError("uncertain_stage", "A paid request may have completed without its result being saved. "
                                                           "Use --retry-uncertain (and --allow-paid) to authorize another request.")
                 if paid_stage and not allow_paid:
+                    events.emit(PIPELINE, "pipeline", "stage_failed", "failed", reason_codes=["paid_consent_required"], refs=refs)
                     raise NetworkError("paid_consent_required", "The next stage makes a paid request; pass --allow-paid.")
                 if index > 0:
-                    self._check_evidence(state, loaded)
+                    try:
+                        self._check_evidence(state, loaded)
+                    except NetworkError as error:
+                        events.emit(PIPELINE, "pipeline", "stage_failed", "failed", reason_codes=[error.code], refs=refs)
+                        raise
             for stage in state["stages"][index:]:
                 if stage["attempts"] >= MAX_ATTEMPTS:
                     state["status"] = "failed"
                     stage["error_code"] = "retry_exhausted"
                     self._save(state)
+                    events.emit(PIPELINE, "pipeline", "stage_failed", "failed", reason_codes=["retry_exhausted"], refs=refs)
                     return self._summary(state)
+                component, attempt = STAGE_COMPONENTS[stage["name"]], {"attempt": stage["attempts"] + 1}
+                reason = retry_reason(stage["status"], stage["error_code"]) if stage["attempts"] else None
+                try:
+                    events.check()                      # never start new work (or a paid request) after a failure
+                    events.emit(component, stage["name"], "stage_started", "started",
+                                reason_codes=[reason] if reason else [], details=attempt)
+                    events.check()
+                except EventFailure as failure:
+                    return self._event_stop(state, failure, stage)
                 stage.update(status="running", attempts=stage["attempts"] + 1, started_at=self.clock(),
                              finished_at=None, error_code=None)
                 state["status"] = "running"
@@ -427,6 +469,7 @@ class Pipeline:
                     stage.update(status="completed", finished_at=self.clock(), artifacts=artifacts)
                     self._trace(state, stage["name"], "completed")
                     self._save(state)
+                    events.emit(component, stage["name"], "stage_completed", "completed", details=attempt)  # after saving
                     continue
                 paid_stage = stage["name"] == "creator" and state["config"]["creator"]["paid"]
                 outcome = "uncertain" if paid_stage and code not in PRE_REQUEST_CODES else "failed"
@@ -434,8 +477,18 @@ class Pipeline:
                 state["status"] = outcome
                 self._trace(state, stage["name"], outcome, code)
                 self._save(state)
+                if outcome == "uncertain":              # a paid request may have completed: outcome unknown
+                    events.emit(component, stage["name"], "stage_interrupted", "uncertain", reason_codes=[code], details=attempt)
+                else:
+                    events.emit(component, stage["name"], "stage_failed", "failed", reason_codes=[code], details=attempt)
+                events.emit(PIPELINE, "pipeline", "stage_failed", "failed", reason_codes=[code], refs=refs)
                 return self._summary(state)
             self._finalize(state, loaded)
+            if state["status"] == "completed":
+                events.emit(PIPELINE, "pipeline", "stage_completed", "completed", refs=refs)
+            else:
+                events.emit(PIPELINE, "pipeline", "stage_failed", "failed",
+                            reason_codes=[state["stages"][-1]["error_code"] or "finalize_failed"], refs=refs)
             return self._summary(state)
 
     def _finalize(self, state, loaded):

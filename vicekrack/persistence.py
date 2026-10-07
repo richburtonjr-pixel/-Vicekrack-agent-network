@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
+from .content_events import DISABLED, EventFailure, workflow_run_ref
 from .errors import NetworkError
 from .manager import WorkflowState
 from .handoff import validate_handoff
@@ -263,8 +264,12 @@ def validate_state(state, run_id):
 
 
 class SavedRuns:
-    def __init__(self, store=None):
+    """Saved workflow runs. Step 33: optional `events` (ContentEvents) record each start/resume as its
+    own timeline; all attempts of a run share one correlation ID derived from the run ID."""
+
+    def __init__(self, store=None, events=None):
         self.store = store or RunStore()
+        self.events = events or DISABLED
 
     def start(self, task, registry_path="config/agents.workflow.json", *, providers=None):
         runner = Orchestrator(registry_path=registry_path, providers=providers)
@@ -286,7 +291,7 @@ class SavedRuns:
                 if self.store.read(path.stem)["task"]["task_id"] == task["task_id"]:
                     raise NetworkError("duplicate_task", "A saved run already owns this task ID; inspect or resume it.")
             self.store.write(state)
-            return self._execute(runner, state)
+            return self._recorded(runner, state)
 
     def resume(self, run_id, *, retry_uncertain=False, registry_path=None, providers=None):
         with self.store.lock(run_id):
@@ -298,7 +303,34 @@ class SavedRuns:
                 raise NetworkError("run_completed", "This run is complete; no stages were repeated.")
             if state["status"] in {"running", "uncertain"} and not retry_uncertain:
                 raise NetworkError("uncertain_stage", "The pending request may have completed. Use --retry-uncertain to explicitly authorize another request and possible charge.")
-            return self._execute(runner, state)
+            if state["status"] in {"running", "uncertain"}:
+                runner.resume_hint = "retry_after_uncertain"
+            return self._recorded(runner, state)
+
+    def _recorded(self, runner, state):
+        """Run with optional event recording. A recording failure stops before new work and keeps every
+        committed checkpoint; the run stays resumable."""
+        events = self.events
+        events.bind(workflow_run_ref(state["run_id"]), workflow_run_ref(state["run_id"]))
+        runner.events = events
+        try:
+            result = self._execute(runner, state)
+        except EventFailure as failure:
+            saved = self.store.read(state["run_id"])
+            events.abort(failure.code)
+            return {"run_id": state["run_id"], "status": saved["status"], "task": saved["outcome"],
+                    "error": {"code": failure.code, "message": "Event recording failed; no new stage was started. "
+                              "Completed stages are saved; resume the run to continue."}, "events": events.summary()}
+        except NetworkError as error:
+            events.abort(error.code)
+            raise
+        if events.enabled:
+            events.close("completed" if result["status"] == "completed" else "failed")
+            result["events"] = events.summary()
+            if events.failure:
+                result["error"] = {"code": events.failure, "message": "The run's result is saved, but its event "
+                                   "timeline is incomplete."}
+        return result
 
     def _execute(self, runner, state):
         workflow = WorkflowState(state["task"]["task_id"], (runner.workflow or {}).get("max_retries", 1), state.get("workflow_state"))

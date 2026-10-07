@@ -5,7 +5,8 @@ python -m vicekrack events-inspect ID [--from-sequence N] [--component NAME]
 python -m vicekrack events-replay ID [--delay-ms N] [--max-events N] [--from-sequence N]
 
 ID is a recorded timeline (tl-...) or a saved record to reconstruct from: a research-agent
-run (rar-...), a simulation run (srun-...) or a content production (prod-...).
+run (rar-...), a simulation run (srun-...), a content production (prod-...) or, since
+Step 33, a saved Step 5 workflow run (wfr-<32 hex>).
 
 Replay prints one JSON line per recorded event, waiting a bounded delay between lines. It
 only displays what was recorded or reconstructed: it loads saved files read-only and
@@ -59,7 +60,10 @@ def load_timeline(identifier, root=None, config=None):
     if text.startswith("prod-"):
         from ..production_timeline import load_production_timeline
         return load_production_timeline(text, root)
-    raise NetworkError("invalid_timeline_id", "Use a tl-, rar-, srun- or prod- ID.")
+    if text.startswith("wfr-"):
+        from ..workflow_timeline import load_workflow_timeline
+        return load_workflow_timeline(text, root)
+    raise NetworkError("invalid_timeline_id", "Use a tl-, rar-, srun-, prod- or wfr- ID.")
 
 
 def reconstructable(department, root=None):
@@ -75,7 +79,9 @@ def reconstructable(department, root=None):
                          "kind": "simulation", "readable": item.get("readable", True)})
     if department in (None, "content"):
         from ..production_timeline import list_production_timelines
+        from ..workflow_timeline import list_workflow_timelines
         rows.extend(list_production_timelines(root))
+        rows.extend(list_workflow_timelines(root))
     return rows
 
 

@@ -127,8 +127,8 @@ States: `idle`, `working`, `blocked`, `completed`, `failed`, `unknown`.
   - each order still pending when the data ended.
 - One `simulated_fill` per fill, carrying the fill bar's start time.
 
-**Content:** content production is **not** instrumented in this step. The read-only
-adapter rebuilds its timeline from the saved state's stage trace:
+**Content (Step 33):** see [Content recording](#content-recording-step-33) below. Saved
+productions can also be rebuilt read-only from the saved state's stage trace:
 - `started`, `completed` and `failed` map to the matching events;
 - `uncertain` and `interrupted` map to `stage_interrupted`.
 
@@ -142,6 +142,52 @@ reads `state.json` directly: it takes no lock and creates no files.
   fill-time outcomes, then end-of-data outcomes, then the record order.
 - With the default replay step this matches the recorded order exactly (a test checks
   it). With coarse `--step-seconds` it can differ from the original emission order.
+
+## Content recording (Step 33)
+
+Department `content`, optional with `--record-events`:
+
+| Command | Timeline kind | Components |
+|---|---|---|
+| `run` / `resume` (saved Step 5 runs) and the one-shot `TASK.json` command | `research_review_workflow` | `content.workflow.orchestrator`, `.researcher`, `.analyst`, `.reviewer` |
+| `produce` / `production-resume` | `content_production` | `content.production.pipeline`, `.brief`, `.creator`, `.validate`, `.plan`, `.preview` |
+| `quality-report` | `content_quality` | `content.production.quality` |
+
+Each role or stage records `stage_started`, then `stage_completed` or `stage_failed`. A
+paid Creator request whose outcome is unknown records `stage_interrupted` with status
+`uncertain`. The controllers (orchestrator, pipeline) record their own start and end.
+
+**Attempts and correlation:**
+- Every invocation (start or resume) is a separate timeline.
+- All timelines of one run share `correlation_id = "cor-" + sha256({"run": ID})[:24]`,
+  where ID is `wfr-<run id>` or the production ID. The read-only reconstructions use the
+  same correlation, and a quality report shares its production's.
+- Work finished in an earlier attempt is recorded once as `stage_reused` (idle →
+  completed, reason `completed_in_earlier_attempt`), so it never appears to run again.
+- Restarted work carries `details.attempt` and a reason: `retry_after_failure`,
+  `retry_after_uncertain` or `resumed_after_interruption`.
+
+**Failure handling (content):**
+- Recording errors are captured, never thrown in the middle of a stage.
+- `started` is recorded before the stage's intent checkpoint, and `completed`/`failed`
+  after the result is saved.
+- Before any NEW role or stage starts, the command checks whether recording failed. If it
+  did, it stops there: committed results stay saved, no further provider or paid request
+  is made, and the run or production stays resumable.
+- The command reports `event_persistence_failed` (or the recorder's code), and its
+  timeline is `partial`.
+
+**Saved Step 5 runs** (`wfr-<32 hex>`) can be rebuilt read-only from their
+`workflow_state.audit_trace`. Its per-attempt times are kept, truncated to whole seconds
+(`time_basis: source_recorded`). Older runs without a workflow state show roles without
+times (`none_saved`).
+
+**Additive contract changes (Step 33).** Every existing event and timeline still
+validates:
+- the `stage_reused` event type and a `details.attempt` field;
+- the `wfr-` run ID, and `workflow_run`/`quality_report` references (`qr-…`);
+- the `research_review_workflow` and `content_quality` timeline kinds;
+- the `none_saved` time basis.
 
 ## Storage, ordering, duplicates, concurrency
 
@@ -192,8 +238,9 @@ another reason, the timeline is closed as `failed` (when a component recorded a 
 
 ## Limitations
 
-- Only `agent-run` and `sim-run` record live events. Content productions, the paper
-  journal and the other commands are covered only by reconstruction, or not at all.
+- Live events come from `agent-run`, `sim-run` and, since Step 33, the Step 5 workflow,
+  `produce`/`production-resume` and `quality-report`. The paper journal and other commands
+  are covered only by reconstruction, or not at all.
 - **Liveness** is the writer's OS lock, so it only applies on the same machine.
   Reconstructed content timelines are never checked for liveness.
 - **Reconstructed trading timelines** have no wall-clock times, and with coarse replay

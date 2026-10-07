@@ -93,7 +93,7 @@ button { cursor: pointer; }
 .live { color: #86efac; font-size: 12px; }
 .caption { margin: 6px 0 0; font-size: 13px; color: #cfd8e3; min-height: 1.4em; }
 .footnote { margin: 0 14px 10px; color: var(--muted); font-size: 12px; }
-.feed-wrap h2 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 10px 0 6px; font-weight: 500; }
+.stations-wrap h2, .feed-wrap h2 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 10px 0 6px; font-weight: 500; }
 .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .feed li { display: grid; grid-template-columns: 10px 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px;
   padding: 4px 8px; background: var(--panel); border: 1px solid #18202a; border-radius: 7px; }
@@ -223,3 +223,18 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
   .legend { position: static; margin: 6px 0 0; border: none; background: transparent; padding: 6px 4px; }
   .kv { grid-template-columns: 96px 1fr; }
 }
+
+/* Step 33: operations stations, timeline filters, station details */
+.stations { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 4px; }
+.station-btn { width: 100%; display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto auto; column-gap: 8px;
+  text-align: left; background: var(--panel); border: 1px solid #18202a; border-radius: 7px; padding: 4px 8px; font-size: 12px; }
+.station-btn .dot { width: 9px; height: 9px; border-radius: 50%; grid-row: span 2; align-self: center; }
+.station-btn.trading { box-shadow: inset 2px 0 0 var(--teal); }
+.station-btn.content { box-shadow: inset 2px 0 0 var(--violet); }
+.station-state { color: var(--muted); font-size: 11px; }
+.station-card { border: 1px solid #1c2530; border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+.station-card p { margin: 2px 0 4px; }
+.filters { display: flex; gap: 6px; margin: 0 0 10px; }
+.filter-btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; font-size: 12px; }
+.filter-btn[aria-pressed="true"] { border-color: #3b6f78; background: #0f2228; }
+.stations-wrap, .feed-wrap { margin-top: 8px; }

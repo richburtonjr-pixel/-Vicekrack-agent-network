@@ -39,10 +39,12 @@ from vicekrack.trading.timeline import SIM_COMPONENTS, from_agent_run, from_simu
 # Independent statement of the documented transition table: event type -> (allowed from, to).
 RULES = {"stage_started": ({"idle", "failed", "unknown"}, "working"), "stage_completed": ({"working"}, "completed"),
          "stage_failed": ({"working"}, "failed"), "stage_blocked": ({"idle"}, "blocked"),
-         "stage_interrupted": ({"working"}, "unknown"), "order_decision": ({"working"}, "working"),
+         "stage_interrupted": ({"working"}, "unknown"), "stage_reused": ({"idle"}, "completed"),  # Step 33
+         "order_decision": ({"working"}, "working"),
          "simulated_fill": ({"working"}, "working")}
 STATUS = {"stage_started": "started", "stage_completed": "completed", "stage_failed": "failed", "stage_blocked": "blocked",
-          "stage_interrupted": "interrupted", "order_decision": "accepted", "simulated_fill": "filled"}
+          "stage_interrupted": "interrupted", "stage_reused": "completed", "order_decision": "accepted",
+          "simulated_fill": "filled"}
 ENGINE = "trading.simulation.engine"
 
 

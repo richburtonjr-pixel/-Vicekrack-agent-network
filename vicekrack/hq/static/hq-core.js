@@ -31,7 +31,7 @@
     observed: { badge: "LIVE OBSERVED", tone: "live" }
   };
   var SPEEDS = [0.5, 1, 2, 4, 8];
-  var ID_PATTERN = /^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24})$/;
+  var ID_PATTERN = /^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24}|wfr-[0-9a-f]{32})$/;
 
   function stateStyle(state) { return STATES[state] || STATES.unknown; }
 
@@ -170,9 +170,15 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  /* Deterministic idle choice for (bot, cycle): a spot and a dwell time. Decoration only. */
-  function wanderChoice(botId, cycle, spots) {
+  /* Deterministic idle choice for (bot, cycle): a spot and a dwell time. Decoration only.
+   * Occupancy (Step 33): spots in `taken` (claimed by other bots) are skipped, so idle bots spread
+   * out; if every spot is taken the bot uses its first (own) spot. */
+  function wanderChoice(botId, cycle, spots, taken) {
     var random = rng(hashSeed(botId + ":" + cycle));
+    if (taken) {
+      var free = spots.filter(function (spot) { return !taken[spot.node]; });
+      spots = free.length ? free : spots.slice(0, 1);
+    }
     var total = 0;
     spots.forEach(function (spot) { total += spot.weight; });
     var pick = random() * total, chosen = spots[spots.length - 1];
@@ -200,12 +206,23 @@
     if (event.status && event.event_type.indexOf(event.status) === -1) { text += " (" + words(event.status) + ")"; }
     if (event.details && event.details.conclusion) { text += " · " + words(event.details.conclusion); }
     if (event.details && event.details.verdict) { text += " · " + words(event.details.verdict); }
+    if (event.event_type === "stage_reused") { text += " · finished in an earlier attempt (not run again)"; }
+    if (event.details && event.details.attempt > 1) { text += " · attempt " + event.details.attempt; }
     return text;
   }
   function validScene(scene) {
-    return !!scene && scene.contract === "hq_scene" && scene.version === "1.0" && MODES.hasOwnProperty(scene.mode) &&
-      Array.isArray(scene.frames) && Array.isArray(scene.rooms);
+    return !!scene && scene.contract === "hq_scene" && scene.version === "1.1" && MODES.hasOwnProperty(scene.mode) &&
+      Array.isArray(scene.frames) && Array.isArray(scene.rooms) && Array.isArray(scene.stations);
   }
+  /* What a bot's movement means, in words: movement is never evidence of activity. */
+  var MOVEMENT = {
+    station: "At its station because of recorded work",
+    seat: "Waiting in its room (queued in a recorded workflow)",
+    door: "Standing at its door: blocked by an earlier recorded failure",
+    hold: "Holding position: the current status is unknown",
+    free: "Decorative idle roaming: not evidence that this agent is running"
+  };
+  function movementFor(intent) { return MOVEMENT[intent] || MOVEMENT.free; }
   /* Room states at a replay position: before the first event everything is idle. */
   function roomStatesAt(scene, index, rooms) {
     if (index >= 0 && scene.frames[index]) { return scene.frames[index].room_states; }
@@ -236,7 +253,7 @@
   return {
     STATES: STATES, STATE_ORDER: STATE_ORDER, MODES: MODES, SPEEDS: SPEEDS, ID_PATTERN: ID_PATTERN,
     stateStyle: stateStyle, intentFor: intentFor, Replay: Replay, Graph: Graph, hashSeed: hashSeed, rng: rng,
-    wanderChoice: wanderChoice, plain: plain, words: words, formatTime: formatTime, describeEvent: describeEvent,
+    wanderChoice: wanderChoice, movementFor: movementFor, MOVEMENT: MOVEMENT, plain: plain, words: words, formatTime: formatTime, describeEvent: describeEvent,
     validScene: validScene, roomStatesAt: roomStatesAt, counters: counters, lastEventFor: lastEventFor
   };
 }));

@@ -50,7 +50,9 @@
       "enum": [
         "research_agent_workflow",
         "simulation",
-        "content_production"
+        "content_production",
+        "research_review_workflow",
+        "content_quality"
       ]
     },
     "correlation_id": {
@@ -86,7 +88,8 @@
               "enum": [
                 "research_agent_run",
                 "simulation_run",
-                "production"
+                "production",
+                "workflow_run"
               ]
             },
             "id": {
@@ -107,7 +110,8 @@
       "enum": [
         "recorded_at_emission",
         "source_recorded",
-        "simulated_only"
+        "simulated_only",
+        "none_saved"
       ]
     },
     "started_at": {
@@ -241,7 +245,7 @@
     },
     "run_id": {
       "type": "string",
-      "pattern": "^(rar|srun|prod)-[0-9a-f]{24}$"
+      "pattern": "^((rar|srun|prod)-[0-9a-f]{24}|wfr-[0-9a-f]{32})$"
     },
     "component": {
       "type": "string",

@@ -114,10 +114,12 @@ test("scene helpers read only recorded frames", () => {
       room_states: { trend_agent: "working" } },
     { event: { component: "trading.simulation.engine", event_type: "simulated_fill", status: "filled", details: {} },
       room_states: { trend_agent: "completed" } }];
-  const scene = { contract: "hq_scene", version: "1.0", mode: "recorded_replay", frames, rooms: [] };
+  const scene = { contract: "hq_scene", version: "1.1", mode: "recorded_replay", frames, rooms: [], stations: [] };
   assert.ok(C.validScene(scene));
   assert.ok(!C.validScene({ ...scene, mode: "made_up" }));
   assert.ok(!C.validScene({ ...scene, contract: "other" }));
+  assert.ok(!C.validScene({ ...scene, version: "1.0" }));
+  assert.ok(C.ID_PATTERN.test("wfr-" + "a".repeat(32)) && !C.ID_PATTERN.test("wfr-" + "a".repeat(24)));
   assert.deepStrictEqual(C.roomStatesAt(scene, -1, ["trend_agent", "creator"]), { trend_agent: "idle", creator: "idle" });
   assert.deepStrictEqual(C.roomStatesAt(scene, 2, []), { trend_agent: "completed" });
   assert.deepStrictEqual(C.counters(scene, 2), { accepted: 0, rejected: 1, pending: 0, fills: 1 });
@@ -127,6 +129,31 @@ test("scene helpers read only recorded frames", () => {
   assert.strictEqual(C.describeEvent(frames[0].event, "Trend Agent"), "Trend Agent · stage started");
   assert.ok(C.ID_PATTERN.test("demo") && C.ID_PATTERN.test("srun-" + "a".repeat(24)));
   assert.ok(!C.ID_PATTERN.test("../etc/passwd") && !C.ID_PATTERN.test("tl-" + "a".repeat(23)));
+});
+
+test("occupancy: idle bots never claim the same shared spot", () => {
+  const shared = ["sofa1", "sofa2", "coffee", "stool1", "stool2"].map((node) => ({ node, weight: 1, activity: "relax" }));
+  const bots = ["market_scout", "trend_agent", "strategy_agent", "risk_review", "researcher", "analyst", "reviewer", "creator"];
+  for (let cycle = 0; cycle < 40; cycle += 1) {
+    const taken = {};
+    bots.forEach((bot) => {
+      const own = [{ node: "seat_" + bot, weight: 3, activity: "sit" }, { node: "nook_" + bot, weight: 2, activity: "idle" }];
+      const choice = C.wanderChoice(bot, cycle, own.concat(shared), taken);
+      assert.ok(!taken[choice.node], "two bots chose " + choice.node);
+      taken[choice.node] = true;
+    });
+  }
+  // When every spot is taken, a bot falls back to its own first spot.
+  assert.strictEqual(C.wanderChoice("x", 1, [{ node: "own", weight: 1 }, { node: "s", weight: 1 }], { own: true, s: true }).node, "own");
+});
+
+test("movement is described honestly and never as activity when roaming", () => {
+  assert.match(C.movementFor("free"), /not evidence/);
+  assert.match(C.movementFor("station"), /recorded work/);
+  ["station", "seat", "door", "hold", "free"].forEach((intent) => assert.ok(C.movementFor(intent).length > 10));
+  assert.strictEqual(C.movementFor("anything"), C.MOVEMENT.free);
+  assert.ok(C.describeEvent({ component: "content.workflow.researcher", event_type: "stage_reused", status: "completed",
+    details: { attempt: 1 } }, "Researcher").includes("not run again"));
 });
 
 console.log(JSON.stringify({ passed }));

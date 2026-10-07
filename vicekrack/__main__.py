@@ -9,13 +9,18 @@ from .errors import NetworkError
 from .orchestrator import Orchestrator, read_json
 
 
+RECORD_HELP = "Record execution events under runtime/events/content/ (Step 33); stops before new work if they cannot be saved"
+
+
 def saved_command():
+    from .content_events import ContentEvents
     from .persistence import SavedRuns
     parser = argparse.ArgumentParser(description="Explicit local saved workflow runs")
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
     run.add_argument("task")
     run.add_argument("--registry", default="config/agents.workflow.json")
+    run.add_argument("--record-events", action="store_true", help=RECORD_HELP)
     commands.add_parser("list")
     inspect = commands.add_parser("inspect")
     inspect.add_argument("run_id")
@@ -23,9 +28,11 @@ def saved_command():
     resume.add_argument("run_id")
     resume.add_argument("--registry", default=None)
     resume.add_argument("--retry-uncertain", action="store_true")
+    resume.add_argument("--record-events", action="store_true", help=RECORD_HELP)
     args = parser.parse_args()
     try:
-        runs = SavedRuns()
+        events = ContentEvents.persistent("workflow") if getattr(args, "record_events", False) else None
+        runs = SavedRuns(events=events)
         if args.command == "run":
             task = json.loads(sys.stdin.read()) if args.task == "-" else read_json(Path(args.task))
             result = runs.start(task, args.registry)
@@ -35,7 +42,7 @@ def saved_command():
             result = runs.store.inspect(args.run_id)
         else:
             result = {"runs": runs.store.list_runs()}
-        code = 1 if args.command in {"run", "resume"} and result["status"] != "completed" else 0
+        code = 1 if args.command in {"run", "resume"} and (result["status"] != "completed" or "error" in result) else 0
     except NetworkError as error:
         result, code = {"error": error.as_dict()}, 1
     except (OSError, ValueError, UnicodeError):
@@ -132,14 +139,28 @@ def main():
     parser.add_argument("task", help="Task JSON file, or - to read JSON from stdin")
     parser.add_argument("--registry", default="config/agents.json",
                         help="Registry path relative to the project root (default: local mock)")
+    parser.add_argument("--record-events", action="store_true",
+                        help="Record workflow events (Step 33); output becomes {\"task\": ..., \"events\": ...}")
     args = parser.parse_args()
+    from .content_events import ContentEvents, EventFailure
+    events = ContentEvents.persistent("workflow") if args.record_events else None
     try:
         if args.task == "-":
             task = json.loads(sys.stdin.read())
         else:
             task = read_json(Path(args.task))
-        result = Orchestrator(registry_path=args.registry).run(task)
+        runner = Orchestrator(registry_path=args.registry)
+        runner.events = events
+        result = runner.run(task)
         exit_code = 0 if result["status"] == "completed" else 1
+        if events is not None:
+            events.close("completed" if result["status"] == "completed" else "failed")
+            result = {"task": result, "events": events.summary()}
+            exit_code = 1 if events.failure else exit_code
+    except EventFailure as failure:
+        events.abort(failure.code)
+        result, exit_code = {"error": {"code": failure.code, "message": "Event recording failed before any agent ran."},
+                             "events": events.summary()}, 1
     except NetworkError as error:
         result, exit_code = {"error": error.as_dict()}, 1
     except (OSError, ValueError, UnicodeError):

@@ -169,8 +169,10 @@ class Check:
 
 
 class QualityChecker:
-    def __init__(self, root=None, clock=None, prober=None, poster_reader=None):
+    def __init__(self, root=None, clock=None, prober=None, poster_reader=None, events=None):
         # Defaults are looked up at call time (simple to replace in tests).
+        from .content_events import DISABLED
+        self.events = events or DISABLED            # Step 33: optional execution events
         self.root = root
         self.clock = clock or (lambda: utc_now())
         self.prober = prober or (lambda path: probe_media(path))
@@ -179,12 +181,24 @@ class QualityChecker:
 
     def run(self, production_id):
         """Check one production under its lock and save the report. Returns (report, path)."""
+        from .content_events import QUALITY
+        events, refs = self.events, [{"kind": "production", "id": production_id}]
+        events.bind(production_id, production_id)       # same correlation as the production's attempts
         with self.store.lock(production_id):
-            checks = self._checks(production_id)
+            events.check()                              # a recording failure stops before any checks run
+            events.emit(QUALITY, "quality", "stage_started", "started", refs=refs)
+            try:
+                checks = self._checks(production_id)
+            except NetworkError as error:
+                events.emit(QUALITY, "quality", "stage_failed", "failed", reason_codes=[error.code], refs=refs)
+                raise
         report = self._report(production_id, checks)
         folder = Path(self.root if self.root is not None else ROOT) / "runtime/quality"
         if not _publish(report, folder, report["report_id"] + ".json"):
+            events.emit(QUALITY, "quality", "stage_failed", "failed", reason_codes=["quality_report_exists"], refs=refs)
             raise NetworkError("quality_report_exists", "An identical report already exists.")
+        events.emit(QUALITY, "quality", "stage_completed", "completed", reason_codes=["result_" + report["result"]],
+                    refs=refs + [{"kind": "quality_report", "id": report["report_id"]}])   # after the report is saved
         return report, (folder / (report["report_id"] + ".json")).resolve()
 
     # -- helpers

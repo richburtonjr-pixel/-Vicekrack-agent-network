@@ -33,7 +33,7 @@ FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/styles.css": ("styles.css", "text/css; charset=utf-8"),
          "/static/hq-core.js": ("hq-core.js", "text/javascript; charset=utf-8"),
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8")}
-TIMELINE = re.compile(r"^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24})$")
+TIMELINE = re.compile(r"^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24}|wfr-[0-9a-f]{32})$")
 MAX_TIMELINES = 200
 HEADERS = {
     "Content-Security-Policy": ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
@@ -67,20 +67,36 @@ def _allowed_origin(headers, port):
 
 
 def timelines(root=None):
+    """Demo, recorded and reconstructable timelines. Recorded timelines of one run share a correlation
+    ID (Step 33). Attempts of the same command on the same run (same correlation and kind) get
+    `attempt` k of `attempts` n, ordered by start time (ties: the order in which their timelines
+    were created on disk)."""
+    from ..content_events import correlation_for
     from ..events.cli import reconstructable
     from ..events.store import EventStore
     rows = [{"id": "demo", "label": "Demo HQ (synthetic)", "origin": "demo", "department": "both", "kind": "hq_demo",
-             "readable": True}]
+             "readable": True, "correlation_id": None}]
+    recorded = []
     for row in EventStore(root).list():
-        rows.append({"id": row["timeline_id"], "label": row.get("kind", "timeline"), "origin": "recorded",
-                     "department": row["department"], "kind": row.get("kind"), "readable": row["readable"],
-                     "completeness": row.get("completeness"), "outcome": row.get("outcome"), "live": row.get("live"),
-                     "started_at": row.get("started_at"), "event_count": row.get("event_count")})
+        recorded.append({"id": row["timeline_id"], "label": row.get("kind", "timeline"), "origin": "recorded",
+                         "department": row["department"], "kind": row.get("kind"), "readable": row["readable"],
+                         "completeness": row.get("completeness"), "outcome": row.get("outcome"), "live": row.get("live"),
+                         "started_at": row.get("started_at"), "event_count": row.get("event_count"),
+                         "run_id": row.get("run_id"), "correlation_id": row.get("correlation_id"),
+                         "created_ns": row.get("created_ns", 0)})
+    groups = {}
+    for row in sorted(recorded, key=lambda r: (r.get("started_at") or "", r.pop("created_ns", 0), r["id"])):
+        if row["correlation_id"]:                       # attempts: same run AND same kind (a quality check is not a retry)
+            groups.setdefault((row["correlation_id"], row["kind"]), []).append(row)
+    for members in groups.values():
+        for number, row in enumerate(members, start=1):
+            row.update(attempt=number, attempts=len(members))
+    rows.extend(recorded)
     for row in reconstructable(None, root):
         rows.append({"id": row["source_id"], "label": row["kind"], "origin": "reconstructed",
                      "department": row["department"], "kind": row["kind"], "readable": row["readable"],
                      "completeness": row.get("completeness"), "outcome": row.get("outcome"),
-                     "event_count": row.get("event_count")})
+                     "event_count": row.get("event_count"), "correlation_id": correlation_for(row["source_id"])})
     return {"items": rows[:MAX_TIMELINES], "total": len(rows), "shown_limit": MAX_TIMELINES}
 
 
@@ -119,7 +135,7 @@ def respond(method, target, headers, *, port, root=None):
             query = parse_qs(parts.query, max_num_fields=2)
             values = query.get("timeline", [])
             if len(values) != 1 or set(query) != {"timeline"} or not TIMELINE.match(values[0]):
-                return _error(400, "invalid_timeline_id", "Use demo or a tl-, rar-, srun- or prod- ID.")
+                return _error(400, "invalid_timeline_id", "Use demo or a tl-, rar-, srun-, prod- or wfr- ID.")
             return _json(200, scene(values[0], root))
     except NetworkError as error:
         status = 404 if error.code.endswith("not_found") else 422 if error.code.startswith("invalid") else 409

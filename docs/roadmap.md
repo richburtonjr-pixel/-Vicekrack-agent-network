@@ -45,7 +45,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 29 | Trading | Bounded offline paper-execution simulation: explicit simulation policy, isolated in-run account, next-open fills with documented slippage/fees, risk limits and kill switch, opposite-EMA and max-holding exits, exact cash/position/P&L accounting, versioned simulated contracts | #29 |
 | 30 | Trading | Read-only analytics of saved simulations: equity rebuilt by replay from validated fills, closed-trade statistics, P&L and net return (never annualized), drawdown, holding, exposure, order outcomes, strategy attribution with shared-account explanation; `unavailable` metrics with reasons, tamper-checked inputs | #30 |
 | 31 | Shared | Structured execution events (`execution_event` 1.0) and bounded timelines: optional recording in the research-agent workflow and simulator (stage started/completed/blocked/failed, order decisions, simulated fills), recorded vs reconstructed timelines with no invented times, read-only adapters for saved trading runs and content productions, display-state transition rules, atomic per-department storage with duplicate/concurrency/retention rules, explicit failure on persistence errors, list/inspect/replay CLI | #31 |
-| 32 | Shared | ViceKrack Living HQ: local read-only visual Command Center over Step 31 timelines; two-floor isometric house (trading upstairs, content downstairs, shared operations lobby/lounge/kitchen) with distinct bots; status-first replay (play/pause/scrub/speed), recorded vs reconstructed vs live vs demo labelling, honest partial/interrupted display, supported-only handoffs, decorative idle behaviour; inspector, Timeline/Text views, presentation mode, reduced motion and keyboard access; loopback-only GET API with Host/Origin checks and strict CSP; deterministic demo | this PR |
+| 32 | Shared | ViceKrack Living HQ: local read-only visual Command Center over Step 31 timelines; two-floor isometric house (trading upstairs, content downstairs, shared operations lobby/lounge/kitchen) with distinct bots; status-first replay (play/pause/scrub/speed), recorded vs reconstructed vs live vs demo labelling, honest partial/interrupted display, supported-only handoffs, decorative idle behaviour; inspector, Timeline/Text views, presentation mode, reduced motion and keyboard access; loopback-only GET API with Host/Origin checks and strict CSP; deterministic demo | #32 |
+| 33 | Shared | Accurate agent activity: rooms show only their actual roles (Step 5 Researcher/Analyst/Reviewer, production Creator); automated stages and controllers as labelled operations stations; optional event recording for the Step 5 workflow, production pipeline and quality report with explicit resume handling (`stage_reused`, attempt numbers, shared correlation), fail-closed recording that keeps committed results and never repeats paid calls; read-only reconstruction of saved workflow runs; department timeline filters, attempt grouping, honest movement labels and idle-spot occupancy | this PR |
 
 ## Deferred work
 
@@ -73,8 +74,8 @@ Other content work that is deferred and not scheduled:
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
 The content track has had no new steps since Step 22. Steps 23–30 built the trading
-foundation, and Steps 31–32 added shared execution events and the read-only Living HQ,
-which only reads saved content productions. Nothing in these steps changed content
+foundation, and Steps 31–33 added shared execution events, the read-only Living HQ and
+optional event recording for the existing content commands (outputs unchanged). Nothing in these steps changed content
 behaviour; all content tests still pass.
 
 ### Trading: not started, and out of scope until explicitly requested
@@ -115,9 +116,10 @@ change limits, release the kill switch or publish content without a separate des
 
 Step 31 added its data layer: execution events, recorded and reconstructed timelines,
 display states and a terminal replay (see [Execution events](events.md)). Step 32 added
-the visual, read-only Living HQ on top of it (see [Living HQ](hq.md)). Still not built:
-- live event recording for content productions, the Step 5 shared workflow, the paper
-  journal and other commands;
+the visual, read-only Living HQ on top of it (see [Living HQ](hq.md)). Step 33 added event
+recording for the Step 5 workflow, content productions and quality reports, with
+role-accurate rooms. Still not built:
+- live event recording for the paper journal and the other commands;
 - liveness across machines, and streaming instead of polling;
 - multi-user access;
 - any control actions (trading controls, publishing, retries).

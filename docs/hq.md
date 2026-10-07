@@ -53,14 +53,22 @@ Record or save something first, then pick it in the **Timeline** view:
 .\.venv\Scripts\python.exe -m vicekrack market-list
 .\.venv\Scripts\python.exe -m vicekrack agent-run DATASET_ID --save --record-events
 .\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack run examples/workflow-task.json --registry config/agents.workflow.json --record-events
+.\.venv\Scripts\python.exe -m vicekrack produce SELECTION_RUN_ID RECORD_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack quality-report PRODUCTION_ID --record-events
 .\.venv\Scripts\python.exe -m vicekrack hq-serve
 ```
+
+The content commands (Step 33) also accept `--record-events` on `resume RUN_ID` and
+`production-resume PRODUCTION_ID`. The one-shot `python -m vicekrack TASK.json --registry
+config/agents.workflow.json --record-events` prints `{"task": ..., "events": ...}`.
 
 The Timeline view lists four kinds of entry:
 - the demo;
 - **recorded** timelines (`tl-…`), captured while a command ran with `--record-events`;
 - **reconstructable** saved records: research-agent runs (`rar-…`), simulation runs
-  (`srun-…`) and content productions (`prod-…`, from `produce`);
+  (`srun-…`), content productions (`prod-…`, from `produce`) and saved Step 5 workflow runs
+  (`wfr-…`, from `run`);
 - an open recorded timeline, which appears as **LIVE OBSERVED** while its command is
   still running.
 
@@ -74,22 +82,51 @@ The Timeline view lists four kinds of entry:
 **Completeness** is shown next to the badge: complete, partial, open or interrupted,
 following Step 31's rules. Issues such as `missing_events` are listed.
 
+**Attempts (Step 33).** Each start or resume of a run is its own recorded timeline.
+- All timelines of one run share a correlation ID, shown as "run xxxxxxxx".
+- Timelines of the same command on the same run are numbered "attempt k of n". A quality
+  check is not counted as an attempt of its production.
+- In a resumed attempt, roles and stages finished earlier appear as **stage reused**
+  ("finished in an earlier attempt (not run again)"). They are never drawn as running
+  again.
+- A retried stage shows its attempt number and reason.
+
+Use the **All / Trading / Content** filter to pick timelines from either department. The
+Trading and Content views also list that department's timelines in the inspector.
+
 ## The house
 
 | Floor | Rooms | Driven by |
 |---|---|---|
 | Upstairs (teal) | Market Scout, Trend Agent, Strategy Agent, Risk Review | the four Step 28 research stages (`trading.research.*`) |
-| Downstairs (violet) | Researcher, Analyst, Reviewer, Creator | content production stages: brief, plan, validate, creator |
-| Shared | Operations lobby | consoles for the research controller, the simulator engine (with order and fill counters) and the content preview render |
+| Downstairs (violet) | Researcher, Analyst, Reviewer | the actual Step 5 workflow roles (`content.workflow.researcher/analyst/reviewer`) |
+| Downstairs (violet) | Creator | the production pipeline's Creator stage, i.e. the Creator role (`content.production.creator`) |
+| Shared | Operations lobby | labelled **operations stations** (below), with simulated order and fill counters |
 | Shared | Lounge, kitchen, corridors, stairs | decoration only |
 
-The Step 5 Researcher → Analyst → Reviewer workflow emits no Step 31 events. So the
-downstairs rooms reflect the matching content-production stages, and each room's inspector
-says exactly which component drives it.
+**Operations stations** are automated stages and workflow controllers, not agents:
 
-A room whose components have no events in the selected timeline shows **No recorded
-activity**. A simulation-only timeline therefore lights only the Operations console, and a
-content production lights only the downstairs.
+| Station | Component |
+|---|---|
+| Research controller | `trading.research.controller` |
+| Simulator | `trading.simulation.engine` |
+| Workflow orchestrator | `content.workflow.orchestrator` |
+| Production pipeline | `content.production.pipeline` |
+| Brief builder | `content.production.brief` |
+| Script validator | `content.production.validate` |
+| Scene planner | `content.production.plan` |
+| Preview renderer | `content.production.preview` |
+| Quality checker | `content.production.quality` |
+
+**Attribution.** Until Step 32, the brief, plan and validate stages were drawn in the
+Researcher, Analyst and Reviewer rooms. They are automated stages, not those roles, so Step
+33 shows them only as stations.
+- An older saved production therefore lights only the Creator room and its stations. Its
+  events keep their honest stage labels, such as "Scene planner · stage completed".
+- A room or station without events in the selected timeline shows **No recorded
+  activity**.
+- The station strip under the replay bar lists every station's status in text. The
+  inspector for Operations shows each station's last event.
 
 ## States and what bots do
 
@@ -105,6 +142,12 @@ content production lights only the downstairs.
 
 Every state also has a text label: in the room sign, the sidebar, the inspector, the
 Text view and the legend.
+
+**Movement is not evidence.** A bot walking to the kitchen or sitting in the lounge is
+decorative idle roaming, and the inspector's **Movement** row says so ("Decorative idle
+roaming: not evidence that this agent is running"). Only the status label, which comes
+from recorded events, says whether work happened. Idle bots claim separate spots (one bot
+per sofa, stool or counter place, plus their own seat and nook), so they don't pile up.
 
 **"Waiting"** is derived only inside the fixed workflow orders. It is an idle stage while
 its workflow is actively working: the research controller is working, or an earlier stage
@@ -191,16 +234,19 @@ supports it:
 
 ## Limitations
 
-- **Mapping:** the downstairs rooms reflect content-production stages. The Step 5 shared
-  workflow and the paper journal have no events yet, so they don't appear.
+- **Mapping:** the paper journal and other commands still emit no events, so they don't
+  appear. Old Step 5 runs saved without a workflow state show roles without times
+  (`none_saved`).
 - **Live observation:** it needs the HQ server and the recording command on the same
   computer, because liveness is Step 31's lock file. Content productions are never shown
   as live.
 - **Refresh:** the page polls every 2 s rather than streaming, and stops after 900
   refreshes.
-- **The drawing:** it's a lightweight SVG illustration, not a game engine. Bots can
-  overlap when they share a spot, and the phone-width house is small; the Text view and
-  event feed are the readable alternative there.
+- **The drawing:** it's a lightweight SVG illustration, not a game engine. Walking bots
+  can cross paths (occupancy only applies to resting spots). The phone-width house is
+  small; the station strip, Text view and event feed are the readable alternative there.
+- **Attempt order:** attempts that start within the same second are ordered by when their
+  timelines were created on disk.
 - **Times:** reconstructed trading timelines have simulated times only, as Step 31 records
   them.
 - **Still to come:** trading controls, publishing, AI calls and multi-user access are not

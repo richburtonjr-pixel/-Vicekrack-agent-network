@@ -44,10 +44,11 @@ MANIFEST = Draft202012Validator({
                    "timeline_id": {"type": "string", "pattern": TIMELINE_ID.pattern},
                    "correlation_id": {"type": "string", "pattern": "^cor-[0-9a-f]{24}$"},
                    "department": {"enum": list(DEPARTMENTS)},
-                   "kind": {"enum": ["research_agent_workflow", "simulation", "content_production"]},
+                   "kind": {"enum": ["research_agent_workflow", "simulation", "content_production",
+                                     "research_review_workflow", "content_quality"]},
                    "components": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": True,
                                   "items": {"type": "string", "pattern": "^(trading|content)\\.[a-z0-9_.]{1,90}$"}},
-                   "run_id": {"anyOf": [{"type": "string", "pattern": "^(rar|srun|prod)-[0-9a-f]{24}$"}, {"type": "null"}]},
+                   "run_id": {"anyOf": [{"type": "string", "pattern": "^((rar|srun|prod)-[0-9a-f]{24}|wfr-[0-9a-f]{32})$"}, {"type": "null"}]},
                    "started_at": STAMP}})
 CLOSE = Draft202012Validator({
     "type": "object", "additionalProperties": False,
@@ -320,6 +321,14 @@ class EventStore:
                           outcome=closed["outcome"] if closed else None, live=live,
                           issues=list(dict.fromkeys(issues)))
 
+    @staticmethod
+    def _created_ns(folder):
+        """When the manifest was written (ns): orders attempts that started within the same second."""
+        try:
+            return (folder / "manifest.json").stat().st_mtime_ns
+        except OSError:
+            return 0
+
     def list(self, department=None):
         rows = []
         for name in ([department] if department else DEPARTMENTS):
@@ -328,6 +337,7 @@ class EventStore:
                     view = self.load(folder.name)
                     rows.append({"timeline_id": view["timeline_id"], "origin": "recorded", "department": name,
                                  "kind": view["kind"], "run_id": view["run_id"], "started_at": view["started_at"],
+                                 "correlation_id": view["correlation_id"], "created_ns": self._created_ns(folder),
                                  "completeness": view["completeness"], "outcome": view["outcome"], "live": view["live"],
                                  "event_count": view["event_count"], "readable": True})
                 except NetworkError:
