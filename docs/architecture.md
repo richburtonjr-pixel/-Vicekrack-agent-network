@@ -699,3 +699,30 @@ flowchart LR
 explicit policy. It never imports the paper-account, risk-engine, intent, journal or agent
 modules (a test enforces this), and simulation runs carry `paper_account_access: false`
 and `broker: null`. See [Simulation](simulation.md).
+
+## Step 30: simulation analytics
+
+`vicekrack/trading/analytics/` reads saved simulation runs and writes only its own reports:
+
+```mermaid
+flowchart LR
+    RUN[(simulation run, re-validated)] --> B[build_report]
+    DS[(market_dataset, re-validated, hash must match)] --> R[market.replay.drive: closed bars only]
+    R --> E[EquityConsumer: apply fills at bar open, equity at close]
+    E --> B
+    B --> M[closed trades, account, drawdown, holding, exposure, orders, attribution]
+    M --> REP[(runtime/trading/analytics/reports)]
+    B -. never writes .- X[simulation runs / datasets / paper accounts / kill switches]
+```
+
+- `report.py`: `EquityConsumer` rebuilds cash, shares and equity bar by bar;
+  `build_report` checks the inputs, reconciles the rebuilt equity with the run's summary
+  and computes the metrics (`unavailable` with a reason when undefined); `validate_report`
+  checks the schema, hash and internal consistency.
+- `store.py`: atomic report storage and the analytics config loader.
+- `cli.py`: `analytics-generate`, `analytics-inspect` and `analytics-list`.
+
+**Boundary:** analytics imports only market replay, simulation validation/storage and the
+shared helpers. It never imports paper accounts, the risk engine, intents, the journal,
+agents, signals or indicators, and never runs a simulation (a test enforces this). See
+[Simulation analytics](analytics.md).

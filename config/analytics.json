@@ -1,0 +1,9 @@
+{
+  "config_version": "1.0",
+  "description": "Read-only analytics of saved simulation runs (Step 30). Descriptive only; never annualized.",
+  "limits": {
+    "max_curve_points": 5000,
+    "max_trades": 1000,
+    "max_cli_items": 50
+  }
+}

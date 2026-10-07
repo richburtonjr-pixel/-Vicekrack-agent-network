@@ -42,7 +42,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | #26 |
 | 27 | Trading | Rule-based research signals (VWAP reclaim, EMA crossover, breakout with optional volume filter) on closed bars and indicators: exact comparisons, not-ready handling, cooldown, deterministic IDs, bounded evaluations; research only, `authorization_possible: false` | #27 |
 | 28 | Trading | Bounded deterministic research-agent workflow: Market Scout, Trend Agent, Strategy Agent and Risk Review stages with validated handoffs over evidence frozen at a simulated time; fixed four-stage controller, explicit failure states, interface for a future AI analysis layer; research only | #28 |
-| 29 | Trading | Bounded offline paper-execution simulation: explicit simulation policy, isolated in-run account, next-open fills with documented slippage/fees, risk limits and kill switch, opposite-EMA and max-holding exits, exact cash/position/P&L accounting, versioned simulated contracts | this PR |
+| 29 | Trading | Bounded offline paper-execution simulation: explicit simulation policy, isolated in-run account, next-open fills with documented slippage/fees, risk limits and kill switch, opposite-EMA and max-holding exits, exact cash/position/P&L accounting, versioned simulated contracts | #29 |
+| 30 | Trading | Read-only analytics of saved simulations: equity rebuilt by replay from validated fills, closed-trade statistics, P&L and net return (never annualized), drawdown, holding, exposure, order outcomes, strategy attribution with shared-account explanation; `unavailable` metrics with reasons, tamper-checked inputs | this PR |
 
 ## Deferred work
 
@@ -63,12 +64,13 @@ Other content work that is deferred and not scheduled:
   effects.
 - Sourced or generated media for scenes, beyond the local silent previews. This needs
   rights tracking per asset.
-- A Publisher (platform upload) and an Analyst (performance metrics). Both need explicit
+- A Publisher (platform upload) and an Analyst (content performance metrics; Step 30's
+  trading analytics is unrelated). Both need explicit
   consent, credentials handled through environment variables, and the human review step
   above first.
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
-The content track has had no new steps since Step 22, while Steps 23–29 built the trading
+The content track has had no new steps since Step 22, while Steps 23–30 built the trading
 foundation. Nothing in the trading track changed content behaviour; all content tests
 still pass.
 
@@ -82,8 +84,9 @@ still pass.
 - Turning research signals (Step 27) into order-type `trading_signal` proposals or paper
   intents, and any connection from indicators or research signals to the risk engine or
   paper accounts.
-- More research rules (short or exit rules, rule combinations), backtests, performance
-  statistics or P&L of research signals.
+- More research rules (short or exit rules, rule combinations). Step 30 describes saved
+  simulation runs only; there are no multi-run backtests, parameter sweeps, risk-adjusted
+  or annualized statistics.
 - Connecting replayed or imported data to paper authorization. This would need a
   separate, freshness-safe design.
 - AI-generated signals or AI trading agents. Step 28's agents are deterministic local
@@ -94,6 +97,8 @@ still pass.
   own offline simulator; nothing connects simulation results to Step 24 paper accounts.
 - More simulation features: short selling, limit and stop orders, partial fills,
   multiple symbols, liquidity or market-impact models, and strategy optimization.
+- More analytics: comparisons across runs, risk-adjusted ratios, benchmarks and charts.
+  Step 30 reports are read-only descriptions of one run.
 - Background or scheduled execution.
 - A trading dashboard.
 
