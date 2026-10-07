@@ -13,6 +13,11 @@ that stage `failed`. The run stops immediately: later stages are `not_run`, the 
 `failed`, and nothing is retried. Agent conclusions such as `insufficient_data` are not
 failures; the workflow still completes and explains them.
 
+Execution events (Step 31): with an optional `events` sink the controller emits
+stage_started / stage_completed / stage_failed for itself and each stage, and
+stage_blocked for stages not run after a failure. Events never enter the run or its
+hashes; a sink failure stops the workflow with that event code (no retry).
+
 The controller never imports the paper-account, risk-engine, order or journal modules.
 """
 
@@ -25,6 +30,7 @@ from ..errors import TradingError
 from .analysis import NoAnalysisLayer
 from .evidence import build_evidence
 from .handlers import default_handlers
+from ..timeline import AGENT_CONTROLLER, TradingEvents
 
 STAGES = ("market_scout", "trend_agent", "strategy_agent", "risk_review")
 NOTICE = ("Research-only workflow output from deterministic local handlers on historical data at a simulated time. "
@@ -48,7 +54,8 @@ def _handoff(position, role, handler, sim_time, **values):
 
 
 def run_workflow(dataset, *, workflow_config, market_config, indicator_config, signal_config, created_at,
-                 sim_time=None, handlers=None, analysis_layer=None, strategies=None, monotonic=time.monotonic):
+                 sim_time=None, handlers=None, analysis_layer=None, strategies=None, monotonic=time.monotonic,
+                 events=None):
     if strategies:                        # explicit override; the run records the effective configuration's hash
         workflow_config = {**workflow_config, "strategies": list(strategies)}
     validate_schema("research_agent_config", workflow_config)
@@ -60,17 +67,34 @@ def run_workflow(dataset, *, workflow_config, market_config, indicator_config, s
     if layer.name != "none":
         raise TradingError("analysis_layer_unavailable", "Only the 'none' analysis layer exists in this step.")
 
-    evidence, hashes = build_evidence(dataset, sim_time=sim_time, workflow_config=workflow_config,
-                                      market_config=market_config, indicator_config=indicator_config,
-                                      signal_config=signal_config, created_at=created_at)
+    events = TradingEvents(events)
+    dataset_ref = [{"kind": "dataset", "id": dataset["dataset_id"]}]
+    # The requested simulated time is not validated yet, so the first events carry none.
+    events.emit(AGENT_CONTROLLER, "workflow", "stage_started", "started", refs=dataset_ref)
+    try:
+        evidence, hashes = build_evidence(dataset, sim_time=sim_time, workflow_config=workflow_config,
+                                          market_config=market_config, indicator_config=indicator_config,
+                                          signal_config=signal_config, created_at=created_at)
+    except TradingError as error:
+        events.emit(AGENT_CONTROLLER, "workflow", "stage_failed", "failed", reason_codes=[error.code])
+        raise
     sim_time = evidence["sim_time_utc"]
+    identities = [getattr(h, "identity", f"{h.role}@1.0") for h in handlers]
+    run_id = "rar-" + sha256({"dataset_id": dataset["dataset_id"], "bars": dataset["bars_sha256"],
+                              "config": sha256(workflow_config), "sim_time": sim_time, "handlers": identities})[:24]
+    if events.enabled:
+        events.sink.run_id = run_id
     limits = workflow_config["limits"]
     stages, failure = [], None
     for position, handler in enumerate(handlers, start=1):
-        role, identity = handler.role, getattr(handler, "identity", f"{handler.role}@1.0")
+        role, identity = handler.role, identities[position - 1]
+        component, details = f"trading.research.{role}", {"position": position}
         if failure is not None:
             stages.append(_handoff(position, role, identity, sim_time))
+            events.emit(component, role, "stage_blocked", "blocked", sim_time=sim_time,
+                        reason_codes=["earlier_stage_failed"], details=details)
             continue
+        events.emit(component, role, "stage_started", "started", sim_time=sim_time, details=details)
         stage_input = {"evidence": {"sim_time_utc": sim_time, **evidence[role]}, "prior": deepcopy(stages)}
         input_sha = sha256(stage_input)
         started = monotonic()
@@ -83,19 +107,21 @@ def run_workflow(dataset, *, workflow_config, market_config, indicator_config, s
         except TradingError as error:
             code = error.code if error.code in {"stage_timeout", "invalid_handoff", "handoff_too_large"} else "stage_error"
             failure = {"role": role, "code": code}
-            stages.append(_handoff(position, role, identity, sim_time, status="failed", reason_codes=[code],
-                                   input_sha256=input_sha, summary="The stage failed; later stages were not run."))
-            continue
         except Exception:
             failure = {"role": role, "code": "stage_error"}
-            stages.append(_handoff(position, role, identity, sim_time, status="failed", reason_codes=["stage_error"],
+        if failure is not None:
+            stages.append(_handoff(position, role, identity, sim_time, status="failed", reason_codes=[failure["code"]],
                                    input_sha256=input_sha, summary="The stage failed; later stages were not run."))
+            events.emit(component, role, "stage_failed", "failed", sim_time=sim_time, reason_codes=[failure["code"]],
+                        details=details)
             continue
         layer.commentary(role, stage_input["evidence"], output)          # "none": always None, never stored
         stages.append(_handoff(position, role, identity, sim_time, status="completed", conclusion=output["conclusion"],
                                summary=output["summary"], findings=output["findings"],
                                reason_codes=output["reason_codes"], limitations=output["limitations"],
                                input_sha256=input_sha, output_sha256=sha256(output)))
+        events.emit(component, role, "stage_completed", "completed", sim_time=sim_time,
+                    reason_codes=output["reason_codes"][:10], details={**details, "conclusion": output["conclusion"]})
 
     review = stages[-1]
     verdict = ("workflow_failed" if failure else review["conclusion"])
@@ -107,14 +133,18 @@ def run_workflow(dataset, *, workflow_config, market_config, indicator_config, s
             "analysis_layer": {"name": "none", "advisory_only": True}, "status": "failed" if failure else "completed",
             "failure": failure, "stages": stages, "final": final}
     run = {
-        "contract": "research_agent_run", "version": "1.0",
-        "run_id": "rar-" + sha256({"dataset_id": dataset["dataset_id"], "bars": dataset["bars_sha256"],
-                                   "config": body["hashes"]["workflow_config_sha256"], "sim_time": sim_time,
-                                   "handlers": [s["handler"] for s in stages]})[:24],
+        "contract": "research_agent_run", "version": "1.0", "run_id": run_id,
         "mode": "historical_replay", "research_only": True, "authorization_possible": False, "account_access": False,
         **body, "results_sha256": sha256(body), "created_at": created_at, "notice": NOTICE,
     }
     validate_run(run)
+    own = [{"kind": "research_agent_run", "id": run_id}]
+    if failure:
+        events.emit(AGENT_CONTROLLER, "workflow", "stage_failed", "failed", sim_time=sim_time,
+                    reason_codes=[failure["code"]], refs=own, details={"verdict": verdict})
+    else:
+        events.emit(AGENT_CONTROLLER, "workflow", "stage_completed", "completed", sim_time=sim_time, refs=own,
+                    details={"verdict": verdict})
     return run
 
 

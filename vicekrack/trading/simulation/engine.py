@@ -25,6 +25,12 @@ proceeds - exit fee - cost basis; open positions at the end are marked to the la
 (unrealized P&L = quantity x last close - cost basis) and NEVER liquidated; orders still
 pending at the end are `pending_at_end_of_data`.
 
+Execution events (Step 31): with an optional `events` sink the simulator emits
+stage_started / stage_completed (or stage_failed) for its engine, one order_decision per
+accepted, rejected or end-of-data order outcome (with its reason codes) and one
+simulated_fill per fill. Events carry simulated times only as recorded in the run, never
+enter the run or its hashes, and a sink failure stops the run with that event code.
+
 Isolation: own in-run account (`simacct-...`), own storage, own kill switch. This module
 never imports Step 24 paper accounts, the paper risk engine, paper intents, the journal or
 the Step 28 agents; research signals stay non-authorizing everywhere else.
@@ -39,11 +45,12 @@ from ..market.bars import from_utc_text, missing_between
 from ..market.replay import drive, plan
 from ..money import fmt, parse
 from ..signals.engine import SignalConsumer, indicator_settings_for, load_strategies, provenance, validate_signal_record
+from ..timeline import EVENT_CODES, SIM_ENGINE, TradingEvents, fill_event_fields, order_event_fields
 
 NOTICE = ("SIMULATED offline execution on historical data. No broker, no live or paper-account orders; results are "
           "not a prediction or profitability claim.")
 PASSTHROUGH = {"indicator_window_too_small", "indicator_too_many_points", "signal_too_many_evaluations",
-               "sim_too_many_orders"}
+               "sim_too_many_orders"} | EVENT_CODES
 CENT, PRICE = Decimal("0.01"), Decimal("0.00000001")
 TEN_THOUSAND = Decimal(10000)
 
@@ -84,8 +91,9 @@ class SimulationConsumer:
     name = "paper_simulation"
 
     def __init__(self, dataset, policy, strategies, signal_settings, indicator_config, signal_config, kill_switch, run_id,
-                 start_utc):
+                 start_utc, events=None):
         self.dataset, self.policy, self.run_id, self.kill_switch = dataset, policy, run_id, kill_switch
+        self.events = events or TradingEvents()
         self.signals = SignalConsumer(dataset, strategies, signal_settings, indicator_config,
                                       signal_config["limits"]["max_evaluations"])
         exit_ema = policy["exits"]["opposite_ema_crossover"]
@@ -163,6 +171,8 @@ class SimulationConsumer:
         if status == "pending":
             self.pending.append(order)
             self.accepted += 1
+        self.events.emit(SIM_ENGINE, "replay", "order_decision", "accepted" if status == "pending" else "rejected",
+                         **order_event_fields(order, order["history"][0]))
         return order
 
     def _entry(self, signal, bar, now):
@@ -241,6 +251,7 @@ class SimulationConsumer:
         order["status"] = "rejected"
         order["history"].append({"at_utc": at, "status": "rejected", "reason_codes": reasons})
         self.pending.remove(order)
+        self.events.emit(SIM_ENGINE, "replay", "order_decision", "rejected", **order_event_fields(order, order["history"][-1]))
 
     # ------------------------------------------------------------------ fills
     def _fill(self, order, bar, missing):
@@ -279,6 +290,7 @@ class SimulationConsumer:
         order.update(status="filled", fill_id=fill_id)
         order["history"].append({"at_utc": at, "status": "filled", "reason_codes": reasons})
         self.pending.remove(order)
+        self.events.emit(SIM_ENGINE, "replay", "simulated_fill", "filled", **fill_event_fields(fill, order, at))
         if order["side"] == "buy":
             self.cash -= notional
             self.ledger.append(self._ledger_entry(at, "buy", -notional, fill_id))
@@ -312,7 +324,7 @@ class SimulationConsumer:
 
 # ---------------------------------------------------------------- run
 def run_simulation(dataset, policy, *, market_config, indicator_config, signal_config, kill_switch, created_at,
-                   start=None, end=None, step_seconds=None):
+                   start=None, end=None, step_seconds=None, events=None):
     validate_policy(policy)
     if dataset["bar_count"] > policy["limits"]["max_bars"]:
         raise TradingError("sim_too_many_bars", "The dataset has more bars than limits.max_bars allows.")
@@ -323,8 +335,34 @@ def run_simulation(dataset, policy, *, market_config, indicator_config, signal_c
     policy_sha = sha256(policy)
     run_id = "srun-" + sha256({"dataset_id": dataset["dataset_id"], "bars": dataset["bars_sha256"], "policy": policy_sha,
                                "replay": window, "kill_switch": kill_switch[0]})[:24]
+    events = TradingEvents(events)
+    if events.enabled:
+        events.sink.run_id = run_id
+    events.emit(SIM_ENGINE, "replay", "stage_started", "started", sim_time=window["start_utc"],
+                reason_codes=["kill_switch_engaged"] if kill_switch[0] else [],
+                refs=[{"kind": "dataset", "id": dataset["dataset_id"]}])
     consumer = SimulationConsumer(dataset, policy, strategies, signal_settings, indicator_config, signal_config,
-                                  kill_switch, run_id, window["start_utc"])
+                                  kill_switch, run_id, window["start_utc"], events)
+    try:
+        run = _finish(consumer, dataset, policy, window, run_id, policy_sha, strategies, kill_switch, created_at,
+                      market_config, start, end, step_seconds)
+    except TradingError as error:
+        if error.code not in EVENT_CODES:
+            events.emit(SIM_ENGINE, "replay", "stage_failed", "failed", sim_time=_last_time(consumer, window),
+                        reason_codes=[error.code])
+        raise
+    events.emit(SIM_ENGINE, "replay", "stage_completed", "completed",
+                sim_time=run["summary"]["last_bar_close_utc"] or window["end_utc"],
+                refs=[{"kind": "simulation_run", "id": run_id}])
+    return run
+
+
+def _last_time(consumer, window):
+    return consumer.last_bar["available_at_utc"] if consumer.last_bar else window["start_utc"]
+
+
+def _finish(consumer, dataset, policy, window, run_id, policy_sha, strategies, kill_switch, created_at, market_config,
+            start, end, step_seconds):
     drive(dataset, [consumer], config=market_config, start=start, end=end, step_seconds=step_seconds, passthrough=PASSTHROUGH)
 
     for order in list(consumer.pending):
@@ -332,6 +370,8 @@ def run_simulation(dataset, policy, *, market_config, indicator_config, signal_c
         order["status"] = "pending_at_end_of_data"
         order["history"].append({"at_utc": max(at, order["not_before_utc"]), "status": "pending_at_end_of_data",
                                  "reason_codes": ["no_later_bar_to_fill"]})
+        consumer.events.emit(SIM_ENGINE, "replay", "order_decision", "pending_at_end_of_data",
+                             **order_event_fields(order, order["history"][-1]))
     last = consumer.last_bar
     unrealized = Decimal(0)
     for position in consumer.positions:

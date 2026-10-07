@@ -1168,3 +1168,38 @@ nothing (runs, datasets, paper accounts and kill switches are untouched).
   read.
 
 See [Simulation analytics](docs/analytics.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 31: execution events and timeline replay (read-only display data)
+
+Structured events for the future Command Center. Recording is optional and never changes
+results; viewing and replaying only read saved files.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack agent-run DATASET_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack events-list
+.\.venv\Scripts\python.exe -m vicekrack events-inspect TIMELINE_OR_RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack events-replay TIMELINE_OR_RUN_ID --delay-ms 300
+```
+
+- **Event contract (`execution_event` 1.0):**
+  - IDs: event, timeline, correlation and run;
+  - where it happened: department, component and stage;
+  - sequence number, simulated time, recorded time, status and reason codes;
+  - references by ID only. There are never prompts, source text, credentials,
+    environment values, raw errors or file paths.
+- **Recorded vs reconstructed:**
+  - *Recorded* timelines are captured while `agent-run` or `sim-run` runs. They hold
+    stage start, completion, block and failure events, plus every simulated order
+    decision and fill.
+  - *Reconstructed* timelines are rebuilt from saved research-agent runs, simulation runs
+    and content productions. Start times are never invented.
+- **Display states:** idle, working, blocked, completed, failed and unknown, with fixed
+  transition rules. `working` is shown only while the recording process is provably
+  alive; old or interrupted results show `unknown`.
+- **Storage:** atomic, one file per event in ignored `runtime/events/<department>/`.
+  Duplicates are refused, there is one writer per timeline, and retention is bounded.
+- **If saving events fails**, the command stops with an explicit error, saves nothing,
+  and the timeline is never shown as complete.
+
+See [Execution events](docs/events.md) and the [Roadmap](docs/roadmap.md).

@@ -1,0 +1,14 @@
+{
+  "config_version": "1.0",
+  "description": "Execution events and timeline replay (Step 31). Local, read-only display data; never authorizes or runs anything.",
+  "limits": {
+    "max_events_per_timeline": 5000,
+    "max_timelines_per_department": 200,
+    "max_cli_items": 50
+  },
+  "replay": {
+    "default_delay_ms": 200,
+    "max_delay_ms": 2000,
+    "max_events": 500
+  }
+}

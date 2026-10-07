@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "events_config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_version",
+    "description",
+    "limits",
+    "replay"
+  ],
+  "properties": {
+    "config_version": {
+      "const": "1.0"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_events_per_timeline",
+        "max_timelines_per_department",
+        "max_cli_items"
+      ],
+      "properties": {
+        "max_events_per_timeline": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 100000
+        },
+        "max_timelines_per_department": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "max_cli_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_delay_ms",
+        "max_delay_ms",
+        "max_events"
+      ],
+      "properties": {
+        "default_delay_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "max_delay_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "max_events": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        }
+      }
+    }
+  }
+}
