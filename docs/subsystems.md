@@ -23,7 +23,7 @@ flowchart TB
         T6[simulation/: offline simulated execution in its own in-run account]
         T7[analytics/: read-only descriptive reports of saved simulations]
     end
-    CC[Future Command Center: read-only views]
+    CC[Living HQ, Step 32: read-only views]
     Content --> Core
     Trading --> Core
     CC -. reads .-> R
@@ -93,9 +93,10 @@ flowchart TB
 
 Changes to the shared core must keep both subsystems' tests passing.
 
-## Future Command Center (not built)
+## Command Center: ViceKrack Living HQ (Step 32, read-only)
 
-A future dashboard should be a **read-only** consumer.
+The Living HQ (`python -m vicekrack hq-serve`, see [Living HQ](hq.md)) is a **read-only**
+consumer of Step 31 timelines. Its data sources:
 
 - **Trading:** the journal events (`trading_journal_event` 1.1), the account state
   (`trading-state show`), the research-signal evaluations (`signal-inspect`) and the
@@ -108,7 +109,8 @@ A future dashboard should be a **read-only** consumer.
 - **Both (Step 31):** `execution_event` timelines with display states. Recorded ones come
   from `agent-run`/`sim-run --record-events`; reconstructed ones come from saved runs and
   productions. `events-inspect` and `events-replay` already show them in a terminal.
-- **Rule:** the Command Center must not authorize orders, change limits or release the
-  kill switch without a separate, explicit design step.
+- **Rule:** the Command Center must not authorize orders, change limits, release the kill
+  switch, publish or run anything without a separate, explicit design step. The Living HQ
+  has GET-only routes on 127.0.0.1 and no controls of that kind.
 
 See also the [Roadmap](roadmap.md).

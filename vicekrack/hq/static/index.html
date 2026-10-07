@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>ViceKrack Living HQ</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <a class="skip" href="#list-view">Skip to the text view</a>
+  <div class="app" id="app">
+    <aside class="sidebar" aria-label="Navigation">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="logo-a" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0ea5b7"/>
+            </linearGradient>
+          </defs>
+          <path d="M32 4 L58 30 L32 60 L6 30 Z" fill="url(#logo-a)"/>
+          <path d="M32 16 L46 30 L32 46 L18 30 Z" fill="#0b1118"/>
+          <path d="M32 22 L40 30 L32 39 L24 30 Z" fill="#7dd3fc"/>
+        </svg>
+        <div class="brand-text"><span>VICEKRACK</span><strong>HQ</strong></div>
+      </div>
+      <nav class="views" aria-label="Views">
+        <button type="button" class="view-btn" data-view="house" aria-pressed="true"><span class="ico ico-house" aria-hidden="true"></span>House</button>
+        <button type="button" class="view-btn" data-view="trading" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading</button>
+        <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
+        <button type="button" class="view-btn" data-view="timeline" aria-pressed="false"><span class="ico ico-clock" aria-hidden="true"></span>Timeline</button>
+      </nav>
+      <section class="bot-list" aria-labelledby="bots-heading">
+        <h2 id="bots-heading">Rooms</h2>
+        <ul id="bot-buttons"></ul>
+      </section>
+      <p class="tagline">Multi-agent work, shown as it was recorded.</p>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="topbar">
+        <div class="mode" id="mode-badge" role="status" aria-live="polite">LOADING</div>
+        <div class="crumbs" aria-hidden="true">PLAN <span>&rsaquo;</span> AGENTS <span>&rsaquo;</span> HIGHER OUTPUT</div>
+        <div class="tools" role="toolbar" aria-label="Display options">
+          <button type="button" id="btn-list" aria-pressed="false" title="Text view (V)">Text view</button>
+          <button type="button" id="btn-labels" aria-pressed="true" title="Labels (L)">Labels</button>
+          <button type="button" id="btn-motion" aria-pressed="false" title="Reduced motion (M)">Reduce motion</button>
+          <button type="button" id="btn-present" aria-pressed="false" title="Presentation mode (P)">Present</button>
+        </div>
+      </header>
+      <div class="timeline-strip" id="timeline-strip">
+        <span id="timeline-name">-</span>
+        <span class="chip" id="completeness-chip">-</span>
+        <span id="timeline-meta"></span>
+        <span class="issues" id="timeline-issues"></span>
+      </div>
+
+      <section class="stage-wrap" id="stage-wrap" aria-label="Headquarters">
+        <svg id="stage" class="stage" role="img" aria-labelledby="stage-title" focusable="false">
+          <title id="stage-title">ViceKrack headquarters</title>
+        </svg>
+        <div class="legend" id="legend" aria-label="Status legend"></div>
+        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; L labels &middot; Esc exit</div>
+        <button type="button" class="present-exit" id="present-exit">Exit presentation</button>
+      </section>
+
+      <section class="list-view" id="list-view" aria-label="Text view of rooms" hidden>
+        <h2>Rooms at the replay position</h2>
+        <table class="table">
+          <thead><tr><th scope="col">Room</th><th scope="col">Driven by</th><th scope="col">At replay position</th><th scope="col">Now (as loaded)</th><th scope="col">Last recorded event</th><th scope="col">Recorded at</th><th scope="col">Reason codes</th></tr></thead>
+          <tbody id="list-body"></tbody>
+        </table>
+      </section>
+
+      <section class="timeline-view" id="timeline-view" aria-label="Timelines" hidden>
+        <div class="timeline-head">
+          <h2>Timelines</h2>
+          <button type="button" id="btn-refresh">Refresh list</button>
+        </div>
+        <p class="hint">Demo data is synthetic. Recorded timelines were captured while a command ran. Reconstructed timelines are rebuilt from saved records.</p>
+        <ul class="timeline-list" id="timeline-list"></ul>
+        <h2>Events in this timeline</h2>
+        <table class="table events">
+          <thead><tr><th scope="col">#</th><th scope="col">Room</th><th scope="col">Event</th><th scope="col">Status</th><th scope="col">Simulated time</th><th scope="col">Recorded at</th><th scope="col">Reason codes</th><th scope="col"><span class="sr">Seek</span></th></tr></thead>
+          <tbody id="event-body"></tbody>
+        </table>
+      </section>
+
+      <footer class="dock" id="dock" aria-label="Replay controls">
+        <div class="controls">
+          <button type="button" id="btn-restart" aria-label="Restart" title="Restart (Home)">&#x23EE;</button>
+          <button type="button" id="btn-back" aria-label="Previous event" title="Previous event (Left arrow)">&#x25C0;</button>
+          <button type="button" id="btn-play" class="play" aria-label="Play" title="Play or pause (Space)">&#x25B6;</button>
+          <button type="button" id="btn-forward" aria-label="Next event" title="Next event (Right arrow)">&#x25B6;&#x25B6;</button>
+          <label class="scrub"><span class="sr">Replay position</span>
+            <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
+          </label>
+          <span class="position" id="position">0 / 0</span>
+          <label class="speed">Speed
+            <select id="speed"><option value="0.5">0.5&times;</option><option value="1" selected>1&times;</option><option value="2">2&times;</option><option value="4">4&times;</option><option value="8">8&times;</option></select>
+          </label>
+          <div class="source" role="group" aria-label="Status source">
+            <button type="button" id="src-replay" aria-pressed="true">Replay position</button>
+            <button type="button" id="src-now" aria-pressed="false">Now (as loaded)</button>
+          </div>
+          <span class="live" id="live-indicator" hidden></span>
+        </div>
+        <p class="caption" id="caption">-</p>
+        <section class="feed-wrap" aria-labelledby="feed-heading">
+          <h2 id="feed-heading">Recent events at this position</h2>
+          <ol class="feed" id="feed"></ol>
+        </section>
+        <p class="sr" id="announcer" aria-live="polite"></p>
+      </footer>
+      <p class="footnote" id="footnote">Read-only. Idle wandering is decoration: it never runs agents, trades, publishing or messages.</p>
+    </main>
+
+    <aside class="inspector" id="inspector" aria-label="Inspector">
+      <div id="inspector-body"></div>
+    </aside>
+  </div>
+  <noscript><p class="noscript">The Living HQ needs JavaScript. Use <code>python -m vicekrack events-inspect</code> for a text view.</p></noscript>
+  <script src="/static/hq-core.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

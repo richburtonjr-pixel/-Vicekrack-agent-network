@@ -1203,3 +1203,57 @@ results; viewing and replaying only read saved files.
   and the timeline is never shown as complete.
 
 See [Execution events](docs/events.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 32: ViceKrack Living HQ (local, read-only visual Command Center)
+
+A two-floor headquarters where bots show recorded work:
+- **upstairs:** the trading research stages;
+- **downstairs:** the content production stages;
+- **shared:** an operations lobby, lounge and kitchen.
+
+It only reads the Step 31 timelines: it never runs agents, trades, publishes or sends
+messages.
+
+![Living HQ demo](docs/images/hq/hq-demo-house.png)
+
+**Install and launch.** The HQ uses the normal install; there's nothing extra, and no
+credentials or internet are needed.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+On Linux/macOS use `python3 -m venv .venv` and `.venv/bin/python`.
+- Open **http://127.0.0.1:8765/**, and press Ctrl+C in the terminal to stop.
+- Use `--port 9000` if 8765 is busy.
+- The server listens on 127.0.0.1 only.
+
+**Demo.** The page opens on a deterministic demo labelled **DEMO DATA · SYNTHETIC**, so
+the house is explorable immediately without credentials or saved runs.
+
+**Real timelines.** Create some, then choose them in the **Timeline** view:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack market-list
+.\.venv\Scripts\python.exe -m vicekrack agent-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+- **Labels:** every timeline is labelled **Recorded replay**, **Reconstructed history**
+  or **Live observed**, with its completeness (complete, partial, open or interrupted).
+- **Live view:** a command still recording shows as Live observed. The page refreshes it
+  every 2 seconds while the tab is open, up to 900 times.
+- **Saved records:** research-agent runs, simulation runs and content productions also
+  appear, as reconstructed history.
+- **Status vs. animation:** status changes instantly with the replay; bot movement is only
+  decoration. Rooms with nothing mapped in the timeline say **No recorded activity**.
+- **Views and controls:** House, Trading, Content and Timeline views; a bot inspector;
+  play, pause, scrub, restart and speed.
+- **Accessibility:** presentation mode (P), reduced motion (M), a text view (V), and full
+  keyboard control.
+
+See [Living HQ](docs/hq.md) and the [Roadmap](docs/roadmap.md).

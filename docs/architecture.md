@@ -759,3 +759,40 @@ Instrumentation adds an optional `events` argument to `run_workflow` and `run_si
 (via `trading/timeline.py` `TradingEvents`). Events never enter run bodies or hashes. A
 sink failure is raised as a `TradingError` with the event code, which the simulator passes
 through `drive()`. See [Execution events](events.md).
+
+## Step 32: ViceKrack Living HQ
+
+`vicekrack/hq/` is a read-only presentation layer over Step 31:
+
+```mermaid
+flowchart LR
+    B[Browser: index.html + hq-core.js + app.js] -- GET only --> S[server.py: 127.0.0.1 only]
+    S --> A[api.respond: method, Host/Origin, exact routes, CSP]
+    A --> L[events.cli.load_timeline: Step 31 validation + liveness]
+    A --> D[demo.py: deterministic synthetic scene]
+    L --> SC[scene.py: frames, waiting, handoffs, current]
+    D --> SC
+    SC --> A
+    A -. never .- X[agents / simulator / productions / orders / publishing]
+```
+
+- `layout.py`: rooms, floors, which Step 31 components drive which room, and the fixed
+  workflow orders.
+- `scene.py`: an `hq_scene` 1.0 per timeline:
+  - per-event frames in recorded order, using Step 31's transition rules;
+  - derived "waiting";
+  - handoffs only where the recorded order supports them;
+  - `current` from Step 31's display rules.
+- `demo.py`: the labelled synthetic demo. Its events pass Step 31's payload validator.
+- `api.py`: a pure request→response function, with GET only and allowlisted routes and IDs.
+  It enforces Host/Origin checks, strict security headers and fixed error codes.
+- `server.py` and the `hq-serve` command: the loopback `ThreadingHTTPServer`. No
+  background work runs.
+- `static/`:
+  - `hq-core.js`: pure, Node-tested logic (replay controller, path graph, status-to-place
+    rules, seeded decorative wandering);
+  - `app.js`: SVG drawing and UI, text inserted with `textContent` only, GET-only fetches,
+    bounded polling for live timelines;
+  - `styles.css` and `index.html`: no inline script or style, and no external resources.
+
+See [Living HQ](hq.md).
