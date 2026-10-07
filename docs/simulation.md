@@ -170,3 +170,6 @@ P&L, one fill per order and fill-not-before-decision. Tampered runs give
 - **Unrealized P&L ignores exit costs**, and open positions are not liquidated.
 - **Offline only:** one dataset per run, with no strategy optimization, live feeds or
   brokers. Results describe a simulation, not expected performance.
+
+To describe a saved run (trades, equity curve, drawdown, attribution), see
+[Simulation analytics](analytics.md) (Step 30).

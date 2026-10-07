@@ -1138,3 +1138,33 @@ On Linux/macOS use `.venv/bin/python`. With the shipped policy you should see:
   fully re-validated on read.
 
 See [Simulation](docs/simulation.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 30: simulation analytics (read-only, SIMULATED)
+
+Describe what one saved Step 29 simulation did: trades, P&L, equity and drawdown. Reports
+are **descriptive only**: never annualized, not a prediction or advice, and they change
+nothing (runs, datasets, paper accounts and kill switches are untouched).
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack analytics-generate RUN_ID
+.\.venv\Scripts\python.exe -m vicekrack analytics-generate RUN_ID --save
+.\.venv\Scripts\python.exe -m vicekrack analytics-list
+.\.venv\Scripts\python.exe -m vicekrack analytics-inspect REPORT_ID --section closed_trades
+```
+
+- **Closed trades:** count, wins, losses, breakeven, win rate, average net, win and loss,
+  expectancy and profit factor. Open positions are reported separately and never counted
+  as trades.
+- **Account:** initial and ending equity, realized and unrealized P&L, fees, and net
+  return in dollars and percent.
+- **Equity curve:** rebuilt with a bounded replay from validated fills, cash, positions
+  and only bars already closed at each time; maximum drawdown in dollars and percent.
+- **Also:** holding periods, exposure, order outcomes (rejections by reason, orders still
+  pending at the end) and per-strategy attribution. A run that mixes strategies is
+  flagged `shared_account` with an explanation that it is not an independent comparison.
+- **Undefined metrics** are `unavailable` with a reason, never zero or infinity.
+- **Tamper checks:** the run and dataset are re-validated and must match by ID and hash.
+  Reports are saved atomically in ignored `runtime/trading/analytics/` and re-validated on
+  read.
+
+See [Simulation analytics](docs/analytics.md) and the [Roadmap](docs/roadmap.md).

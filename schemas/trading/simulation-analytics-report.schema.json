@@ -1,0 +1,882 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/simulation-analytics-report.schema.json",
+  "title": "Simulation analytics report 1.0",
+  "description": "Read-only performance analytics derived from a validated Step 29 simulation run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "report_id",
+    "simulated",
+    "read_only",
+    "annualized",
+    "predictive",
+    "source",
+    "period",
+    "account",
+    "closed_trades",
+    "open_positions",
+    "equity_curve",
+    "drawdown",
+    "holding",
+    "exposure",
+    "orders",
+    "attribution",
+    "results_sha256",
+    "created_at",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "simulation_analytics_report"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^sarp-[0-9a-f]{24}$"
+    },
+    "simulated": {
+      "const": true
+    },
+    "read_only": {
+      "const": true
+    },
+    "annualized": {
+      "const": false
+    },
+    "predictive": {
+      "const": false
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "run_results_sha256",
+        "policy_sha256",
+        "simulation_account_id",
+        "dataset_id",
+        "dataset_bars_sha256",
+        "symbol",
+        "interval",
+        "data_label",
+        "analytics_config_sha256"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "run_results_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "simulation_account_id": {
+          "$ref": "#/$defs/account_id"
+        },
+        "dataset_id": {
+          "$ref": "#/$defs/dataset_id"
+        },
+        "dataset_bars_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbol": {
+          "$ref": "#/$defs/symbol"
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "data_label": {
+          "$ref": "#/$defs/label"
+        },
+        "analytics_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay_start_utc",
+        "replay_end_utc",
+        "first_bar_close_utc",
+        "last_bar_close_utc",
+        "bars"
+      ],
+      "properties": {
+        "replay_start_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "replay_end_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "first_bar_close_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_bar_close_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initial_equity",
+        "ending_cash",
+        "ending_equity",
+        "realized_pnl",
+        "unrealized_pnl",
+        "fees_total",
+        "net_return",
+        "net_return_percent"
+      ],
+      "properties": {
+        "initial_equity": {
+          "$ref": "#/$defs/decimal"
+        },
+        "ending_cash": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "ending_equity": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "realized_pnl": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "unrealized_pnl": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "fees_total": {
+          "$ref": "#/$defs/decimal"
+        },
+        "net_return": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "net_return_percent": {
+          "$ref": "#/$defs/metric"
+        }
+      }
+    },
+    "closed_trades": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "wins",
+        "losses",
+        "breakeven",
+        "gross_profit",
+        "gross_loss",
+        "net_pnl",
+        "fees",
+        "win_rate_percent",
+        "average_net",
+        "average_win",
+        "average_loss",
+        "expectancy",
+        "profit_factor",
+        "trades"
+      ],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "wins": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "losses": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "breakeven": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "gross_profit": {
+          "$ref": "#/$defs/decimal"
+        },
+        "gross_loss": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "net_pnl": {
+          "$ref": "#/$defs/signed_decimal"
+        },
+        "fees": {
+          "$ref": "#/$defs/decimal"
+        },
+        "win_rate_percent": {
+          "$ref": "#/$defs/metric"
+        },
+        "average_net": {
+          "$ref": "#/$defs/metric"
+        },
+        "average_win": {
+          "$ref": "#/$defs/metric"
+        },
+        "average_loss": {
+          "$ref": "#/$defs/metric"
+        },
+        "expectancy": {
+          "$ref": "#/$defs/metric"
+        },
+        "profit_factor": {
+          "$ref": "#/$defs/metric"
+        },
+        "trades": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "strategy",
+              "entry_fill_id",
+              "exit_fill_id",
+              "quantity",
+              "opened_at_utc",
+              "closed_at_utc",
+              "entry_price",
+              "exit_price",
+              "gross_pnl",
+              "fees",
+              "net_pnl",
+              "outcome",
+              "bars_held",
+              "seconds_held"
+            ],
+            "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "strategy": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/strategy_name"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "entry_fill_id": {
+                "$ref": "#/$defs/fill_id"
+              },
+              "exit_fill_id": {
+                "$ref": "#/$defs/fill_id"
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000
+              },
+              "opened_at_utc": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "closed_at_utc": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "entry_price": {
+                "$ref": "#/$defs/decimal"
+              },
+              "exit_price": {
+                "$ref": "#/$defs/decimal"
+              },
+              "gross_pnl": {
+                "$ref": "#/$defs/signed_decimal"
+              },
+              "fees": {
+                "$ref": "#/$defs/decimal"
+              },
+              "net_pnl": {
+                "$ref": "#/$defs/signed_decimal"
+              },
+              "outcome": {
+                "enum": [
+                  "win",
+                  "loss",
+                  "breakeven"
+                ]
+              },
+              "bars_held": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "seconds_held": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000
+              }
+            }
+          }
+        }
+      }
+    },
+    "open_positions": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy",
+          "entry_fill_id",
+          "quantity",
+          "opened_at_utc",
+          "cost_basis",
+          "mark_price",
+          "market_value",
+          "unrealized_pnl",
+          "bars_held"
+        ],
+        "properties": {
+          "strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/strategy_name"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entry_fill_id": {
+            "$ref": "#/$defs/fill_id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "opened_at_utc": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "cost_basis": {
+            "$ref": "#/$defs/decimal"
+          },
+          "mark_price": {
+            "$ref": "#/$defs/decimal"
+          },
+          "market_value": {
+            "$ref": "#/$defs/decimal"
+          },
+          "unrealized_pnl": {
+            "$ref": "#/$defs/signed_decimal"
+          },
+          "bars_held": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
+      }
+    },
+    "equity_curve": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100001,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "at_utc",
+          "close",
+          "cash",
+          "position_quantity",
+          "market_value",
+          "equity",
+          "peak_equity",
+          "drawdown",
+          "drawdown_percent"
+        ],
+        "properties": {
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at_utc": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/decimal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cash": {
+            "$ref": "#/$defs/signed_decimal"
+          },
+          "position_quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "market_value": {
+            "$ref": "#/$defs/decimal"
+          },
+          "equity": {
+            "$ref": "#/$defs/signed_decimal"
+          },
+          "peak_equity": {
+            "$ref": "#/$defs/signed_decimal"
+          },
+          "drawdown": {
+            "$ref": "#/$defs/decimal"
+          },
+          "drawdown_percent": {
+            "$ref": "#/$defs/decimal"
+          }
+        }
+      }
+    },
+    "drawdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_dollars",
+        "max_dollars_at_utc",
+        "max_percent",
+        "max_percent_at_utc",
+        "peak_equity"
+      ],
+      "properties": {
+        "max_dollars": {
+          "$ref": "#/$defs/decimal"
+        },
+        "max_dollars_at_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "max_percent": {
+          "$ref": "#/$defs/decimal"
+        },
+        "max_percent_at_utc": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "peak_equity": {
+          "$ref": "#/$defs/signed_decimal"
+        }
+      }
+    },
+    "holding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "closed_average_bars",
+        "closed_min_bars",
+        "closed_max_bars",
+        "closed_average_seconds",
+        "open_bars"
+      ],
+      "properties": {
+        "closed_average_bars": {
+          "$ref": "#/$defs/metric"
+        },
+        "closed_min_bars": {
+          "$ref": "#/$defs/metric"
+        },
+        "closed_max_bars": {
+          "$ref": "#/$defs/metric"
+        },
+        "closed_average_seconds": {
+          "$ref": "#/$defs/metric"
+        },
+        "open_bars": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bars_total",
+        "bars_with_position",
+        "exposure_percent",
+        "max_position_market_value"
+      ],
+      "properties": {
+        "bars_total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "bars_with_position": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "exposure_percent": {
+          "$ref": "#/$defs/metric"
+        },
+        "max_position_market_value": {
+          "$ref": "#/$defs/decimal"
+        }
+      }
+    },
+    "orders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "created",
+        "filled",
+        "rejected",
+        "pending_at_end",
+        "rejected_by_reason",
+        "pending_orders"
+      ],
+      "properties": {
+        "created": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "filled": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "rejected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "pending_at_end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "rejected_by_reason": {
+          "type": "object",
+          "maxProperties": 100,
+          "propertyNames": {
+            "pattern": "^[a-z0-9_]{1,60}$"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          }
+        },
+        "pending_orders": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "order_id",
+              "purpose",
+              "decision_bar_sequence",
+              "source"
+            ],
+            "properties": {
+              "order_id": {
+                "$ref": "#/$defs/order_id"
+              },
+              "purpose": {
+                "enum": [
+                  "entry",
+                  "exit"
+                ]
+              },
+              "decision_bar_sequence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "source": {
+                "type": "string",
+                "maxLength": 60
+              }
+            }
+          }
+        }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shared_account",
+        "explanation",
+        "strategies"
+      ],
+      "properties": {
+        "shared_account": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "strategies": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "strategy",
+              "closed_trades",
+              "wins",
+              "losses",
+              "breakeven",
+              "net_pnl",
+              "fees",
+              "win_rate_percent",
+              "open_positions",
+              "unrealized_pnl",
+              "signals_accepted",
+              "signals_rejected",
+              "blocked_by_shared_account"
+            ],
+            "properties": {
+              "strategy": {
+                "$ref": "#/$defs/strategy_name"
+              },
+              "closed_trades": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "wins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "losses": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "breakeven": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "net_pnl": {
+                "$ref": "#/$defs/signed_decimal"
+              },
+              "fees": {
+                "$ref": "#/$defs/decimal"
+              },
+              "win_rate_percent": {
+                "$ref": "#/$defs/metric"
+              },
+              "open_positions": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "unrealized_pnl": {
+                "$ref": "#/$defs/signed_decimal"
+              },
+              "signals_accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "signals_rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "blocked_by_shared_account": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              }
+            }
+          }
+        }
+      }
+    },
+    "results_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "notice": {
+      "const": "SIMULATED, descriptive analytics of one offline simulation on historical data. Not annualized, not a prediction of future performance, not advice; no orders or accounts are affected."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "decimal": {
+      "description": "Non-negative decimal as a string (no floats, exponents, NaN or infinity).",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+    },
+    "money": {
+      "description": "Non-negative amount in account currency, at most 2 decimal places.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]{0,14}$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,60}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^mds-[0-9a-f]{24}$"
+    },
+    "interval": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ]
+    },
+    "label": {
+      "enum": [
+        "synthetic",
+        "historical",
+        "delayed",
+        "unknown"
+      ],
+      "description": "What the importer declared. Never verified."
+    },
+    "strategy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^srun-[0-9a-f]{24}$"
+    },
+    "fill_id": {
+      "type": "string",
+      "pattern": "^sfil-[0-9a-f]{24}$"
+    },
+    "order_id": {
+      "type": "string",
+      "pattern": "^sord-[0-9a-f]{24}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^simacct-[0-9a-f]{24}$"
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_+-]+){1,2})$"
+    },
+    "metric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/signed_decimal"
+            },
+            "reason": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "value": {
+              "type": "null"
+            },
+            "reason": {
+              "$ref": "#/$defs/code"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

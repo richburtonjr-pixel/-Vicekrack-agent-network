@@ -35,6 +35,7 @@ SCHEMAS = {
     "research_agent_output": "research-agent-output",
     "simulation_policy": "simulation-policy", "simulation_order": "simulation-order", "simulation_fill": "simulation-fill",
     "simulation_position": "simulation-position", "cash_ledger_entry": "cash-ledger-entry", "simulation_run": "simulation-run",
+    "simulation_analytics_report": "simulation-analytics-report", "analytics_config": "analytics-config",
 }
 FUTURE_SKEW = timedelta(seconds=5)
 # Field names that must never appear in trading data (in addition to the shared core list).

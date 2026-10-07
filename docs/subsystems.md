@@ -14,13 +14,14 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-29]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
         T2[market/: offline datasets + replay, no account access]
         T3[indicators/: descriptive values on closed bars, no account access]
         T4[signals/: research-only rule evaluations, no account access]
         T5[agents/: deterministic four-stage research review, no account access]
         T6[simulation/: offline simulated execution in its own in-run account]
+        T7[analytics/: read-only descriptive reports of saved simulations]
     end
     CC[Future Command Center: read-only views]
     Content --> Core
@@ -44,7 +45,8 @@ flowchart TB
   accounts (`runtime/trading/accounts/`), market data (`runtime/trading/market/`),
   indicator results (`runtime/trading/indicators/`), research signals
   (`runtime/trading/signals/`), research-agent runs (`runtime/trading/agents/`) and
-  simulation runs (`runtime/trading/simulation/`).
+  simulation runs (`runtime/trading/simulation/`) and analytics reports
+  (`runtime/trading/analytics/`).
 - **Market-data boundary:** `vicekrack/trading/market/` (Step 25) never imports the
   account state, risk engine, order or journal modules. Replay can't authorize anything
   or change an account.
@@ -63,9 +65,12 @@ flowchart TB
   research signals may become orders, and only *simulated* ones, under its explicit
   policy. It keeps its own in-run account, storage and kill switch, never uses Step 24
   paper accounts or the paper risk engine, and never reads Step 28 verdicts.
+- **Analytics boundary:** `vicekrack/trading/analytics/` (Step 30) only reads saved
+  simulation runs and their datasets, and writes only its own reports. It never runs a
+  simulation or touches paper accounts, kill switches or intents.
 - **Imports:** only the shared core: `vicekrack.errors` and `vicekrack.persistence`. It
   never imports content modules, and content modules never import it.
-- **CLI:** only the `trading-*`, `market-*`, `indicator-*`, `signal-*`, `agent-*` and `sim-*` commands, routed
+- **CLI:** only the `trading-*`, `market-*`, `indicator-*`, `signal-*`, `agent-*`, `sim-*` and `analytics-*` commands, routed
   by `vicekrack/__main__.py` to the matching `cli` module in `vicekrack.trading`.
 - **Scope today:** paper only, with offline market data. There are no live market feeds, broker connections, live
   orders, AI trading decisions or background loops.
