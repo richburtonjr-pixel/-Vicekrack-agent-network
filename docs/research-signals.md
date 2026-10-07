@@ -156,3 +156,6 @@ Everything is stored in ignored `runtime/trading/signals/`.
 - **No performance claims:** there is no backtest, P&L or performance statistic.
 - **Step 28** reviews these signals in a deterministic research-agent workflow
   ([Research agents](research-agents.md)), which is still research only.
+- **Step 29's offline simulator** ([Simulation](simulation.md)) is the only place a
+  research signal can become an order, and that order is simulated, under an explicit
+  policy, in a separate simulation account.

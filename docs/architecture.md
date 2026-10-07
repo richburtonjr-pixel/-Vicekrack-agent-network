@@ -665,3 +665,37 @@ flowchart LR
 **Boundary:** the agents package never imports account, risk-engine, order, journal or
 provider code, and never reads environment variables (a test enforces this). See
 [Research agents](research-agents.md).
+
+## Step 29: offline paper-execution simulation
+
+`vicekrack/trading/simulation/` is a separate, simulated-only subsystem:
+
+```mermaid
+flowchart LR
+    D[(market_dataset)] --> R[market.replay.drive: closed bars only]
+    P[simulation policy, validated + hashed] --> C
+    R --> C[SimulationConsumer]
+    C --> SG[Step 27 SignalConsumer: research signals]
+    C --> EX[Step 26 IndicatorConsumer: exit EMAs]
+    C --> O[orders: accept / reject with reasons]
+    O --> F[fills at next available open: slippage + fees]
+    F --> L[cash ledger, positions, realized / unrealized P&L]
+    L --> RUN[(runtime/trading/simulation/runs)]
+    C -. never imports .- X[PaperAccount / risk engine / intents / journal / agents]
+```
+
+- `engine.py`:
+  - `validate_policy` checks the policy;
+  - `SimulationConsumer`, for each closed bar: fills pending orders at the open, then
+    counts bars held, applies the exit rules and accepts or rejects entries;
+  - `run_simulation` marks open positions to the last close and builds the summary;
+  - `validate_run` recomputes the fill arithmetic, ledger balances, cost basis, realized
+    P&L and the one-fill-per-order rule.
+- `store.py`: atomic run storage (exclusive links) and the simulation-only kill-switch
+  file.
+- `cli.py`: `sim-run`, `sim-inspect`, `sim-list` and `sim-kill-switch`.
+
+**Boundary:** the only path from a research signal to a simulated order is this package's
+explicit policy. It never imports the paper-account, risk-engine, intent, journal or agent
+modules (a test enforces this), and simulation runs carry `paper_account_access: false`
+and `broker: null`. See [Simulation](simulation.md).

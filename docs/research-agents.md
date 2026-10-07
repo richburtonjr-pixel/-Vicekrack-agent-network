@@ -129,6 +129,7 @@ Today only `NoAnalysisLayer` (`name: "none"`) exists. Any other layer is refused
   and overnight breaks count as gaps.
 - **Not a risk check:** "sufficient" means only that the research inputs are complete. A
   future paper evaluation would still need fresh data and every paper-account risk check.
+  It grants no trade permission, and the Step 29 simulator never reads it.
 - **Bounded inputs:** windows are bounded (`max_window_bars`, `max_signals`). Older bars
   and signals are not reviewed.
 - **The time budget doesn't interrupt:** it is measured after a handler returns, so a

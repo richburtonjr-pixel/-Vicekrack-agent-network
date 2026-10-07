@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals and a deterministic research-agent workflow | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals, a deterministic research-agent workflow and an offline execution simulator | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -41,7 +41,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 25 | Trading | Offline market data: provider-neutral adapters (synthetic fixtures, local CSV), `ohlcv_bar`/`market_dataset` contracts, provenance, explicit gaps, bounded simulation-clock replay without future bars, kept separate from paper accounts | #25 |
 | 26 | Trading | Deterministic offline indicators on closed replay bars: EMA, Wilder RSI, volume average, session VWAP; exact decimals, explicit warm-up/flat/zero-volume/gap handling, versioned results with provenance; no signals or account access | #26 |
 | 27 | Trading | Rule-based research signals (VWAP reclaim, EMA crossover, breakout with optional volume filter) on closed bars and indicators: exact comparisons, not-ready handling, cooldown, deterministic IDs, bounded evaluations; research only, `authorization_possible: false` | #27 |
-| 28 | Trading | Bounded deterministic research-agent workflow: Market Scout, Trend Agent, Strategy Agent and Risk Review stages with validated handoffs over evidence frozen at a simulated time; fixed four-stage controller, explicit failure states, interface for a future AI analysis layer; research only | this PR |
+| 28 | Trading | Bounded deterministic research-agent workflow: Market Scout, Trend Agent, Strategy Agent and Risk Review stages with validated handoffs over evidence frozen at a simulated time; fixed four-stage controller, explicit failure states, interface for a future AI analysis layer; research only | #28 |
+| 29 | Trading | Bounded offline paper-execution simulation: explicit simulation policy, isolated in-run account, next-open fills with documented slippage/fees, risk limits and kill switch, opposite-EMA and max-holding exits, exact cash/position/P&L accounting, versioned simulated contracts | this PR |
 
 ## Deferred work
 
@@ -67,7 +68,7 @@ Other content work that is deferred and not scheduled:
   above first.
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
-The content track has had no new steps since Step 22, while Steps 23–28 built the trading
+The content track has had no new steps since Step 22, while Steps 23–29 built the trading
 foundation. Nothing in the trading track changed content behaviour; all content tests
 still pass.
 
@@ -89,7 +90,10 @@ still pass.
   rules; only an interface for advisory AI commentary exists, with no provider calls.
 - Any path from the research-agent verdict to paper authorization or intents.
 - Broker connections and order submission.
-- Simulated or real fills, positions and realized P&L.
+- Real fills or positions. Step 29 simulates fills, positions and P&L only inside its
+  own offline simulator; nothing connects simulation results to Step 24 paper accounts.
+- More simulation features: short selling, limit and stop orders, partial fills,
+  multiple symbols, liquidity or market-impact models, and strategy optimization.
 - Background or scheduled execution.
 - A trading dashboard.
 
