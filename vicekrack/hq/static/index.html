@@ -27,6 +27,7 @@
       <nav class="views" aria-label="Views">
         <button type="button" class="view-btn" data-view="house" aria-pressed="true"><span class="ico ico-house" aria-hidden="true"></span>House</button>
         <button type="button" class="view-btn" data-view="trading" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading</button>
+        <button type="button" class="view-btn" data-view="results" aria-pressed="false"><span class="ico ico-results" aria-hidden="true"></span>Results</button>
         <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
         <button type="button" class="view-btn" data-view="timeline" aria-pressed="false"><span class="ico ico-clock" aria-hidden="true"></span>Timeline</button>
       </nav>
@@ -60,7 +61,7 @@
           <title id="stage-title">ViceKrack headquarters</title>
         </svg>
         <div class="legend" id="legend" aria-label="Status legend"></div>
-        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; L labels &middot; Esc exit</div>
+        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R results &middot; L labels &middot; Esc exit</div>
         <button type="button" class="present-exit" id="present-exit">Exit presentation</button>
       </section>
 
@@ -89,6 +90,22 @@
           <thead><tr><th scope="col">#</th><th scope="col">Room</th><th scope="col">Event</th><th scope="col">Status</th><th scope="col">Simulated time</th><th scope="col">Recorded at</th><th scope="col">Reason codes</th><th scope="col"><span class="sr">Seek</span></th></tr></thead>
           <tbody id="event-body"></tbody>
         </table>
+      </section>
+
+      <section class="results-view" id="results-view" aria-labelledby="results-heading" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="results-heading">Trading results desk</h2>
+            <p class="results-sub" id="results-sub">Simulated results of one saved offline run. Read-only: nothing here runs, trades or changes anything.</p>
+          </div>
+          <span class="sim-badge" id="results-badge">SIMULATED</span>
+        </div>
+        <div class="results-tabs" role="group" aria-label="Which results to show">
+          <button type="button" id="res-tab-position" aria-pressed="true">At replay position</button>
+          <button type="button" id="res-tab-summary" aria-pressed="false">Completed run summary</button>
+        </div>
+        <p class="results-where" id="results-where" aria-live="polite"></p>
+        <div id="results-body"></div>
       </section>
 
       <footer class="dock" id="dock" aria-label="Replay controls">

@@ -544,6 +544,17 @@
       var dot = el("circle", { r: 4, cy: -4 }, cell);
       svgText(cell, 8, 0, station.short, { class: "ops-name" });
       var title = el("title", {}, cell);
+      if (station.station === "simulator") {                  // Step 34: the simulator light opens the results desk
+        cell.setAttribute("class", "ops-link");
+        cell.setAttribute("tabindex", "0");
+        cell.setAttribute("role", "button");
+        cell.setAttribute("aria-label", "Simulator: open the trading results desk");
+        el("rect", { x: -8, y: -12, width: 94, height: 15, rx: 3, class: "ops-hit" }, cell);
+        cell.addEventListener("click", function (event) { event.stopPropagation(); openResults(); });
+        cell.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); openResults(); }
+        });
+      }
       S.ops[station.component] = { dot: dot, title: title, label: station.label };
     });
     S.opsCounters = svgText(board, -8, 79, "", { class: "ops-name counters" });
@@ -622,6 +633,7 @@
     renderInspector();
     renderEventRows();
     renderFeed();
+    syncResults();
     if (stepped) { announce(); }
   }
 
@@ -725,7 +737,7 @@
     var scene = S.scene;
     if (!scene) { return; }
     if (!S.selected) {
-      var dept = S.view === "trading" ? "trading" : S.view === "content" ? "content" : null;
+      var dept = S.view === "trading" || S.view === "results" ? "trading" : S.view === "content" ? "content" : null;
       h("h2", { class: "panel-title" }, body, dept ? (dept === "trading" ? "Trading department" : "Content department") : "Headquarters");
       row(body, "Data", scene.mode_label);
       row(body, "Timeline", scene.timeline.timeline_id);
@@ -747,6 +759,11 @@
         b.addEventListener("click", function () { select(meta.room); });
         li.appendChild(meta.has_activity ? stateChip(states[meta.room] || "idle") : h("span", { class: "muted" }, null, "No recorded activity"));
       });
+      if (dept === "trading") {
+        var open = h("button", { type: "button", class: "action" }, body, "Open trading results desk");
+        open.addEventListener("click", openResults);
+        h("p", { class: "muted small" }, body, "Simulated results of the selected simulation run (read-only).");
+      }
       if (dept) {
         h("h3", {}, body, "Timelines in this department");
         var picks = h("ul", { class: "mini-list" }, body);
@@ -824,6 +841,13 @@
       dot.style.background = station.has_activity ? style.color : "#4b5563";
       h("span", { class: "station-name" }, b, station.label);
       h("span", { class: "station-state" }, b, station.has_activity ? style.label : "No recorded activity");
+      if (station.station === "simulator") {
+        h("span", { class: "station-open" }, b, "Open results");
+        b.setAttribute("aria-label", "Simulator station, " + (station.has_activity ? style.label : "no recorded activity") +
+          ". Open the trading results desk");
+        b.addEventListener("click", openResults);
+        return;
+      }
       b.setAttribute("aria-label", station.label + " station, " + (station.has_activity ? style.label : "no recorded activity"));
       b.addEventListener("click", function () { select("operations"); });
     });
@@ -837,6 +861,10 @@
       var box = h("div", { class: "station-card" }, body);
       h("strong", {}, box, station.label);
       h("p", { class: "muted small" }, box, station.role);
+      if (station.station === "simulator") {
+        var open = h("button", { type: "button", class: "action" }, box, "Open trading results");
+        open.addEventListener("click", openResults);
+      }
       if (!station.has_activity) { h("p", { class: "muted small" }, box, "No recorded activity in this timeline"); return; }
       row(box, "Status", stateChip(states[station.component] || "idle"));
       var last = C.lastEventFor(scene, index, [station.component]);
@@ -982,12 +1010,15 @@
     Array.prototype.forEach.call(document.querySelectorAll(".view-btn"), function (b) {
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
-    var timeline = view === "timeline";
+    var timeline = view === "timeline", results = view === "results";
     $("timeline-view").hidden = !timeline;
-    $("stage-wrap").hidden = timeline || S.list;
-    $("list-view").hidden = !(S.list && !timeline);
+    $("results-view").hidden = !results;
+    $("stage-wrap").hidden = timeline || results || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results);
+    document.body.classList.toggle("results-open", results);
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
+    R.renderedKey = null;
     renderStatuses(false);
   }
 
@@ -1129,6 +1160,469 @@
     window.requestAnimationFrame(loop);
   }
 
+  /* ------------------------------------------------------------------ trading results desk (Step 34)
+   * Read-only. Three GET documents per simulation timeline: an index (no results), the portfolio at
+   * one replay position (the server sends nothing from later events), and a separately labelled
+   * completed-run summary. Only the latest requested position is ever drawn. */
+  var R = { timelineId: null, index: null, at: null, summary: null, tab: "position", inflightAt: false,
+    inflightSummary: false, wanted: null, shown: null, error: null, generation: 0 };
+  var ROW_LIMIT = 200;
+
+  function resultsAllowed() {
+    var t = S.scene && S.scene.timeline;
+    return !!t && (t.timeline_id === "demo" || (t.department === "trading" && t.kind === "simulation"));
+  }
+  function currentPosition() {
+    var frames = S.scene ? S.scene.frames.length : 0;
+    return C.resultsPosition(S.replay ? S.replay.index : -1, frames, S.source === "now" && !!S.scene.current);
+  }
+  function openResults() {
+    S.focusRoom = null;
+    setView("results");
+  }
+  function resetResults() {
+    R.generation += 1;
+    R.timelineId = null; R.index = null; R.at = null; R.summary = null; R.error = null; R.wanted = null; R.shown = null;
+    R.inflightAt = false; R.inflightSummary = false; R.renderedKey = null;
+  }
+  /* Called whenever the view, timeline or replay position changes. */
+  function syncResults() {
+    if (S.view !== "results" || !S.scene) { return; }
+    if (!resultsAllowed()) { renderResults(); return; }
+    if (R.timelineId !== S.timelineId) {
+      resetResults();
+      R.timelineId = S.timelineId;
+      var generation = R.generation;
+      getJSON("/api/results?timeline=" + encodeURIComponent(S.timelineId)).then(function (doc) {
+        if (generation !== R.generation) { return; }
+        if (!C.validResults(doc, "index")) { throw new Error("invalid_results"); }
+        R.index = doc;
+        syncResults();
+      }).catch(function (error) {
+        if (generation !== R.generation) { return; }
+        R.error = C.plain(error.message);
+        renderResults();
+      });
+      renderResults();
+      return;
+    }
+    if (!R.index) { renderResults(); return; }
+    if (R.tab === "summary") { loadSummary(); } else { requestAt(currentPosition()); }
+    renderResults();
+  }
+  function requestAt(position) {
+    R.wanted = position;
+    if (R.inflightAt || (R.at && R.at.position === position && R.shown === position)) { return; }
+    R.inflightAt = true;
+    var generation = R.generation;
+    getJSON("/api/results/at?timeline=" + encodeURIComponent(R.timelineId) + "&position=" + position).then(function (doc) {
+      if (generation !== R.generation) { return; }
+      R.inflightAt = false;
+      if (!C.validResults(doc, "replay_position") || doc.timeline_id !== R.index.timeline.timeline_id) {
+        throw new Error("invalid_results");
+      }
+      R.error = null;
+      if (doc.position === R.wanted) { R.at = doc; R.shown = doc.position; renderResults(); }
+      else { requestAt(R.wanted); }                       // a newer position was asked for meanwhile
+    }).catch(function (error) {
+      if (generation !== R.generation) { return; }
+      R.inflightAt = false;
+      R.error = C.plain(error.message);
+      renderResults();
+    });
+  }
+  function loadSummary() {
+    if (R.summary || R.inflightSummary) { return; }
+    R.inflightSummary = true;
+    var generation = R.generation;
+    getJSON("/api/results/summary?timeline=" + encodeURIComponent(R.timelineId)).then(function (doc) {
+      if (generation !== R.generation) { return; }
+      R.inflightSummary = false;
+      if (!C.validResults(doc, "completed_run_summary")) { throw new Error("invalid_results"); }
+      R.summary = doc;
+      renderResults();
+    }).catch(function (error) {
+      if (generation !== R.generation) { return; }
+      R.inflightSummary = false;
+      R.error = C.plain(error.message);
+      renderResults();
+    });
+  }
+  function setResultsTab(tab) {
+    R.tab = tab;
+    $("res-tab-position").setAttribute("aria-pressed", tab === "position" ? "true" : "false");
+    $("res-tab-summary").setAttribute("aria-pressed", tab === "summary" ? "true" : "false");
+    syncResults();
+  }
+
+  /* ---- small render helpers (text only) */
+  function tile(parent, label, value, note, tone) {
+    var box = h("div", { class: "tile" + (tone ? " " + tone : "") }, parent);
+    h("span", { class: "tile-label" }, box, label);
+    h("span", { class: "tile-value" + (String(value).length > 12 ? " long" : "") }, box, value);
+    if (note) { h("span", { class: "tile-note" }, box, note); }
+    return box;
+  }
+  function signedTone(text) {
+    var value = String(text || "");
+    return /^-/.test(value) && /[1-9]/.test(value) ? "neg" : /[1-9]/.test(value) ? "pos" : "";
+  }
+  function metricTile(parent, label, metric, signed) {
+    if (!metric || metric.status !== "available") {
+      return tile(parent, label, "Unavailable", C.reasonText(metric && metric.reason ? metric.reason : "unknown"), "na");
+    }
+    return tile(parent, label, C.money(metric.value, signed), null, signed ? signedTone(metric.value) : "");
+  }
+  function codeList(codes) {
+    var span = h("span", { class: "codes" });
+    (codes && codes.length ? codes : ["none"]).forEach(function (code) { h("code", {}, span, code); });
+    return span;
+  }
+  function table(parent, caption, headers, rows, note) {
+    var wrap = h("div", { class: "table-wrap", tabindex: "0", role: "region", "aria-label": C.plain(caption) }, parent);
+    var t = h("table", { class: "table results-table" }, wrap);
+    h("caption", {}, t, caption);
+    var head = h("tr", {}, h("thead", {}, t));
+    headers.forEach(function (label) { h("th", { scope: "col" }, head, label); });
+    var body = h("tbody", {}, t);
+    var shown = rows.length > ROW_LIMIT ? rows.slice(rows.length - ROW_LIMIT) : rows;
+    shown.forEach(function (cells) {
+      var tr = h("tr", {}, body);
+      cells.forEach(function (cell, n) {
+        var td = h(n === 0 ? "th" : "td", n === 0 ? { scope: "row" } : {}, tr);
+        if (cell instanceof Node) { td.appendChild(cell); } else { td.textContent = C.plain(cell); }
+      });
+    });
+    if (!rows.length) {
+      var empty = h("tr", {}, body);
+      h("td", { colspan: headers.length, class: "muted" }, empty, note || "None.");
+    } else if (rows.length > ROW_LIMIT) {
+      h("p", { class: "muted small" }, wrap, "Showing the last " + ROW_LIMIT + " of " + rows.length + " rows.");
+    }
+    return t;
+  }
+  function para(tag, attrs, parent, text) {             // long server explanations (bounded by C.prose)
+    var node = h(tag, attrs, parent);
+    node.textContent = C.prose(text);
+    return node;
+  }
+  function idCode(value) { return value ? h("code", {}, null, value) : h("span", { class: "muted" }, null, "none"); }
+  function sim(stamp) { return stamp ? C.formatTime(stamp) : "-"; }
+
+  /* ---- charts: one series each, one y-axis each, recessive grid, crosshair tooltip, data table */
+  function chart(parent, spec) {
+    var points = spec.points, wrap = h("figure", { class: "chart" }, parent);
+    h("figcaption", { class: "chart-title" }, wrap, spec.title);
+    if (!points.length) {
+      h("p", { class: "muted small" }, wrap, spec.empty);
+      return wrap;
+    }
+    var width = spec.width, height = 190, pad = { l: 64, r: 12, t: 10, b: 26 };
+    var g = C.scale(points, spec.key, width, height, pad, spec.xDomain);
+    var svg = el("svg", { viewBox: "0 0 " + width + " " + height, class: "chart-svg", role: "img", focusable: "false" }, wrap);
+    el("title", {}, svg).textContent = spec.label;
+    [g.y0 + (g.y1 - g.y0) * 0.1, (g.y0 + g.y1) / 2, g.y1 - (g.y1 - g.y0) * 0.1].forEach(function (v) {
+      el("line", { x1: pad.l, x2: width - pad.r, y1: g.py(v), y2: g.py(v), class: "grid" }, svg);
+      svgText(svg, pad.l - 6, g.py(v) + 4, spec.tick(v), { class: "tick", "text-anchor": "end" });
+    });
+    if (spec.reference !== undefined) {
+      var ry = g.py(spec.reference);
+      el("line", { x1: pad.l, x2: width - pad.r, y1: ry, y2: ry, class: "reference" }, svg);
+      svgText(svg, width - pad.r, ry - 4, spec.referenceLabel, { class: "tick", "text-anchor": "end" });
+    }
+    var line = g.points.map(function (p) { return g.px(p.x).toFixed(1) + "," + g.py(p.y).toFixed(1); });
+    if (spec.area) {
+      el("polygon", { points: g.px(g.points[0].x).toFixed(1) + "," + g.py(0).toFixed(1) + " " + line.join(" ") + " " +
+        g.px(g.points[g.points.length - 1].x).toFixed(1) + "," + g.py(0).toFixed(1), class: "area " + spec.tone }, svg);
+    }
+    el("polyline", { points: line.join(" "), class: "series " + spec.tone }, svg);
+    var last = g.points[g.points.length - 1];
+    el("circle", { cx: g.px(last.x), cy: g.py(last.y), r: 4, class: "marker " + spec.tone }, svg);
+    var first = C.formatTime(new Date(g.x0).toISOString().slice(0, 19) + "Z");
+    var end = C.formatTime(new Date(g.x1).toISOString().slice(0, 19) + "Z");
+    svgText(svg, pad.l, height - 6, first.slice(0, 16), { class: "tick" });
+    svgText(svg, width - pad.r, height - 6, end.slice(0, 10) === first.slice(0, 10) ? end.slice(11) : end,
+      { class: "tick", "text-anchor": "end" });
+    var cross = el("line", { y1: pad.t, y2: height - pad.b, class: "crosshair", visibility: "hidden" }, svg);
+    var tip = h("div", { class: "chart-tip", role: "presentation", hidden: "hidden" }, wrap);
+    var hit = el("rect", { x: pad.l, y: pad.t, width: width - pad.l - pad.r, height: height - pad.t - pad.b, class: "hit" }, svg);
+    var xs = g.points.map(function (p) { return g.px(p.x); });
+    function show(event) {
+      var box = svg.getBoundingClientRect();
+      if (!box.width) { return; }
+      var x = (event.clientX - box.left) * width / box.width;
+      var n = C.nearestIndex(xs, x), p = g.points[n];
+      cross.setAttribute("x1", xs[n]); cross.setAttribute("x2", xs[n]); cross.setAttribute("visibility", "visible");
+      tip.textContent = C.formatTime(p.point.at_utc) + " · " + spec.tipText(p.point);
+      tip.hidden = false;
+      tip.style.left = Math.min(Math.max(xs[n] / width * 100, 8), 72) + "%";
+    }
+    hit.addEventListener("pointermove", show);
+    hit.addEventListener("pointerdown", show);
+    hit.addEventListener("pointerleave", function () { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
+    var details = h("details", { class: "chart-data" }, wrap);
+    h("summary", {}, details, "Data table (" + points.length + " points)");
+    table(details, spec.title + " data", ["Bar close (simulated time)", spec.column],
+      points.map(function (p) { return [C.formatTime(p.at_utc), spec.cell(p)]; }));
+    return wrap;
+  }
+  /* Draw at the column's real pixel width so chart text stays at its CSS size (one column under 680px). */
+  function chartWidth(container) {
+    var total = container.clientWidth || 640;
+    return Math.round(Math.max(280, Math.min(900, total >= 680 ? (total - 10) / 2 - 20 : total - 20)));
+  }
+  function equityChart(parent, points, initial, xDomain, title) {
+    return chart(parent, { title: title, width: chartWidth(parent), points: points, key: "equity", tone: "equity", xDomain: xDomain,
+      label: title + ": " + points.length + " bar-close points, simulated", empty: "No bar had closed yet at this simulated time.",
+      reference: Number(initial), referenceLabel: "initial cash " + C.money(initial),
+      tick: function (v) { return "$" + v.toFixed(v >= 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); },
+      tipText: function (p) { return "equity " + C.money(p.equity); }, column: "Equity", cell: function (p) { return C.money(p.equity); } });
+  }
+  function drawdownChart(parent, points, xDomain, title) {
+    var rows = points.map(function (p) { return Object.assign({}, p, { negative: "-" + p.drawdown_percent }); });
+    return chart(parent, { title: title, width: chartWidth(parent), points: rows, key: "negative", tone: "drawdown", xDomain: xDomain, area: true,
+      label: title + ": drawdown below the running peak, percent", empty: "No bar had closed yet at this simulated time.",
+      tick: function (v) { var t = v.toFixed(2); return (t === "-0.00" ? "0.00" : t) + "%"; },
+      tipText: function (p) { return "drawdown " + C.percent(p.drawdown_percent) + " (" + C.money(p.drawdown) + ")"; },
+      column: "Drawdown", cell: function (p) { return C.percent(p.drawdown_percent) + " · " + C.money(p.drawdown); } });
+  }
+  function windowDomain() {
+    var w = R.index && R.index.replay_window;
+    return w ? [Date.parse(w.start_utc), Date.parse(w.end_utc)] : null;
+  }
+
+  /* ---- order, fill and trade tables (shared by both views) */
+  function orderRows(orders) {
+    return orders.map(function (o) {
+      var last = o.history[o.history.length - 1];
+      var why = h("span", { class: "codes" });
+      o.history.forEach(function (entry) {
+        h("span", { class: "hist" }, why, C.words(entry.status) + " " + sim(entry.at_utc) + ": ");
+        why.appendChild(codeList(entry.reason_codes));
+      });
+      var source = o.source.kind === "research_signal" ?
+        h("span", {}, null, "signal " + (o.source.strategy || "?") + " · ") : h("span", {}, null, "exit rule " + C.words(o.source.rule));
+      if (o.source.signal_id) { source.appendChild(idCode(o.source.signal_id)); }
+      return [idCode(o.order_id), C.words(o.purpose) + " · " + o.side, o.quantity === null ? "-" : String(o.quantity),
+        C.words(o.status), "bar " + o.source.decision_bar_sequence + " · " + sim(o.source.decision_at_utc), source,
+        o.estimate.notional ? C.money(o.estimate.notional) : "-", why];
+    });
+  }
+  function fillRows(fills) {
+    return fills.map(function (f) {
+      return [idCode(f.fill_id), idCode(f.order_id), f.side, String(f.quantity), "bar " + f.bar_sequence + " · " + sim(f.bar_open_utc),
+        C.money(f.open_price), C.money(f.fill_price), C.money(f.notional), C.money(f.fee), C.money(f.cash_change, true),
+        f.gap_before_fill ? f.gap_before_fill + " missing" : "none"];
+    });
+  }
+  var ORDER_HEAD = ["Order", "Purpose · side", "Qty", "Status", "Decided (simulated)", "Supporting reference", "Estimated notional",
+    "History: simulator checks and reasons"];
+  var FILL_HEAD = ["Fill", "Order", "Side", "Qty", "Filled at bar open (simulated)", "Open", "Fill price", "Notional", "Fee",
+    "Cash change", "Gap before fill"];
+
+  function renderResultsHeader(body) {
+    var idx = R.index;
+    var demo = idx.demo;
+    var badge = $("results-badge");
+    badge.textContent = demo ? "DEMO DATA · SYNTHETIC · SIMULATED" : "SAVED SIMULATION · SIMULATED";
+    badge.className = "sim-badge " + (demo ? "demo" : "saved");
+    var facts = h("div", { class: "facts" }, body);
+    row(facts, "Run", idCode(idx.run.run_id));
+    row(facts, "Timeline", C.words(idx.timeline.origin) + " · " + idx.timeline.timeline_id + " · " + C.words(idx.timeline.completeness));
+    row(facts, "Dataset", idx.dataset.symbol + " · " + idx.dataset.interval + " · " + idx.dataset.data_label + " · " + idx.dataset.dataset_id);
+    row(facts, "Strategies", idx.strategies.map(function (s) { return s.name; }).join(", "));
+    row(facts, "Costs", idx.policy.costs.slippage_bps + " bps slippage · fee " + C.money(idx.policy.costs.fee_per_order) +
+      " + " + idx.policy.costs.fee_bps + " bps per order");
+    row(facts, "Kill switch", idx.kill_switch.engaged ? "engaged (" + C.words(idx.kill_switch.source) + ")" : "not engaged");
+    var analytics = idx.correlation.analytics;
+    row(facts, "Analytics", analytics.status === "available" ? "report " + analytics.report_id + " (matched by hashes)" :
+      "unavailable: " + C.reasonText(analytics.reason));
+    if (analytics.rejected_reports.length) {
+      row(facts, "Rejected reports", analytics.rejected_reports.map(function (r) {
+        return r.report_id + " (" + C.reasonText(r.code) + ")";
+      }).join("; "));
+    }
+    row(facts, "Correlation", para("span", {}, null, idx.correlation.method));
+    para("p", { class: "separation" }, body, idx.separation);
+  }
+
+  function renderPosition(body) {
+    var doc = R.at, idx = R.index;
+    if (idx.replay_state.status !== "available") {
+      var box = h("div", { class: "notice warn" }, body);
+      h("strong", {}, box, "Portfolio at a replay position is unavailable for this timeline.");
+      h("p", {}, box, "Reasons: " + idx.replay_state.reasons.map(C.reasonText).join("; ") +
+        ". No intermediate state is invented. The completed run summary is still available.");
+      return;
+    }
+    if (!doc) { h("p", { class: "muted" }, body, "Loading the portfolio at this position..."); return; }
+    if (doc.status === "not_started") {
+      h("p", { class: "notice" }, body, "Before the simulator's first event: no simulated orders, fills or cash changes yet. " +
+        "Step forward to the simulator's events.");
+      return;
+    }
+    if (doc.status !== "available") {
+      h("p", { class: "notice warn" }, body, "Unavailable: " + doc.reasons.map(C.reasonText).join("; "));
+      return;
+    }
+    var p = doc.portfolio;
+    var tiles = h("div", { class: "tiles" }, body);
+    tile(tiles, "Initial cash", C.money(p.initial_cash));
+    tile(tiles, "Cash", C.money(p.cash));
+    metricTile(tiles, "Equity", p.equity);
+    tile(tiles, "Realized P&L", C.money(p.realized_pnl, true), null, signedTone(p.realized_pnl));
+    metricTile(tiles, "Unrealized P&L", p.unrealized_pnl, true);
+    tile(tiles, "Fees so far", C.money(p.fees));
+    tile(tiles, "Open position", p.open_quantity ? p.open_quantity + " shares" : "none",
+      p.open_quantity && p.mark ? "marked at " + C.money(p.mark.price) + " (bar " + p.mark.bar_sequence + " close)" : null);
+    var dd = p.drawdown_so_far;
+    tile(tiles, "Max drawdown so far", dd.max_percent.status === "available" ? C.percent(dd.max_percent.value) : "Unavailable",
+      dd.max_dollars.status === "available" ? C.money(dd.max_dollars.value) : C.reasonText(dd.max_dollars.reason),
+      dd.max_percent.status === "available" ? "" : "na");
+    h("p", { class: "muted small" }, body, p.mark_basis + " Equity and drawdown points appear only once their bar has closed.");
+    var charts = h("div", { class: "charts" }, body);
+    if (p.equity_curve_status.status !== "available") {
+      h("p", { class: "notice" }, charts, "Equity and drawdown charts are unavailable: " + C.reasonText(p.equity_curve_status.reason) + ".");
+    } else {
+      equityChart(charts, p.equity_curve, p.initial_cash, windowDomain(), "Equity so far (simulated)");
+      drawdownChart(charts, p.equity_curve, windowDomain(), "Drawdown so far (simulated)");
+    }
+    table(body, "Open position at this position", ["Entry fill", "Strategy · signal", "Qty", "Opened (simulated)", "Entry price",
+      "Cost basis", "Mark", "Market value", "Unrealized P&L"], p.open_positions.map(function (o) {
+      var src = h("span", {}, null, (o.strategy || "-") + " · "); src.appendChild(idCode(o.signal_id));
+      return [idCode(o.entry_fill_id), src, String(o.quantity), sim(o.opened_at_utc), C.money(o.entry_price), C.money(o.cost_basis),
+        o.mark_price ? C.money(o.mark_price) + " @ " + sim(o.marked_at_utc) : "Unavailable",
+        C.metricText(o.market_value, C.money), C.metricText(o.unrealized_pnl, function (v) { return C.money(v, true); })];
+    }), "No open position at this replay position.");
+    table(body, "Closed trades so far", ["Entry → exit fill", "Strategy", "Qty", "Opened", "Closed", "Entry", "Exit", "Realized P&L",
+      "Outcome"], p.closed_trades.map(function (t) {
+      var ids = h("span", { class: "codes" }); ids.appendChild(idCode(t.entry_fill_id)); ids.appendChild(idCode(t.exit_fill_id));
+      return [ids, t.strategy || "-", String(t.quantity), sim(t.opened_at_utc), sim(t.closed_at_utc), C.money(t.entry_price),
+        C.money(t.exit_price), C.money(t.realized_pnl, true), t.outcome];
+    }), "No closed trades yet at this replay position.");
+    table(body, "Simulated orders so far (simulator policy decisions)", ORDER_HEAD, orderRows(p.orders), "No orders decided yet.");
+    table(body, "Simulated fills so far", FILL_HEAD, fillRows(p.fills), "No fills yet.");
+  }
+
+  function statRow(label, metric, format) { return [label, C.metricText(metric, format)]; }
+  function renderSummary(body) {
+    var doc = R.summary;
+    if (!doc) { h("p", { class: "muted" }, body, "Loading the completed run summary..."); return; }
+    h("p", { class: "notice summary-label" }, body, doc.label);
+    var a = doc.account, tiles = h("div", { class: "tiles" }, body);
+    tile(tiles, "Initial cash", C.money(a.initial_cash));
+    tile(tiles, "Ending cash", C.money(a.ending_cash));
+    tile(tiles, "Ending equity", C.money(a.ending_equity));
+    tile(tiles, "Net return", C.money(a.net_return, true), C.metricText(a.net_return_percent, function (v) { return C.percent(v, true); }) +
+      " · not annualized", signedTone(a.net_return));
+    tile(tiles, "Realized P&L", C.money(a.realized_pnl, true), null, signedTone(a.realized_pnl));
+    tile(tiles, "Unrealized P&L", C.money(a.unrealized_pnl, true), "no exit costs assumed", signedTone(a.unrealized_pnl));
+    tile(tiles, "Fees", C.money(a.fees_total));
+    tile(tiles, "Open at end", a.open_position_quantity ? a.open_position_quantity + " shares" : "none",
+      a.last_close ? "marked at last close " + C.money(a.last_close) : null);
+    var report = doc.analytics.report;
+    var charts = h("div", { class: "charts" }, body);
+    if (!report) {
+      h("p", { class: "notice warn" }, charts, "Analytics unavailable: " + C.reasonText(doc.analytics.reason) +
+        ". Closed-trade statistics, the equity curve and drawdown need a matching Step 30 report " +
+        "(analytics-generate RUN_ID --save). Run figures above come from the validated run itself.");
+    } else {
+      equityChart(charts, report.equity_curve, a.initial_cash, null, "Equity, whole run (simulated)");
+      drawdownChart(charts, report.equity_curve, null, "Drawdown, whole run (simulated)");
+      var ct = report.closed_trades;
+      table(body, "Closed-trade statistics (report " + report.report_id + ")", ["Statistic", "Value"], [
+        ["Closed trades", ct.count + " (" + ct.wins + " wins · " + ct.losses + " losses · " + ct.breakeven + " breakeven)"],
+        ["Net P&L of closed trades", C.money(ct.net_pnl, true)], ["Fees in closed trades", C.money(ct.fees)],
+        statRow("Win rate", ct.win_rate_percent, C.percent), statRow("Average net per trade (expectancy)", ct.expectancy, C.money),
+        statRow("Average win", ct.average_win, C.money), statRow("Average loss", ct.average_loss, C.money),
+        statRow("Profit factor", ct.profit_factor, function (v) { return C.roundText(v, 2); }),
+        ["Max drawdown", C.money(report.drawdown.max_dollars) + " at " + sim(report.drawdown.max_dollars_at_utc) + " · " +
+          C.percent(report.drawdown.max_percent) + " at " + sim(report.drawdown.max_percent_at_utc)],
+        statRow("Average bars held (closed)", report.holding.closed_average_bars, function (v) { return C.roundText(v, 2); }),
+        statRow("Exposure (bars with a position)", report.exposure.exposure_percent, C.percent)]);
+      table(body, "Closed trades", ["Position", "Strategy", "Qty", "Opened", "Closed", "Entry", "Exit", "Gross", "Fees", "Net P&L", "Outcome"],
+        ct.trades.map(function (t) {
+          return [String(t.position), t.strategy, String(t.quantity), sim(t.opened_at_utc), sim(t.closed_at_utc), C.money(t.entry_price),
+            C.money(t.exit_price), C.money(t.gross_pnl, true), C.money(t.fees), C.money(t.net_pnl, true), t.outcome];
+        }), "No closed trades in this run: statistics that need them are shown as unavailable, never as zero.");
+      table(body, "Rejected orders by reason", ["Reason code", "Orders"], Object.keys(report.orders.rejected_by_reason).map(function (k) {
+        return [h("code", {}, null, k), String(report.orders.rejected_by_reason[k])];
+      }), "No rejected orders.");
+      var attribution = h("section", { class: "attribution" }, body);
+      h("h3", {}, attribution, "Strategy attribution" + (report.attribution.shared_account ? " (shared account)" : ""));
+      para("p", { class: "muted small" }, attribution, report.attribution.explanation);
+      table(attribution, "Per-strategy share of this run", ["Strategy", "Closed", "Net P&L", "Win rate", "Open", "Unrealized",
+        "Signals accepted", "Rejected", "Blocked by shared account"], report.attribution.strategies.map(function (s) {
+        return [s.strategy, String(s.closed_trades), C.money(s.net_pnl, true), C.metricText(s.win_rate_percent, C.percent),
+          String(s.open_positions), C.money(s.unrealized_pnl, true), String(s.signals_accepted), String(s.signals_rejected),
+          String(s.blocked_by_shared_account)];
+      }));
+    }
+    table(body, "All simulated orders (simulator policy decisions)", ORDER_HEAD, orderRows(doc.orders), "No orders.");
+    table(body, "All simulated fills", FILL_HEAD, fillRows(doc.fills), "No fills.");
+  }
+
+  function renderLimitations(body, rows) {
+    var box = h("section", { class: "limitations" }, body);
+    h("h3", {}, box, "Limitations (dataset, strategy, cost model, simulation)");
+    var list = h("ul", {}, box);
+    rows.forEach(function (item) {
+      var li = h("li", {}, list);
+      h("strong", {}, li, C.words(item.area) + ": ");
+      para("span", {}, li, item.text);
+    });
+  }
+
+  var RESULT_ERRORS = {
+    sim_run_not_found: "The simulation run behind this timeline was not saved (record it with sim-run DATASET_ID --save --record-events).",
+    sim_run_corrupt: "The saved simulation run failed validation, so no results are shown.",
+    timeline_run_mismatch: "This timeline's events do not match the saved run, so they are not combined.",
+    results_run_missing: "This timeline does not name a saved simulation run.",
+    results_not_simulation: "This timeline is not a simulation."
+  };
+  function renderResults() {
+    if (S.view !== "results") { return; }
+    var key = [S.timelineId, R.tab, currentPosition(), R.at ? R.at.position : "-", R.summary ? "s" : "-", R.index ? "i" : "-",
+      R.error, resultsAllowed(), S.timelines.length].join("|");
+    if (key === R.renderedKey) { return; }
+    R.renderedKey = key;
+    var body = $("results-body");
+    clear(body);
+    var where = $("results-where");
+    if (!resultsAllowed()) {
+      $("results-badge").textContent = "SIMULATED";
+      where.textContent = "";
+      h("p", { class: "notice" }, body, "The selected timeline (" + (S.scene ? C.words(S.scene.timeline.kind) : "none") +
+        ") is not a trading simulation. Results exist for simulation runs only. Research-agent and content timelines stay in the house.");
+      var picks = S.timelines.filter(function (t) { return t.kind === "simulation" || t.id === "demo"; });
+      var list = h("ul", { class: "mini-list" }, body);
+      picks.forEach(function (t) {
+        var li = h("li", {}, list);
+        var b = h("button", { type: "button", class: "link" }, li, timelineName(t));
+        b.disabled = t.readable === false;
+        b.addEventListener("click", function () { loadScene(t.id).then(function () { setView("results"); }); });
+        h("span", { class: "muted small" }, li, t.origin);
+      });
+      if (picks.length <= 1) { h("li", { class: "muted" }, list, "No saved simulations yet: sim-run DATASET_ID --save --record-events."); }
+      return;
+    }
+    if (R.error) {
+      h("p", { class: "notice warn" }, body, (RESULT_ERRORS[R.error] || "Could not load results (" + R.error + ").") +
+        " Nothing was changed.");
+      if (!R.index) { return; }
+    }
+    if (!R.index) { h("p", { class: "muted" }, body, "Loading results..."); return; }
+    var frames = S.scene.frames.length, position = currentPosition();
+    var event = R.at && R.at.event;
+    where.textContent = R.tab === "summary" ? "Completed run summary: end-of-run figures, independent of the replay position." :
+      "At replay position " + position + " of " + frames + (R.at && R.at.position === position && event ?
+        " · " + C.words(event.event_type) + " · simulated market time " + sim(event.sim_time_utc) +
+        " · recorded " + (event.recorded_at ? C.formatTime(event.recorded_at) : "not recorded (reconstructed)") : "");
+    renderResultsHeader(body);
+    if (R.tab === "summary") { renderSummary(body); } else { renderPosition(body); }
+    renderLimitations(body, R.tab === "summary" && R.summary ? R.summary.limitations : R.index.limitations);
+  }
+
   /* ------------------------------------------------------------------ data (GET only) */
   function getJSON(path) {
     return window.fetch(path, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
@@ -1206,6 +1700,8 @@
     document.body.classList.toggle("presenting", on);
     $("btn-present").setAttribute("aria-pressed", on ? "true" : "false");
     if (!on) { focusRoom(null); }
+    R.renderedKey = null;                                    // redraw results charts at the new layout width
+    renderResults();
   }
   function wire() {
     Array.prototype.forEach.call(document.querySelectorAll(".view-btn"), function (b) {
@@ -1225,6 +1721,13 @@
     $("btn-present").addEventListener("click", function () { setPresenting(!S.presenting); });
     $("present-exit").addEventListener("click", function () { setPresenting(false); });
     $("btn-refresh").addEventListener("click", loadTimelines);
+    $("res-tab-position").addEventListener("click", function () { setResultsTab("position"); });
+    $("res-tab-summary").addEventListener("click", function () { setResultsTab("summary"); });
+    var resizeTimer = null;
+    window.addEventListener("resize", function () {           // redraw charts at the new width (text stays 1:1)
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(function () { R.renderedKey = null; renderResults(); }, 200);
+    });
     Array.prototype.forEach.call(document.querySelectorAll(".filter-btn"), function (b) {
       b.addEventListener("click", function () { S.filter = b.getAttribute("data-filter"); renderTimelines(); });
     });
@@ -1240,6 +1743,7 @@
       else if (e.key === "l" || e.key === "L") { $("btn-labels").click(); }
       else if (e.key === "m" || e.key === "M") { $("btn-motion").click(); }
       else if (e.key === "v" || e.key === "V") { $("btn-list").click(); }
+      else if (e.key === "r" || e.key === "R") { if (S.view === "results") { setView("house"); } else { openResults(); } }
       else if (e.key === "Escape") { if (S.presenting) { setPresenting(false); } else { select(null); } }
       else if (S.presenting && /^[0-8]$/.test(e.key)) { focusRoom(e.key === "0" ? null : BOT_ROOMS[Number(e.key) - 1]); }
     });

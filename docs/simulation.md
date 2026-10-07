@@ -173,4 +173,5 @@ P&L, one fill per order and fill-not-before-decision. Tampered runs give
 
 To describe a saved run (trades, equity curve, drawdown, attribution), see
 [Simulation analytics](analytics.md) (Step 30). To record or replay its execution events, see
-[Execution events](events.md) (Step 31): `sim-run DATASET_ID --record-events`.
+[Execution events](events.md) (Step 31): `sim-run DATASET_ID --record-events`. To view a saved run's results in the Living HQ, select its Simulator station: see the
+[trading results desk](hq.md#trading-results-desk-step-34) (Step 34).

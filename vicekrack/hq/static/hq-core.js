@@ -194,6 +194,11 @@
     if (value === null || value === undefined) { return ""; }
     return String(value).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200);
   }
+  /* Longer explanatory text from the server (still control-free and bounded). */
+  function prose(value) {
+    if (value === null || value === undefined) { return ""; }
+    return String(value).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 600);
+  }
   function words(code) { return plain(code).replace(/_/g, " "); }
   function formatTime(stamp) {
     if (!stamp) { return "not recorded"; }
@@ -250,7 +255,113 @@
     return null;
   }
 
+  /* ---------------------------------------------------------------- results desk (Step 34) */
+  var DECIMAL = /^(-?)(\d+)(?:\.(\d+))?$/;
+  /* Exact decimal text -> grouped money text. No float conversion, no rounding: every digit the
+   * server sent is kept (at least 2 decimals are shown). "signed" adds "+" to positive values. */
+  function money(text, signed) {
+    var m = DECIMAL.exec(plain(text));
+    if (!m) { return "invalid"; }
+    var whole = m[2].replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    var fraction = (m[3] || "");
+    while (fraction.length < 2) { fraction += "0"; }
+    var zero = /^0*$/.test(m[2] + (m[3] || ""));
+    var sign = m[1] && !zero ? "-" : (signed && !zero ? "+" : "");
+    return sign + "$" + whole + "." + fraction;
+  }
+  /* Round decimal text half-even to `places` decimals, as text (display only). */
+  function roundText(text, places) {
+    var m = DECIMAL.exec(plain(text));
+    if (!m) { return null; }
+    var digits = m[2] + ((m[3] || "") + new Array(places + 2).join("0")).slice(0, places);
+    var rest = (m[3] || "").slice(places);
+    var up = false;
+    if (rest.length) {
+      var first = rest.charAt(0), tail = /[1-9]/.test(rest.slice(1));
+      var last = Number(digits.charAt(digits.length - 1));
+      up = first > "5" || (first === "5" && (tail || last % 2 === 1));
+    }
+    var chars = digits.split(""), i = chars.length - 1;
+    while (up && i >= 0) {
+      if (chars[i] === "9") { chars[i] = "0"; i -= 1; } else { chars[i] = String(Number(chars[i]) + 1); up = false; }
+    }
+    if (up) { chars.unshift("1"); }
+    var all = chars.join("");
+    var whole = all.slice(0, all.length - places).replace(/^0+(?=\d)/, "") || "0";
+    var out = places ? whole + "." + all.slice(all.length - places) : whole;
+    return (m[1] && /[1-9]/.test(all) ? "-" : "") + out;
+  }
+  function percent(text, signed) {
+    var rounded = roundText(text, 2);
+    if (rounded === null) { return "invalid"; }
+    return (signed && rounded.charAt(0) !== "-" && /[1-9]/.test(rounded) ? "+" : "") + rounded + "%";
+  }
+  var REASONS = {
+    no_closed_trades: "no closed trades",
+    no_winning_trades: "no winning trades",
+    no_losing_trades: "no losing trades",
+    no_bars_processed: "no bars processed",
+    analytics_report_missing: "no matching Step 30 analytics report is saved",
+    analytics_report_rejected: "the only analytics reports for this run were rejected",
+    analytics_report_ambiguous: "more than one analytics report matches; none is chosen",
+    analytics_report_mismatch: "its run, policy or dataset hashes differ from the run",
+    analytics_report_inconsistent: "its account figures differ from the run",
+    report_corrupt: "it failed validation",
+    no_bar_closed_yet: "no bar had closed yet at this simulated time",
+    timeline_not_complete: "the timeline is not complete",
+    timeline_has_issues: "the timeline has recorded issues",
+    timeline_missing_trade_events: "some order or fill events are missing from the timeline",
+    timeline_not_chronological: "events are not in simulated-time order",
+    simulated_time_missing: "an event has no simulated time",
+    replay_state_inconsistent: "folding the events does not reproduce the saved run",
+    simulator_not_started_at_position: "the simulator had not started at this replay position"
+  };
+  function reasonText(code) { return REASONS[code] || words(code); }
+  /* A Step 30-style metric {status, value, reason}: the value, or "Unavailable (reason)". Never zero. */
+  function metricText(metric, format) {
+    if (!metric || metric.status !== "available") {
+      return "Unavailable (" + reasonText(metric && metric.reason ? metric.reason : "unknown") + ")";
+    }
+    return format ? format(String(metric.value)) : plain(metric.value);
+  }
+  /* Replay index (-1 = before the first event) -> results position (events applied). */
+  function resultsPosition(index, frames, nowMode) {
+    if (nowMode) { return frames; }
+    return clamp((index | 0) + 1, 0, frames);
+  }
+  function validResults(doc, view) {
+    return !!doc && doc.contract === "hq_results" && doc.version === "1.0" && doc.simulated === true &&
+      doc.read_only === true && doc.view === view;
+  }
+  /* Chart geometry from decimal text (floats are used for drawing only, never for displayed values). */
+  function scale(points, key, width, height, pad, xDomain) {
+    var xs = points.map(function (p) { return Date.parse(p.at_utc); });
+    var ys = points.map(function (p) { return Number(p[key]); });
+    var x0 = xDomain ? xDomain[0] : Math.min.apply(null, xs), x1 = xDomain ? xDomain[1] : Math.max.apply(null, xs);
+    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    if (!(x1 > x0)) { x1 = x0 + 1; }
+    if (!(y1 > y0)) { y0 -= 1; y1 += 1; }
+    var span = y1 - y0;
+    y0 -= span * 0.08; y1 += span * 0.08;
+    return {
+      x0: x0, x1: x1, y0: y0, y1: y1,
+      px: function (t) { return pad.l + (t - x0) / (x1 - x0) * (width - pad.l - pad.r); },
+      py: function (v) { return pad.t + (1 - (v - y0) / (y1 - y0)) * (height - pad.t - pad.b); },
+      points: points.map(function (p, i) { return { x: xs[i], y: ys[i], point: p }; })
+    };
+  }
+  function nearestIndex(items, x) {
+    var best = -1, distance = Infinity;
+    for (var i = 0; i < items.length; i += 1) {
+      var d = Math.abs(items[i] - x);
+      if (d < distance) { distance = d; best = i; }
+    }
+    return best;
+  }
+
   return {
+    prose: prose, money: money, roundText: roundText, percent: percent, REASONS: REASONS, reasonText: reasonText, metricText: metricText,
+    resultsPosition: resultsPosition, validResults: validResults, scale: scale, nearestIndex: nearestIndex,
     STATES: STATES, STATE_ORDER: STATE_ORDER, MODES: MODES, SPEEDS: SPEEDS, ID_PATTERN: ID_PATTERN,
     stateStyle: stateStyle, intentFor: intentFor, Replay: Replay, Graph: Graph, hashSeed: hashSeed, rng: rng,
     wanderChoice: wanderChoice, movementFor: movementFor, MOVEMENT: MOVEMENT, plain: plain, words: words, formatTime: formatTime, describeEvent: describeEvent,

@@ -1296,3 +1296,36 @@ Each room now shows activity only from its own role:
 ![Recorded Step 5 workflow, resumed attempt](docs/images/hq/hq-step33-recorded-workflow-resume.png)
 
 See [Living HQ](docs/hq.md), [Execution events](docs/events.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 34: trading results desk in the Living HQ
+
+The Living HQ now shows **simulated trading results**: a read-only desk that connects the
+house to the Step 29 simulator and Step 30 analytics. Select the **Simulator** operations
+station (or the **Results** view, or press **R**) to open the selected run's results.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack analytics-generate RUN_ID --save
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+- **At replay position** shows the portfolio after the events up to the scrubber: cash,
+  equity, realized and unrealized P&L, fees, the open position, orders with their
+  acceptance or rejection reasons and supporting signal references, fills, and equity and
+  drawdown charts. Nothing later is sent to the browser: no future fills, final P&L or
+  end-of-run statistics.
+- **Completed run summary** is a separate, clearly labelled view with the final account,
+  closed-trade statistics (an `unavailable` metric stays unavailable, with its reason),
+  drawdown, rejections by reason, strategy attribution and the limitations of the dataset,
+  strategy, cost model and simulation.
+- **Correlation is by validated IDs and hashes only.** The timeline must match the saved
+  run event by event, and an analytics report counts only if its run, results, policy,
+  dataset and account hashes match. Mismatched or tampered records are rejected and
+  listed; missing analytics is shown as missing.
+- **Read-only.** Opening the desk never runs a simulation, generates analytics, changes
+  accounts or calls a provider. There are no trading controls.
+
+![Results desk at a replay position, saved simulation](docs/images/hq/hq-step34-saved-replay-position.png)
+
+See [Living HQ](docs/hq.md#trading-results-desk-step-34) and the [Roadmap](docs/roadmap.md).

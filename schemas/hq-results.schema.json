@@ -1,0 +1,1829 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hq_results",
+  "description": "Living HQ trading results desk documents (Step 34): index (no results), replay_position (only information available at that position) and completed_run_summary. SIMULATED, read-only display data built from validated Step 29 runs and Step 30 reports.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "simulated",
+        "read_only",
+        "notice",
+        "view",
+        "timeline",
+        "run",
+        "dataset",
+        "strategies",
+        "policy",
+        "kill_switch",
+        "replay_window",
+        "demo",
+        "correlation",
+        "replay_state",
+        "separation",
+        "limitations"
+      ],
+      "properties": {
+        "contract": {
+          "const": "hq_results"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "simulated": {
+          "const": true
+        },
+        "read_only": {
+          "const": true
+        },
+        "notice": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "view": {
+          "const": "index"
+        },
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timeline_id",
+            "origin",
+            "kind",
+            "completeness",
+            "time_basis",
+            "event_count"
+          ],
+          "properties": {
+            "timeline_id": {
+              "type": "string",
+              "pattern": "^(demo|tl-[0-9a-f]{24}|rtl-[0-9a-f]{24})$"
+            },
+            "origin": {
+              "enum": [
+                "demo",
+                "recorded",
+                "reconstructed"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "simulation",
+                "hq_demo"
+              ]
+            },
+            "completeness": {
+              "enum": [
+                "complete",
+                "partial",
+                "open",
+                "interrupted"
+              ]
+            },
+            "time_basis": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "results_sha256",
+            "policy_sha256",
+            "simulation_account_id",
+            "initial_cash",
+            "currency",
+            "saved_at"
+          ],
+          "properties": {
+            "run_id": {
+              "$ref": "#/$defs/run_id"
+            },
+            "results_sha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "policy_sha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "simulation_account_id": {
+              "type": "string",
+              "pattern": "^simacct-[0-9a-f]{24}$"
+            },
+            "initial_cash": {
+              "$ref": "#/$defs/money"
+            },
+            "currency": {
+              "const": "USD"
+            },
+            "saved_at": {
+              "$ref": "#/$defs/utc"
+            }
+          }
+        },
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset_id",
+            "symbol",
+            "interval",
+            "timezone",
+            "data_label",
+            "bars_sha256"
+          ],
+          "properties": {
+            "dataset_id": {
+              "type": "string",
+              "pattern": "^mds-[0-9a-f]{12,64}$"
+            },
+            "symbol": {
+              "type": "string",
+              "pattern": "^[A-Z0-9.\\-]{1,15}$"
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]{1,3}[mhd]$"
+            },
+            "timezone": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "data_label": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,40}$"
+            },
+            "bars_sha256": {
+              "$ref": "#/$defs/sha"
+            }
+          }
+        },
+        "strategies": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "config_sha256"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,40}$"
+              },
+              "config_sha256": {
+                "$ref": "#/$defs/sha"
+              }
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sizing",
+            "exits",
+            "costs",
+            "limits",
+            "entry_strategies"
+          ],
+          "properties": {
+            "sizing": {
+              "type": "object"
+            },
+            "exits": {
+              "type": "object"
+            },
+            "costs": {
+              "type": "object"
+            },
+            "limits": {
+              "type": "object"
+            },
+            "entry_strategies": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kill_switch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "engaged",
+            "source"
+          ],
+          "properties": {
+            "engaged": {
+              "type": "boolean"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/code"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "replay_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_utc",
+            "end_utc",
+            "step_seconds",
+            "steps"
+          ],
+          "properties": {
+            "start_utc": {
+              "$ref": "#/$defs/utc"
+            },
+            "end_utc": {
+              "$ref": "#/$defs/utc"
+            },
+            "step_seconds": {
+              "type": "integer"
+            },
+            "steps": {
+              "type": "integer"
+            }
+          }
+        },
+        "demo": {
+          "type": "boolean"
+        },
+        "correlation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timeline_run",
+            "method",
+            "analytics"
+          ],
+          "properties": {
+            "timeline_run": {
+              "const": "verified"
+            },
+            "method": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "analytics": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "report_id",
+                "reason",
+                "rejected_reports",
+                "unreadable_reports_skipped",
+                "scan_limited"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "available",
+                    "unavailable"
+                  ]
+                },
+                "report_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/report_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "rejected_reports": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "report_id",
+                      "code"
+                    ],
+                    "properties": {
+                      "report_id": {
+                        "$ref": "#/$defs/report_id"
+                      },
+                      "code": {
+                        "$ref": "#/$defs/code"
+                      }
+                    }
+                  }
+                },
+                "unreadable_reports_skipped": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "scan_limited": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "replay_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reasons"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "available",
+                "unavailable"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "$ref": "#/$defs/code"
+              }
+            }
+          }
+        },
+        "separation": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "area",
+              "code",
+              "text"
+            ],
+            "properties": {
+              "area": {
+                "enum": [
+                  "dataset",
+                  "strategy",
+                  "cost_model",
+                  "simulation",
+                  "analytics"
+                ]
+              },
+              "code": {
+                "$ref": "#/$defs/code"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 400
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "simulated",
+        "read_only",
+        "notice",
+        "demo",
+        "view",
+        "timeline_id",
+        "run_id",
+        "position",
+        "positions",
+        "event",
+        "simulated_time_utc",
+        "status",
+        "reasons",
+        "portfolio"
+      ],
+      "properties": {
+        "contract": {
+          "const": "hq_results"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "simulated": {
+          "const": true
+        },
+        "read_only": {
+          "const": true
+        },
+        "notice": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "demo": {
+          "type": "boolean"
+        },
+        "view": {
+          "const": "replay_position"
+        },
+        "timeline_id": {
+          "type": "string",
+          "pattern": "^(demo|tl-[0-9a-f]{24}|rtl-[0-9a-f]{24})$"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "positions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sequence",
+                "component",
+                "event_type",
+                "status",
+                "sim_time_utc",
+                "recorded_at"
+              ],
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "component": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "event_type": {
+                  "$ref": "#/$defs/code"
+                },
+                "status": {
+                  "$ref": "#/$defs/code"
+                },
+                "sim_time_utc": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/utc"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "recorded_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/utc"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "simulated_time_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/utc"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable",
+            "not_started"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "portfolio": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "initial_cash",
+                "cash",
+                "equity",
+                "realized_pnl",
+                "unrealized_pnl",
+                "fees",
+                "open_quantity",
+                "market_value",
+                "mark",
+                "mark_basis",
+                "open_positions",
+                "closed_trades",
+                "orders",
+                "fills",
+                "equity_curve",
+                "equity_curve_status",
+                "drawdown_so_far"
+              ],
+              "properties": {
+                "initial_cash": {
+                  "$ref": "#/$defs/money"
+                },
+                "cash": {
+                  "$ref": "#/$defs/money"
+                },
+                "equity": {
+                  "$ref": "#/$defs/metric"
+                },
+                "realized_pnl": {
+                  "$ref": "#/$defs/money"
+                },
+                "unrealized_pnl": {
+                  "$ref": "#/$defs/metric"
+                },
+                "fees": {
+                  "$ref": "#/$defs/money"
+                },
+                "open_quantity": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "market_value": {
+                  "$ref": "#/$defs/metric"
+                },
+                "mark": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "price",
+                        "bar_sequence",
+                        "at_utc"
+                      ],
+                      "properties": {
+                        "price": {
+                          "$ref": "#/$defs/money"
+                        },
+                        "bar_sequence": {
+                          "type": "integer"
+                        },
+                        "at_utc": {
+                          "$ref": "#/$defs/utc"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "mark_basis": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "open_positions": {
+                  "type": "array",
+                  "maxItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "entry_fill_id",
+                      "order_id",
+                      "strategy",
+                      "signal_id",
+                      "quantity",
+                      "opened_at_utc",
+                      "entry_price",
+                      "cost_basis",
+                      "mark_price",
+                      "marked_at_utc",
+                      "market_value",
+                      "unrealized_pnl"
+                    ],
+                    "properties": {
+                      "entry_fill_id": {
+                        "$ref": "#/$defs/fill_id"
+                      },
+                      "order_id": {
+                        "$ref": "#/$defs/order_id"
+                      },
+                      "strategy": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "signal_id": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/signal_id"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "opened_at_utc": {
+                        "$ref": "#/$defs/utc"
+                      },
+                      "entry_price": {
+                        "$ref": "#/$defs/money"
+                      },
+                      "cost_basis": {
+                        "$ref": "#/$defs/money"
+                      },
+                      "mark_price": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/money"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "marked_at_utc": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/utc"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "market_value": {
+                        "$ref": "#/$defs/metric"
+                      },
+                      "unrealized_pnl": {
+                        "$ref": "#/$defs/metric"
+                      }
+                    }
+                  }
+                },
+                "closed_trades": {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "entry_fill_id",
+                      "exit_fill_id",
+                      "strategy",
+                      "signal_id",
+                      "quantity",
+                      "opened_at_utc",
+                      "closed_at_utc",
+                      "entry_price",
+                      "exit_price",
+                      "realized_pnl",
+                      "outcome"
+                    ],
+                    "properties": {
+                      "entry_fill_id": {
+                        "$ref": "#/$defs/fill_id"
+                      },
+                      "exit_fill_id": {
+                        "$ref": "#/$defs/fill_id"
+                      },
+                      "strategy": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "signal_id": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/signal_id"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "opened_at_utc": {
+                        "$ref": "#/$defs/utc"
+                      },
+                      "closed_at_utc": {
+                        "$ref": "#/$defs/utc"
+                      },
+                      "entry_price": {
+                        "$ref": "#/$defs/money"
+                      },
+                      "exit_price": {
+                        "$ref": "#/$defs/money"
+                      },
+                      "realized_pnl": {
+                        "$ref": "#/$defs/money"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "win",
+                          "loss",
+                          "breakeven"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "orders": {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "items": {
+                    "$ref": "#/$defs/order"
+                  }
+                },
+                "fills": {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "items": {
+                    "$ref": "#/$defs/fill"
+                  }
+                },
+                "equity_curve": {
+                  "type": "array",
+                  "maxItems": 5001,
+                  "items": {
+                    "$ref": "#/$defs/point"
+                  }
+                },
+                "equity_curve_status": {
+                  "$ref": "#/$defs/metric"
+                },
+                "drawdown_so_far": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "max_dollars",
+                    "max_percent"
+                  ],
+                  "properties": {
+                    "max_dollars": {
+                      "$ref": "#/$defs/metric"
+                    },
+                    "max_percent": {
+                      "$ref": "#/$defs/metric"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "simulated",
+        "read_only",
+        "notice",
+        "view",
+        "timeline",
+        "run",
+        "dataset",
+        "strategies",
+        "policy",
+        "kill_switch",
+        "replay_window",
+        "demo",
+        "label",
+        "account",
+        "counts",
+        "positions",
+        "orders",
+        "fills",
+        "analytics",
+        "separation",
+        "limitations"
+      ],
+      "properties": {
+        "contract": {
+          "const": "hq_results"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "simulated": {
+          "const": true
+        },
+        "read_only": {
+          "const": true
+        },
+        "notice": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "view": {
+          "const": "completed_run_summary"
+        },
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timeline_id",
+            "origin",
+            "kind",
+            "completeness",
+            "time_basis",
+            "event_count"
+          ],
+          "properties": {
+            "timeline_id": {
+              "type": "string",
+              "pattern": "^(demo|tl-[0-9a-f]{24}|rtl-[0-9a-f]{24})$"
+            },
+            "origin": {
+              "enum": [
+                "demo",
+                "recorded",
+                "reconstructed"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "simulation",
+                "hq_demo"
+              ]
+            },
+            "completeness": {
+              "enum": [
+                "complete",
+                "partial",
+                "open",
+                "interrupted"
+              ]
+            },
+            "time_basis": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "results_sha256",
+            "policy_sha256",
+            "simulation_account_id",
+            "initial_cash",
+            "currency",
+            "saved_at"
+          ],
+          "properties": {
+            "run_id": {
+              "$ref": "#/$defs/run_id"
+            },
+            "results_sha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "policy_sha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "simulation_account_id": {
+              "type": "string",
+              "pattern": "^simacct-[0-9a-f]{24}$"
+            },
+            "initial_cash": {
+              "$ref": "#/$defs/money"
+            },
+            "currency": {
+              "const": "USD"
+            },
+            "saved_at": {
+              "$ref": "#/$defs/utc"
+            }
+          }
+        },
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset_id",
+            "symbol",
+            "interval",
+            "timezone",
+            "data_label",
+            "bars_sha256"
+          ],
+          "properties": {
+            "dataset_id": {
+              "type": "string",
+              "pattern": "^mds-[0-9a-f]{12,64}$"
+            },
+            "symbol": {
+              "type": "string",
+              "pattern": "^[A-Z0-9.\\-]{1,15}$"
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]{1,3}[mhd]$"
+            },
+            "timezone": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "data_label": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,40}$"
+            },
+            "bars_sha256": {
+              "$ref": "#/$defs/sha"
+            }
+          }
+        },
+        "strategies": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "config_sha256"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,40}$"
+              },
+              "config_sha256": {
+                "$ref": "#/$defs/sha"
+              }
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sizing",
+            "exits",
+            "costs",
+            "limits",
+            "entry_strategies"
+          ],
+          "properties": {
+            "sizing": {
+              "type": "object"
+            },
+            "exits": {
+              "type": "object"
+            },
+            "costs": {
+              "type": "object"
+            },
+            "limits": {
+              "type": "object"
+            },
+            "entry_strategies": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kill_switch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "engaged",
+            "source"
+          ],
+          "properties": {
+            "engaged": {
+              "type": "boolean"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/code"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "replay_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_utc",
+            "end_utc",
+            "step_seconds",
+            "steps"
+          ],
+          "properties": {
+            "start_utc": {
+              "$ref": "#/$defs/utc"
+            },
+            "end_utc": {
+              "$ref": "#/$defs/utc"
+            },
+            "step_seconds": {
+              "type": "integer"
+            },
+            "steps": {
+              "type": "integer"
+            }
+          }
+        },
+        "demo": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "account": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "initial_cash",
+            "ending_cash",
+            "ending_equity",
+            "realized_pnl",
+            "unrealized_pnl",
+            "fees_total",
+            "open_position_quantity",
+            "last_close",
+            "last_bar_close_utc",
+            "net_return",
+            "net_return_percent"
+          ],
+          "properties": {
+            "initial_cash": {
+              "$ref": "#/$defs/money"
+            },
+            "ending_cash": {
+              "$ref": "#/$defs/money"
+            },
+            "ending_equity": {
+              "$ref": "#/$defs/money"
+            },
+            "realized_pnl": {
+              "$ref": "#/$defs/money"
+            },
+            "unrealized_pnl": {
+              "$ref": "#/$defs/money"
+            },
+            "fees_total": {
+              "$ref": "#/$defs/money"
+            },
+            "open_position_quantity": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "last_close": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/money"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "last_bar_close_utc": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/utc"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "net_return": {
+              "$ref": "#/$defs/money"
+            },
+            "net_return_percent": {
+              "$ref": "#/$defs/metric"
+            }
+          }
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "positions": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "type": "object"
+          }
+        },
+        "orders": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/order"
+          }
+        },
+        "fills": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/fill"
+          }
+        },
+        "analytics": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "type": "object",
+          "required": [
+            "status",
+            "report"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "available",
+                "unavailable"
+              ]
+            },
+            "report_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/report_id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/code"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rejected_reports": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "report_id",
+                  "code"
+                ],
+                "properties": {
+                  "report_id": {
+                    "$ref": "#/$defs/report_id"
+                  },
+                  "code": {
+                    "$ref": "#/$defs/code"
+                  }
+                }
+              }
+            },
+            "unreadable_reports_skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "scan_limited": {
+              "type": "boolean"
+            },
+            "report": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "report_id",
+                    "results_sha256",
+                    "created_at",
+                    "period",
+                    "closed_trades",
+                    "open_positions",
+                    "drawdown",
+                    "holding",
+                    "exposure",
+                    "orders",
+                    "attribution",
+                    "account",
+                    "equity_curve",
+                    "analytics_config_sha256"
+                  ],
+                  "properties": {
+                    "report_id": {
+                      "$ref": "#/$defs/report_id"
+                    },
+                    "results_sha256": {
+                      "$ref": "#/$defs/sha"
+                    },
+                    "created_at": {
+                      "$ref": "#/$defs/utc"
+                    },
+                    "period": {
+                      "type": "object"
+                    },
+                    "closed_trades": {
+                      "type": "object"
+                    },
+                    "open_positions": {
+                      "type": "array"
+                    },
+                    "drawdown": {
+                      "type": "object"
+                    },
+                    "holding": {
+                      "type": "object"
+                    },
+                    "exposure": {
+                      "type": "object"
+                    },
+                    "orders": {
+                      "type": "object"
+                    },
+                    "attribution": {
+                      "type": "object"
+                    },
+                    "account": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "net_return",
+                        "net_return_percent"
+                      ],
+                      "properties": {
+                        "net_return": {
+                          "$ref": "#/$defs/money"
+                        },
+                        "net_return_percent": {
+                          "$ref": "#/$defs/metric"
+                        }
+                      }
+                    },
+                    "equity_curve": {
+                      "type": "array",
+                      "maxItems": 5001,
+                      "items": {
+                        "$ref": "#/$defs/point"
+                      }
+                    },
+                    "analytics_config_sha256": {
+                      "$ref": "#/$defs/sha"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "separation": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "area",
+              "code",
+              "text"
+            ],
+            "properties": {
+              "area": {
+                "enum": [
+                  "dataset",
+                  "strategy",
+                  "cost_model",
+                  "simulation",
+                  "analytics"
+                ]
+              },
+              "code": {
+                "$ref": "#/$defs/code"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 400
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "money": {
+      "type": "string",
+      "pattern": "^-?[0-9]{1,15}(\\.[0-9]{1,8})?$"
+    },
+    "utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "value",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/money"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "purpose",
+        "side",
+        "quantity",
+        "order_type",
+        "source",
+        "estimate",
+        "expires_at_utc",
+        "status",
+        "history",
+        "fill_id"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/order_id"
+        },
+        "purpose": {
+          "enum": [
+            "entry",
+            "exit"
+          ]
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "order_type": {
+          "const": "market"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "signal_id",
+            "strategy",
+            "rule",
+            "decision_bar_sequence",
+            "decision_at_utc"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "research_signal",
+                "exit_rule"
+              ]
+            },
+            "signal_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/signal_id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strategy": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,40}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rule": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/code"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "decision_bar_sequence": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "decision_at_utc": {
+              "$ref": "#/$defs/utc"
+            }
+          }
+        },
+        "estimate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference_price",
+            "notional"
+          ],
+          "properties": {
+            "reference_price": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/money"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "notional": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/money"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "expires_at_utc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/utc"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "rejected",
+            "filled",
+            "pending_at_end_of_data"
+          ]
+        },
+        "history": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "at_utc",
+              "status",
+              "reason_codes"
+            ],
+            "properties": {
+              "at_utc": {
+                "$ref": "#/$defs/utc"
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "filled",
+                  "pending_at_end_of_data"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/$defs/code"
+                }
+              }
+            }
+          }
+        },
+        "fill_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fill_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fill_id",
+        "order_id",
+        "side",
+        "quantity",
+        "bar_sequence",
+        "bar_open_utc",
+        "open_price",
+        "slippage_bps",
+        "fill_price",
+        "notional",
+        "fee",
+        "cash_change",
+        "gap_before_fill",
+        "reason_codes"
+      ],
+      "properties": {
+        "fill_id": {
+          "$ref": "#/$defs/fill_id"
+        },
+        "order_id": {
+          "$ref": "#/$defs/order_id"
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell"
+          ]
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_open_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "open_price": {
+          "$ref": "#/$defs/money"
+        },
+        "slippage_bps": {
+          "$ref": "#/$defs/money"
+        },
+        "fill_price": {
+          "$ref": "#/$defs/money"
+        },
+        "notional": {
+          "$ref": "#/$defs/money"
+        },
+        "fee": {
+          "$ref": "#/$defs/money"
+        },
+        "cash_change": {
+          "$ref": "#/$defs/money"
+        },
+        "gap_before_fill": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "at_utc",
+        "close",
+        "cash",
+        "position_quantity",
+        "market_value",
+        "equity",
+        "peak_equity",
+        "drawdown",
+        "drawdown_percent"
+      ],
+      "properties": {
+        "sequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "at_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "close": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cash": {
+          "$ref": "#/$defs/money"
+        },
+        "position_quantity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "market_value": {
+          "$ref": "#/$defs/money"
+        },
+        "equity": {
+          "$ref": "#/$defs/money"
+        },
+        "peak_equity": {
+          "$ref": "#/$defs/money"
+        },
+        "drawdown": {
+          "$ref": "#/$defs/money"
+        },
+        "drawdown_percent": {
+          "$ref": "#/$defs/money"
+        }
+      }
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^srun-[0-9a-f]{24}$"
+    },
+    "order_id": {
+      "type": "string",
+      "pattern": "^sord-[0-9a-f]{24}$"
+    },
+    "fill_id": {
+      "type": "string",
+      "pattern": "^sfil-[0-9a-f]{24}$"
+    },
+    "signal_id": {
+      "type": "string",
+      "pattern": "^rsig-[0-9a-f]{24}$"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^sarp-[0-9a-f]{24}$"
+    }
+  }
+}

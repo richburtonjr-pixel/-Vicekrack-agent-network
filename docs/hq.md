@@ -1,4 +1,4 @@
-# ViceKrack Living HQ (Step 32)
+# ViceKrack Living HQ (Steps 32–34)
 
 > **A read-only window, not a control panel.** The Living HQ draws the Step 31 execution
 > timelines as a two-floor headquarters with bots.
@@ -109,7 +109,7 @@ Trading and Content views also list that department's timelines in the inspector
 | Station | Component |
 |---|---|
 | Research controller | `trading.research.controller` |
-| Simulator | `trading.simulation.engine` |
+| Simulator | `trading.simulation.engine` (select it to open the [trading results desk](#trading-results-desk-step-34)) |
 | Workflow orchestrator | `content.workflow.orchestrator` |
 | Production pipeline | `content.production.pipeline` |
 | Brief builder | `content.production.brief` |
@@ -168,6 +168,7 @@ supports it:
   - **House**: the whole building;
   - **Trading**: upstairs;
   - **Content**: downstairs and terrace;
+  - **Results** (Step 34): the [trading results desk](#trading-results-desk-step-34);
   - **Timeline**: the timeline picker and a full event table with "Go" buttons.
 - **Replay:**
   - play, pause, previous and next event, restart, scrub;
@@ -185,7 +186,8 @@ supports it:
   completeness chip stay visible. Keys 1–8 focus a room, 0 shows the whole house, L
   toggles labels, Esc exits.
 - **Keyboard:** Space plays or pauses, ←/→ step, Home restarts, End jumps to the last
-  event. All controls are buttons, so they are reachable with Tab.
+  event, R opens or closes the results desk. All controls are buttons, so they are
+  reachable with Tab.
 - **Reduce motion (M):** bots stop wandering and go straight to their places. Pulses and
   camera moves are off. The system's reduced-motion setting is followed automatically.
 
@@ -199,7 +201,10 @@ supports it:
 | `/` and `/static/{styles.css, hq-core.js, app.js}` | the bundled page; an exact allowlist, so no path is ever joined with user input |
 | `/api/status` | `{"read_only": true}` |
 | `/api/timelines` | demo + recorded + reconstructable timelines (at most 200) |
-| `/api/scene?timeline=ID` | one `hq_scene` 1.0 document; `ID` must be `demo` or `tl-`/`rar-`/`srun-`/`prod-` + 24 hex |
+| `/api/scene?timeline=ID` | one `hq_scene` 1.1 document; `ID` must be `demo`, `tl-`/`rar-`/`srun-`/`prod-` + 24 hex or `wfr-` + 32 hex |
+| `/api/results?timeline=ID` | Step 34 results index for a simulation timeline (no results) |
+| `/api/results/at?timeline=ID&position=N` | the portfolio after the first N events (`N` is 0 to the event count) |
+| `/api/results/summary?timeline=ID` | the completed run summary |
 
 **Request rules:**
 - Every other method returns 405.
@@ -232,6 +237,99 @@ supports it:
 
 `current` is Step 31's honest display of the timeline as loaded.
 
+## Trading results desk (Step 34)
+
+> **SIMULATED and read-only.** The desk displays saved Step 29 simulation runs and Step 30
+> analytics reports. Opening it never runs a simulation, generates analytics, changes an
+> account or kill switch, or calls a provider. There are no trading controls.
+
+![Results desk at a replay position, demo data](images/hq/hq-step34-demo-replay-position.png)
+
+**Opening it:** select the **Simulator** operations station (in the station strip, the
+operations board or the Operations inspector), the **Results** view, the "Open trading
+results desk" button in the Trading inspector, or press **R**. It shows the timeline you
+selected:
+- a reconstructed simulation run (`srun-…`), or a recorded `sim-run --record-events`
+  timeline (`tl-…`) whose run was saved with `--save`;
+- the demo, whose simulator events match a small synthetic run labelled
+  **DEMO DATA · SYNTHETIC · SIMULATED**. Saved runs are labelled **SAVED SIMULATION ·
+  SIMULATED**.
+
+Other timelines (research agents, content) say they are not simulations and list the
+simulation timelines you can pick.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --save --record-events
+.\.venv\Scripts\python.exe -m vicekrack analytics-generate RUN_ID --save
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+### At replay position
+
+The portfolio after the events up to the replay scrubber:
+- initial cash, cash, equity, realized and unrealized P&L, fees so far, the open position
+  and the largest drawdown so far;
+- orders decided so far, with every history entry seen so far and its reason codes
+  (the simulator's own policy checks), the supporting research signal or exit rule, and
+  the estimated notional;
+- fills so far (bar, open price, fill price, notional, fee, cash change, gaps);
+- closed trades so far, and equity and drawdown charts drawn only up to the last bar
+  that had closed (the time axis spans the whole replay window, so the line grows).
+
+The header line separates **simulated market time** (the event's simulated time) from
+**recorded at** (when the event was written; "not recorded" for reconstructed timelines).
+
+**No future data.** The server folds only the first N events and sends nothing later. An
+order is "pending" until its fill event, without its fill ID; equity points appear only
+once their bar has closed; final P&L and end-of-run statistics are not in this view.
+Marks use the close of the last bar that had closed by that simulated time.
+
+**Unavailable rather than invented.** The portfolio is shown only if the timeline is
+complete with no issues, contains every order history entry exactly once, has simulated
+times that never go backwards, and folds to the saved run's ending cash, fees and
+realized P&L. Otherwise the view says it is unavailable and why. Without a matching
+analytics report, equity and unrealized P&L of an open position and the charts are
+unavailable (the bar closes come from the report), while cash, fees, orders and fills are
+still shown.
+
+### Completed run summary
+
+A separate tab, labelled "end-of-run results, not tied to the replay position":
+- final cash, equity, net return (not annualized), realized and unrealized P&L, fees and
+  the position still open at the end;
+- whole-run equity and drawdown charts;
+- closed-trade statistics. A metric Step 30 marks `unavailable` is shown as
+  "Unavailable (no closed trades)" and so on, never as zero;
+- rejections by reason code, strategy attribution with the shared-account explanation,
+  every order and fill.
+
+![Completed run summary, saved simulation](images/hq/hq-step34-saved-completed-summary.png)
+
+### How records are linked
+
+Only by validated IDs and hashes, never by filenames or timestamps:
+- **Timeline ↔ run:** the timeline names the run; every order decision and fill event must
+  equal what the run's own order history implies (simulated time, reason codes, IDs,
+  details), in order. Otherwise `timeline_run_mismatch`, and nothing is combined.
+- **Run ↔ analytics report:** the report's run ID, run results hash, policy hash, dataset ID,
+  bars hash and simulation account ID must equal the run's, and its account figures must
+  equal the run summary. Reports that claim the run but fail are listed with
+  `analytics_report_mismatch`, `analytics_report_inconsistent` or `report_corrupt`. If two
+  valid reports match, the one made with the current analytics config is used; otherwise
+  the result is `analytics_report_ambiguous`.
+- A tampered run gives `sim_run_corrupt`; a recorded timeline whose run was never saved
+  gives `sim_run_not_found`.
+
+**Separation.** The desk shows the simulator's policy checks and order decisions. The
+research agents upstairs (Step 28) are a separate workflow; their conclusions are never
+used by the simulator, and the desk says so.
+
+**Presentation mode (P)** keeps the desk full-screen under the data badge, with larger
+figures, for recording an explanation; ←/→ still step the replay.
+
+![Results desk on a phone, saved simulation](images/hq/hq-step34-saved-phone.png)
+
 ## Limitations
 
 - **Mapping:** the paper journal and other commands still emit no events, so they don't
@@ -249,5 +347,9 @@ supports it:
   timelines were created on disk.
 - **Times:** reconstructed trading timelines have simulated times only, as Step 31 records
   them.
+- **Results desk:** one run at a time; no comparison across runs. Equity marks come from
+  the correlated analytics report, so without one they are unavailable. Tables show at
+  most the last 200 rows (with a note). Charts are simple inline SVG lines, sampled at bar
+  closes; intrabar moves are not shown.
 - **Still to come:** trading controls, publishing, AI calls and multi-user access are not
   part of the HQ.
