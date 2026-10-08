@@ -487,4 +487,3 @@ def reviewable(production_id, root=None, now=None):
                      "decisions_allowed": found["decisions_allowed"],
                      "approval_blockers": found["approval_blockers"]})
     return rows[:40]
-
