@@ -12,6 +12,8 @@ Routes (GET only; everything else is 405):
   /api/content/at?timeline=ID&position=N      Step 35: what a content timeline proves existed after N events
   /api/content/latest?timeline=ID             Step 35: the latest saved production, re-verified now
   /api/content/media?production=PROD&id=MED   Step 35: one validated preview file (bounded byte ranges)
+  /api/sessions                               Step 39: demo + saved trading research sessions (bounded)
+  /api/session?id=ID                          Step 39: one read-only session summary (ID is demo or tss-...)
 
 Boundaries:
 - The Host header must be this loopback server (127.0.0.1 or localhost on its port);
@@ -36,6 +38,7 @@ from .demo import demo_scene
 from .content import content_at, content_latest, media_file
 from .results import results_at, results_index, results_summary
 from .scene import scene_from_view
+from .sessions import SESSION, session_document, session_items
 
 STATIC = Path(__file__).resolve().parent / "static"
 FILES = {"/": ("index.html", "text/html; charset=utf-8"),
@@ -49,6 +52,12 @@ RESULTS_ROUTES = {"/api/results": {"timeline"}, "/api/results/at": {"timeline", 
 POSITION = re.compile(r"^(0|[1-9][0-9]{0,5})$")
 CONTENT_ROUTES = {"/api/content/at": {"timeline", "position"}, "/api/content/latest": {"timeline"}}
 MEDIA_ROUTE = "/api/content/media"
+SESSION_ERRORS = {
+    "session_not_found": (404, "No saved trading session with this ID."),
+    "session_corrupt": (409, "The session record failed validation, so nothing is shown."),
+    "session_checkpoint_corrupt": (409, "The session checkpoint failed validation, so nothing is shown."),
+    "invalid_session_summary": (500, "The session summary could not be built safely."),
+}
 MAX_RANGE_BYTES = 4 * 1024 * 1024          # one response never carries more than this
 MAX_FULL_BYTES = 8 * 1024 * 1024           # larger files are only served as byte ranges
 RANGE = re.compile(r"^bytes=(\d{0,15})-(\d{0,15})$")
@@ -245,7 +254,20 @@ def respond(method, target, headers, *, port, root=None):
             return _json(200, _content(path, parts.query, root))
         if path == MEDIA_ROUTE:
             return _media(parts.query, headers, root)
+        if path == "/api/sessions":
+            if parts.query:
+                return _error(400, "invalid_session_request", "This route takes no parameters.")
+            return _json(200, session_items(root))
+        if path == "/api/session":
+            query = parse_qs(parts.query, max_num_fields=2)
+            values = query.get("id", [])
+            if len(values) != 1 or set(query) != {"id"} or not SESSION.match(values[0]):
+                return _error(400, "invalid_session_id", "Use demo or a tss- session ID.")
+            return _json(200, session_document(values[0], root))
     except NetworkError as error:
+        if error.code in SESSION_ERRORS:
+            status, message = SESSION_ERRORS[error.code]
+            return _error(status, error.code, message)
         if error.code in RESULTS_ERRORS:
             status, message = RESULTS_ERRORS[error.code]
             return _error(status, error.code, message)

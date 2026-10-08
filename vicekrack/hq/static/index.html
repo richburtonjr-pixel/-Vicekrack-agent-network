@@ -31,6 +31,7 @@
         <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
         <button type="button" class="view-btn" data-view="content-results" aria-pressed="false"><span class="ico ico-film" aria-hidden="true"></span>Content results</button>
         <button type="button" class="view-btn" data-view="timeline" aria-pressed="false"><span class="ico ico-clock" aria-hidden="true"></span>Timeline</button>
+        <button type="button" class="view-btn" data-view="sessions" aria-pressed="false"><span class="ico ico-session" aria-hidden="true"></span>Sessions</button>
       </nav>
       <section class="bot-list" aria-labelledby="bots-heading">
         <h2 id="bots-heading">Rooms</h2>
@@ -62,7 +63,7 @@
           <title id="stage-title">ViceKrack headquarters</title>
         </svg>
         <div class="legend" id="legend" aria-label="Status legend"></div>
-        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R trading results &middot; C content results &middot; L labels &middot; Esc exit</div>
+        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R trading results &middot; C content results &middot; S sessions &middot; L labels &middot; Esc exit</div>
         <button type="button" class="present-exit" id="present-exit">Exit presentation</button>
       </section>
 
@@ -126,6 +127,22 @@
         </div>
         <p class="results-where" id="content-where" aria-live="polite"></p>
         <div id="content-body"></div>
+      </section>
+
+      <section class="results-view sessions-view" id="sessions-view" aria-labelledby="sessions-heading" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="sessions-heading">Trading research sessions</h2>
+            <p class="results-sub">Validate dataset &rarr; research agents &rarr; simulation &rarr; analytics &rarr; summary. Read-only: this view cannot start, resume or change a session.</p>
+          </div>
+          <span class="sim-badge" id="session-badge">SIMULATED</span>
+        </div>
+        <div class="session-pick">
+          <label for="session-select">Session</label>
+          <select id="session-select"></select>
+          <button type="button" class="action" id="btn-sessions-refresh">Refresh list</button>
+        </div>
+        <div id="session-body"></div>
       </section>
 
       <footer class="dock" id="dock" aria-label="Replay controls">

@@ -220,6 +220,31 @@
     if (event.details && event.details.attempt > 1) { text += " · attempt " + event.details.attempt; }
     return text;
   }
+  /* Step 39: read-only trading session summaries. */
+  var SESSION_PATTERN = /^(demo|tss-[0-9a-f]{24})$/;
+  var SESSION_STAGES = ["dataset_validation", "research_analysis", "simulation", "performance_analytics", "hq_summary"];
+  function validSession(doc) {
+    if (!doc || doc.contract !== "hq_session" || doc.version !== "1.0" || doc.read_only !== true || doc.simulated !== true ||
+        !SESSION_PATTERN.test(doc.session_id) || !Array.isArray(doc.stages) || doc.stages.length !== 5 || !doc.links) {
+      return false;
+    }
+    return doc.stages.every(function (stage, n) { return stage.stage === SESSION_STAGES[n] && Array.isArray(stage.attempts); });
+  }
+  /* A link opens an existing read-only view; it is usable only when the server established it. */
+  function sessionLink(link) {
+    if (!link || link.available !== true || !link.timeline_id || !ID_PATTERN.test(link.timeline_id)) { return null; }
+    return link.timeline_id;
+  }
+  /* One attempt in words, with its wall-clock times (real time on the computer that ran it). */
+  function attemptText(attempt) {
+    var text = "#" + attempt.attempt + " " + words(attempt.outcome);
+    if (attempt.reason && attempt.reason !== "first_run") { text += " (" + words(attempt.reason) + ")"; }
+    if (attempt.error_code) { text += ": " + words(attempt.error_code); }
+    text += " · started " + formatTime(attempt.started_at) + (attempt.ended_at ? ", ended " + formatTime(attempt.ended_at) : ", end not recorded");
+    if (attempt.timeline_id) { text += " · timeline " + plain(attempt.timeline_id) + (attempt.timeline_outcome ? " (" + words(attempt.timeline_outcome) + ")" : ""); }
+    return text;
+  }
+
   function validScene(scene) {
     return !!scene && scene.contract === "hq_scene" && scene.version === "1.1" && MODES.hasOwnProperty(scene.mode) &&
       Array.isArray(scene.frames) && Array.isArray(scene.rooms) && Array.isArray(scene.stations);
@@ -386,6 +411,7 @@
     STATES: STATES, STATE_ORDER: STATE_ORDER, MODES: MODES, SPEEDS: SPEEDS, ID_PATTERN: ID_PATTERN,
     stateStyle: stateStyle, intentFor: intentFor, Replay: Replay, Graph: Graph, hashSeed: hashSeed, rng: rng,
     wanderChoice: wanderChoice, movementFor: movementFor, MOVEMENT: MOVEMENT, plain: plain, words: words, formatTime: formatTime, describeEvent: describeEvent,
+    SESSION_PATTERN: SESSION_PATTERN, validSession: validSession, sessionLink: sessionLink, attemptText: attemptText,
     validScene: validScene, roomStatesAt: roomStatesAt, counters: counters, lastEventFor: lastEventFor
   };
 }));

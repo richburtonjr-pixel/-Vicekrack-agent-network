@@ -221,4 +221,22 @@ test("Step 35: content documents must be read-only and never publishable", () =>
   assert.ok(!C.validContent(null, "latest"));
 });
 
+test("Step 39: session summaries must be read-only; links open only server-checked timelines", () => {
+  const stages = ["dataset_validation", "research_analysis", "simulation", "performance_analytics", "hq_summary"]
+    .map((stage) => ({ stage, attempts: [] }));
+  const ok = { contract: "hq_session", version: "1.0", read_only: true, simulated: true, session_id: "demo", stages, links: {} };
+  assert.ok(C.validSession(ok));
+  assert.ok(C.validSession(Object.assign({}, ok, { session_id: "tss-" + "a".repeat(24) })));
+  assert.ok(!C.validSession(Object.assign({}, ok, { read_only: false })));
+  assert.ok(!C.validSession(Object.assign({}, ok, { session_id: "../x" })));
+  assert.ok(!C.validSession(Object.assign({}, ok, { stages: stages.slice().reverse() })));
+  assert.ok(!C.validSession(null));
+  assert.strictEqual(C.sessionLink({ available: true, timeline_id: "tl-" + "b".repeat(24) }), "tl-" + "b".repeat(24));
+  assert.strictEqual(C.sessionLink({ available: false, timeline_id: "tl-" + "b".repeat(24) }), null);
+  assert.strictEqual(C.sessionLink({ available: true, timeline_id: "javascript:x" }), null);
+  const text = C.attemptText({ attempt: 2, reason: "retry_after_failure", outcome: "completed", started_at: "2026-01-06T09:05:00Z",
+    ended_at: null, error_code: null, timeline_id: null, timeline_outcome: null });
+  assert.strictEqual(text, "#2 completed (retry after failure) · started 2026-01-06 09:05:00 UTC, end not recorded");
+});
+
 console.log(JSON.stringify({ passed }));

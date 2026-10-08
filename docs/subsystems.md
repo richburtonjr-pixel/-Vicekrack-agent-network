@@ -14,7 +14,7 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30 and 39]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
         T2[market/: offline datasets + replay, no account access]
         T3[indicators/: descriptive values on closed bars, no account access]
@@ -46,7 +46,11 @@ flowchart TB
   indicator results (`runtime/trading/indicators/`), research signals
   (`runtime/trading/signals/`), research-agent runs (`runtime/trading/agents/`) and
   simulation runs (`runtime/trading/simulation/`) and analytics reports
-  (`runtime/trading/analytics/`).
+  (`runtime/trading/analytics/`), and Step 39 research sessions (`runtime/trading/sessions/`).
+- **Session boundary:** `vicekrack/trading/session/` (Step 39) only coordinates the market,
+  research-agent, simulation and analytics modules in a fixed order. It never imports the
+  account state, risk engine, order or journal modules, and passes no research output to
+  the simulator.
 - **Market-data boundary:** `vicekrack/trading/market/` (Step 25) never imports the
   account state, risk engine, order or journal modules. Replay can't authorize anything
   or change an account.

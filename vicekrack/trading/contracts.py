@@ -36,6 +36,10 @@ SCHEMAS = {
     "simulation_policy": "simulation-policy", "simulation_order": "simulation-order", "simulation_fill": "simulation-fill",
     "simulation_position": "simulation-position", "cash_ledger_entry": "cash-ledger-entry", "simulation_run": "simulation-run",
     "simulation_analytics_report": "simulation-analytics-report", "analytics_config": "analytics-config",
+    "trading_session_config": "trading-session-config", "trading_session": "trading-session",
+    "trading_session_checkpoint": "trading-session-checkpoint",
+    "trading_session_dataset_check": "trading-session-dataset-check",
+    "trading_session_manifest": "trading-session-manifest",
 }
 FUTURE_SKEW = timedelta(seconds=5)
 # Field names that must never appear in trading data (in addition to the shared core list).
