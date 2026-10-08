@@ -1,7 +1,8 @@
 /* ViceKrack Living HQ (Step 32): read-only visual Command Center.
  *
  * Safety rules for this file:
- * - Only GET requests to the read-only /api/ routes (timelines, scene, results, content, sessions). No other
+ * - Only GET requests to the read-only /api/ routes (timelines, scene, results, content, sessions, broker-paper).
+ *   No other
  *   network use.
  * - All text from the server is inserted with textContent / setAttribute, never as HTML.
  * - Status shown for a room always comes from the scene frame at the replay position (or the
@@ -1044,18 +1045,20 @@
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
-    var sessions = view === "sessions";
+    var sessions = view === "sessions", broker = view === "broker";
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
     $("sessions-view").hidden = !sessions;
-    $("stage-wrap").hidden = timeline || results || content || sessions || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions);
-    document.body.classList.toggle("results-open", results || content || sessions);
-    document.body.classList.toggle("sessions-open", sessions);       // replay controls belong to the house timeline
+    $("broker-view").hidden = !broker;
+    $("stage-wrap").hidden = timeline || results || content || sessions || broker || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker);
+    document.body.classList.toggle("results-open", results || content || sessions || broker);
+    document.body.classList.toggle("sessions-open", sessions || broker);   // replay controls belong to the house timeline
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
     if (sessions) { loadSessions(); }
+    if (broker) { loadBroker(); }
     R.renderedKey = null;
     CT.renderedKey = null;
     renderStatuses(false);
@@ -2370,6 +2373,124 @@
     para("p", { class: "muted small" }, body, doc.notice);
   }
 
+
+  /* ------------------------------------------------------------------ Step 41: Alpaca PAPER broker status (read-only)
+   * Only GET /api/broker-paper and /api/broker-paper/intent. There is no control here that prepares,
+   * submits, refreshes or cancels an order; commands are shown as text for a terminal. */
+  var BK = { doc: null, intent: null, selected: null, error: null, generation: 0 };
+  var BROKER_ID = /^bpi-[0-9a-f]{24}$/;
+  function loadBroker() {
+    BK.generation += 1;
+    var generation = BK.generation;
+    return getJSON("/api/broker-paper").then(function (doc) {
+      if (generation !== BK.generation) { return; }
+      if (!doc || doc.contract !== "hq_broker_paper" || doc.read_only !== true || doc.simulated !== false ||
+          doc.real_money !== false || !Array.isArray(doc.intents)) { throw new Error("invalid_broker_view"); }
+      BK.doc = doc; BK.error = null;
+      if (!BK.selected && doc.intents.length) { BK.selected = doc.intents[0].intent_id; }
+      renderBroker();
+      return BK.selected ? loadBrokerIntent(BK.selected) : null;
+    }).catch(function (error) {
+      if (generation !== BK.generation) { return; }
+      BK.doc = null; BK.error = error.message; renderBroker();
+    });
+  }
+  function loadBrokerIntent(id) {
+    if (!BROKER_ID.test(id)) { return Promise.resolve(); }
+    BK.selected = id;
+    var generation = BK.generation;
+    return getJSON("/api/broker-paper/intent?id=" + encodeURIComponent(id)).then(function (doc) {
+      if (generation !== BK.generation) { return; }
+      if (!doc || doc.contract !== "hq_broker_paper_intent" || doc.read_only !== true || doc.intent_id !== id) {
+        throw new Error("invalid_broker_view");
+      }
+      BK.intent = doc; renderBroker();
+    }).catch(function (error) { BK.intent = null; BK.error = error.message; renderBroker(); });
+  }
+  function stateTone(state) {
+    if (state === "filled") { return "pos"; }
+    if (state === "unknown" || state === "mismatch" || state === "other_broker_state") { return "warn"; }
+    return "";
+  }
+  function renderBroker() {
+    var body = $("broker-body");
+    clear(body);
+    var doc = BK.doc;
+    if (!doc) {
+      h("p", { class: "notice warn" }, body, BK.error ? "The paper-broker records could not be shown (" + C.words(BK.error) +
+        "). Nothing was changed." : "Loading saved paper-broker records…");
+      return;
+    }
+    para("p", { class: "separation" }, body, doc.notice);
+    var facts = h("div", { class: "facts" }, body);
+    row(facts, "Kill switch", doc.kill_switch.engaged ? "ENGAGED (" + C.words(doc.kill_switch.source) +
+      "): new paper submissions are blocked; status checks and cancel requests stay allowed" : "released");
+    row(facts, "Last account check", doc.last_check ? C.formatTime(doc.last_check.checked_at) + " · " +
+      doc.last_check.account_status + " · trading " + (doc.last_check.trading_allowed ? "allowed" : "NOT allowed") +
+      " · market " + (doc.last_check.market_open ? "open" : "closed") + " · account " + doc.last_check.account_fingerprint :
+      "none recorded");
+    if (doc.unreconciled) {
+      h("p", { class: "notice warn" }, body, doc.unreconciled + (doc.unreconciled === 1 ? " order is" : " orders are") +
+        " not reconciled with the broker (unknown outcome or mismatch). New paper submissions are blocked until a status " +
+        "refresh resolves " + (doc.unreconciled === 1 ? "it" : "them") + ".");
+    }
+    var tiles = h("div", { class: "tiles" }, body);
+    tile(tiles, "Intents", String(doc.total), doc.total > doc.shown_limit ? "showing " + doc.shown_limit : null);
+    tile(tiles, "Open at broker", String(doc.open_orders), "as of last refresh");
+    tile(tiles, "Unreconciled", String(doc.unreconciled), null, doc.unreconciled ? "neg" : "");
+    if (!doc.intents.length) {
+      h("p", { class: "notice" }, body, "No paper-broker activity is recorded on this computer.");
+    } else {
+      table(body, "Paper intents (newest first; states as of each order's last refresh)",
+        ["Intent", "Order", "Max cost", "State", "Filled", "Last refresh", ""],
+        doc.intents.map(function (r) {
+          var open = h("button", { type: "button", class: "linkish", "data-intent": r.intent_id }, null,
+            r.intent_id === BK.selected ? "Shown" : "Show");
+          open.addEventListener("click", function () { loadBrokerIntent(r.intent_id); });
+          var state = h("span", { class: "state-chip " + stateTone(r.state) }, null, C.words(r.state) +
+            (r.reconciled ? "" : " · not reconciled"));
+          return [idCode(r.intent_id), r.side + " " + r.qty + " " + r.symbol + " limit " + C.money(r.limit_price),
+            C.money(r.max_notional), state, r.filled_qty + (r.filled_avg_price ? " @ " + C.money(r.filled_avg_price) : ""),
+            r.last_observed_at ? C.formatTime(r.last_observed_at) : "never", open];
+        }));
+    }
+    var d = BK.intent;
+    if (d && d.intent_id === BK.selected) {
+      var box = h("section", { class: "data-source", "aria-label": "Selected paper intent" }, body);
+      h("h3", {}, box, "Intent " + d.intent_id);
+      var f = h("div", { class: "facts" }, box);
+      row(f, "Order", d.side + " " + d.qty + " " + d.symbol + " · limit " + C.money(d.limit_price) + " · " + d.time_in_force +
+        " · regular session only");
+      row(f, "Worst-case cost", C.money(d.max_notional) + " (quantity × limit price)");
+      row(f, "State", C.words(d.state) + (d.terminal ? " (final)" : "") + (d.reconciled ? "" : " · NOT reconciled"));
+      row(f, "Broker status", d.broker_status ? d.broker_status + " · filled " + d.filled_qty +
+        (d.filled_avg_price ? " @ " + C.money(d.filled_avg_price) : "") : "not confirmed by the broker");
+      row(f, "Client order ID", idCode(d.client_order_id));
+      row(f, "Submitted", d.submitted_at ? C.formatTime(d.submitted_at) + " (wall clock) · answer: " + C.words(d.outcome) : "not submitted");
+      if (d.quote_at_preparation) {
+        row(f, "Quote at preparation", "bid " + C.money(d.quote_at_preparation.bid) + " · ask " +
+          C.money(d.quote_at_preparation.ask) + " · " + C.formatTime(d.quote_at_preparation.quote_time_utc) + " (" +
+          d.quote_at_preparation.feed + ")");
+      }
+      para("p", { class: "muted small" }, box, d.exposure);
+      if (d.submission_checks) {
+        table(box, "Checks passed immediately before submission", ["Check", "Result"], d.submission_checks.map(function (c) {
+          return [C.words(c.check), c.passed ? "passed" : "BLOCKED: " + C.words(c.reason)];
+        }));
+      }
+      table(box, "Events (sanitized; wall-clock times)", ["#", "Event", "Recorded at", "State", "Reason codes"],
+        d.events.map(function (e) {
+          return [String(e.sequence), C.words(e.event_type), C.formatTime(e.recorded_at),
+            e.details.state ? C.words(e.details.state) + (e.details.broker_status ? " (" + e.details.broker_status + ")" : "") : "-",
+            codeList(e.reason_codes)];
+        }));
+      var commands = h("div", { class: "notice" }, box);
+      h("strong", {}, commands, "Commands (run in a terminal; this page cannot run them)");
+      var list = h("ul", { class: "commands" }, commands);
+      d.commands.forEach(function (command) { h("code", {}, h("li", {}, list), command); });
+    }
+  }
+
   /* ------------------------------------------------------------------ controls */
   function toggle(id, key) {
     S[key] = !S[key];
@@ -2402,6 +2523,7 @@
     $("present-exit").addEventListener("click", function () { setPresenting(false); });
     $("btn-refresh").addEventListener("click", loadTimelines);
     $("btn-sessions-refresh").addEventListener("click", loadSessions);
+    $("btn-broker-refresh").addEventListener("click", loadBroker);
     $("session-select").addEventListener("change", function (e) { loadSession(e.target.value); });
     $("res-tab-position").addEventListener("click", function () { setResultsTab("position"); });
     $("res-tab-summary").addEventListener("click", function () { setResultsTab("summary"); });
@@ -2429,6 +2551,7 @@
       else if (e.key === "v" || e.key === "V") { $("btn-list").click(); }
       else if (e.key === "r" || e.key === "R") { if (S.view === "results") { setView("house"); } else { openResults(); } }
       else if (e.key === "c" || e.key === "C") { if (S.view === "content-results") { setView("house"); } else { openContent(); } }
+      else if (e.key === "b" || e.key === "B") { S.focusRoom = null; setView(S.view === "broker" ? "house" : "broker"); }
       else if (e.key === "s" || e.key === "S") { S.focusRoom = null; setView(S.view === "sessions" ? "house" : "sessions"); }
       else if (e.key === "Escape") { if (S.presenting) { setPresenting(false); } else { select(null); } }
       else if (S.presenting && /^[0-8]$/.test(e.key)) { focusRoom(e.key === "0" ? null : BOT_ROOMS[Number(e.key) - 1]); }

@@ -137,8 +137,9 @@ def source_hash(provider):
     return sha256({"request": provider["request_sha256"], "responses": [r["sha256"] for r in provider["responses"]]})
 
 
-def urllib_transport(url, headers, *, timeout, max_bytes):
-    """One HTTPS GET with certificate verification, no redirects and a byte cap.
+def urllib_transport(url, headers, *, timeout, max_bytes, method="GET", body=None):
+    """One HTTPS request (GET by default; Step 41's paper broker also sends POST and DELETE) with certificate
+    verification, no redirects and a byte cap. Only https:// URLs are accepted.
     Returns (status, lower-case headers, body bytes). Never raises with response or header text."""
     import socket
     import ssl
@@ -149,8 +150,10 @@ def urllib_transport(url, headers, *, timeout, max_bytes):
         def redirect_request(self, *args, **kwargs):
             return None
 
+    if not isinstance(url, str) or not url.startswith("https://") or method not in ("GET", "POST", "DELETE"):
+        raise TradingError("provider_unreachable", "Only HTTPS GET, POST or DELETE requests are allowed.")
     opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ssl.create_default_context()))
-    request = urllib.request.Request(url, headers=headers, method="GET")
+    request = urllib.request.Request(url, headers=headers, method=method, data=body)
     try:
         with opener.open(request, timeout=timeout) as response:
             return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read(max_bytes + 1)

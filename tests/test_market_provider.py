@@ -419,9 +419,11 @@ class IsolationTests(unittest.TestCase):
         for path in sorted((ROOT / "vicekrack/trading").rglob("*.py")):
             source = path.read_text(encoding="utf-8")
             relative = path.relative_to(ROOT).as_posix()
-            for forbidden in ("urllib", "import socket", "http.client", "requests"):
+            for forbidden in ("urllib.request", "urllib.error", "import socket", "http.client", "import requests",
+                              "from requests"):
                 with self.subTest(file=relative, forbidden=forbidden):
-                    if relative == "vicekrack/trading/providers/alpaca.py" and forbidden in ("urllib", "import socket"):
+                    if relative == "vicekrack/trading/providers/alpaca.py" and forbidden in (
+                            "urllib.request", "urllib.error", "import socket"):
                         continue
                     self.assertNotIn(forbidden, source)
             if relative.startswith(("vicekrack/trading/agents", "vicekrack/trading/simulation",

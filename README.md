@@ -87,7 +87,8 @@ for mock. Real providers require a model supporting structured JSON and account 
 The included models are gpt-4.1-mini and claude-sonnet-4-6.
 
 `.env.example` contains only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries (and, since
-Step 40, blank APCA_API_KEY_ID and APCA_API_SECRET_KEY for the optional Alpaca download). The
+Step 40, blank APCA_API_KEY_ID and APCA_API_SECRET_KEY for the optional Alpaca download, and since Step 41
+blank ALPACA_PAPER_API_KEY_ID and ALPACA_PAPER_API_SECRET_KEY for the paper broker). The
 application reads process environment variables; it does not load .env files. Never put
 credentials into task JSON, registry entries, prompts, or source control.
 
@@ -1629,3 +1630,63 @@ Remove-Item Env:APCA_API_KEY_ID, Env:APCA_API_SECRET_KEY
 ![Sessions view showing the historical data source of a dataset fetched from a mocked Alpaca response](docs/images/providers/step40-session-data-source.png)
 
 See [Historical market data from Alpaca](docs/market-providers.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 41: Alpaca paper broker (paper only, explicit)
+
+An adapter for an Alpaca **paper** trading account. It handles explicit order submission
+and order-status tracking, with **no real money**, and uses only
+`https://paper-api.alpaca.markets` (plus `data.alpaca.markets` for one fresh quote).
+- **Never automatic.** Research signals, datasets, sessions and simulations never become
+  orders.
+- **Nothing runs on its own:** no polling, streaming or retries.
+- **Live paper access is unverified.** This step was tested only with a mocked Alpaca; no
+  real request was made.
+
+**1. Paper credentials** (separate names from the Step 40 data keys; environment only):
+
+```powershell
+$env:ALPACA_PAPER_API_KEY_ID = [System.Net.NetworkCredential]::new('', (Read-Host 'Alpaca PAPER key ID' -AsSecureString)).Password
+$env:ALPACA_PAPER_API_SECRET_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Alpaca PAPER secret key' -AsSecureString)).Password
+```
+
+**2. Check, prepare, submit, track, cancel:**
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-check --allow-network
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-prepare --symbol AAPL --side buy --qty 1 --limit-price 190.10 --allow-network
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-submit INTENT_ID --consent paper-execute:INTENT_ID --allow-network
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-status INTENT_ID --allow-network
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-cancel INTENT_ID --consent paper-cancel:INTENT_ID --allow-network
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-list
+.\.venv\Scripts\python.exe -m vicekrack broker-paper-kill-switch engage
+Remove-Item Env:ALPACA_PAPER_API_KEY_ID, Env:ALPACA_PAPER_API_SECRET_KEY
+```
+
+**3. View (read-only):** run `.\.venv\Scripts\python.exe -m vicekrack hq-serve`, then
+open **Paper broker** (or press `B`).
+
+- **Orders:** long-only, whole-share, day limit orders for eligible US stocks in the
+  regular session. A buy's worst-case cost is quantity × limit price, checked against the
+  order and position limits and against buying power. Pending buy orders count as reserved.
+- **Prepare, then consent:**
+  - `prepare` shows the concrete proposal and saves an immutable intent.
+  - `submit` needs `--consent paper-execute:INTENT_ID`.
+  - Immediately before submission, everything is re-checked: the account, the clock and
+    session, asset eligibility, a fresh quote, the spread and price band, positions, open
+    orders, the limits, the kill switch and local reconciliation.
+- **At most once per intent:**
+  - the client order ID is fixed in advance;
+  - the attempt is saved before the request;
+  - the OS lock blocks concurrent runs, and a second submission is refused.
+- **Unknown outcomes:** timeouts and 5xx answers are recorded as `unknown` and are never
+  resent; `broker-paper-status` reconciles them by client order ID. New exposure is
+  blocked until everything is reconciled. Exactly-once execution is not claimed.
+- **Cancellation:** a cancel request is not a confirmed cancellation, because fills can
+  race it. Status checks and cancel requests are allowed while the kill switch is engaged.
+- **Stored records:** keys, raw responses, the account ID or number, and balances are never
+  stored. Records are kept separate from the offline simulator and from Step 24 local paper
+  accounts.
+
+![Paper broker view (mocked Alpaca paper data)](docs/images/broker/step41-paper-broker-desktop.png)
+
+See [Alpaca paper broker](docs/broker-paper.md) and the [Roadmap](docs/roadmap.md).

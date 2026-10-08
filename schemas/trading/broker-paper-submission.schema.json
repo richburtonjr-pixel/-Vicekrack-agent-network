@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/broker-paper-submission.schema.json",
+  "title": "Alpaca paper submission attempt (Step 41, written before the request)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "intent_id",
+    "client_order_id",
+    "started_at",
+    "checks",
+    "endpoint"
+  ],
+  "properties": {
+    "contract": {
+      "const": "broker_paper_submission"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "intent_id": {
+      "type": "string",
+      "pattern": "^bpi-[0-9a-f]{24}$"
+    },
+    "client_order_id": {
+      "type": "string",
+      "pattern": "^vk-[0-9a-f]{24}$"
+    },
+    "started_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check",
+          "passed",
+          "reason"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "endpoint": {
+      "const": "https://paper-api.alpaca.markets"
+    }
+  }
+}

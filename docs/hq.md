@@ -520,3 +520,17 @@ dataset after it is re-validated:
   after, and the gaps (no market calendar).
 
 If the dataset no longer validates, the panel says so and shows nothing from it.
+
+## Paper broker view (Step 41)
+
+**Paper broker** (or the `B` key) lists saved Alpaca PAPER intents. It is read-only and
+labelled **ALPACA PAPER · NOT SIMULATION · NO REAL MONEY**.
+- **Summary:** the kill switch, the last account check, and counts of open and
+  unreconciled orders.
+- **Each intent:** the proposal and its worst-case cost, and the state with the broker's
+  status and fills as of the last explicit refresh. Unreconciled intents carry a warning.
+- **The selected intent:** the checks that passed before submission, its sanitized events,
+  and terminal commands as text.
+
+The view never contacts Alpaca and has no order controls. Its records are kept out of the
+house and the simulation results desk.

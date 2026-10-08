@@ -14,6 +14,8 @@ Routes (GET only; everything else is 405):
   /api/content/media?production=PROD&id=MED   Step 35: one validated preview file (bounded byte ranges)
   /api/sessions                               Step 39: demo + saved trading research sessions (bounded)
   /api/session?id=ID                          Step 39: one read-only session summary (ID is demo or tss-...)
+  /api/broker-paper                           Step 41: saved Alpaca PAPER broker intents and states (read-only)
+  /api/broker-paper/intent?id=bpi-...         Step 41: one paper intent with its sanitized events (read-only)
 
 Boundaries:
 - The Host header must be this loopback server (127.0.0.1 or localhost on its port);
@@ -37,6 +39,7 @@ from ..errors import NetworkError
 from .demo import demo_scene
 from .content import content_at, content_latest, media_file
 from .results import results_at, results_index, results_summary
+from .broker import broker_index, broker_intent
 from .scene import scene_from_view
 from .sessions import SESSION, session_document, session_items
 
@@ -52,7 +55,11 @@ RESULTS_ROUTES = {"/api/results": {"timeline"}, "/api/results/at": {"timeline", 
 POSITION = re.compile(r"^(0|[1-9][0-9]{0,5})$")
 CONTENT_ROUTES = {"/api/content/at": {"timeline", "position"}, "/api/content/latest": {"timeline"}}
 MEDIA_ROUTE = "/api/content/media"
+BROKER_INTENT = re.compile(r"^bpi-[0-9a-f]{24}$")
 SESSION_ERRORS = {
+    "intent_not_found": (404, "No saved paper intent with this ID."),
+    "broker_record_corrupt": (409, "The saved paper-broker records failed validation, so nothing is shown."),
+    "invalid_broker_view": (500, "The paper-broker view could not be built safely."),
     "session_not_found": (404, "No saved trading session with this ID."),
     "session_corrupt": (409, "The session record failed validation, so nothing is shown."),
     "session_checkpoint_corrupt": (409, "The session checkpoint failed validation, so nothing is shown."),
@@ -254,6 +261,16 @@ def respond(method, target, headers, *, port, root=None):
             return _json(200, _content(path, parts.query, root))
         if path == MEDIA_ROUTE:
             return _media(parts.query, headers, root)
+        if path == "/api/broker-paper":
+            if parts.query:
+                return _error(400, "invalid_broker_request", "This route takes no parameters.")
+            return _json(200, broker_index(root))
+        if path == "/api/broker-paper/intent":
+            query = parse_qs(parts.query, max_num_fields=2)
+            values = query.get("id", [])
+            if len(values) != 1 or set(query) != {"id"} or not BROKER_INTENT.match(values[0]):
+                return _error(400, "invalid_intent_id", "Use a bpi- intent ID.")
+            return _json(200, broker_intent(values[0], root))
         if path == "/api/sessions":
             if parts.query:
                 return _error(400, "invalid_session_request", "This route takes no parameters.")

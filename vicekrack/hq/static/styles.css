@@ -402,3 +402,15 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
   background: #0d1218; }
 .data-source h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .data-source .v { overflow-wrap: anywhere; }
+
+/* Step 41: Alpaca PAPER broker status (read-only; visually distinct from simulation) */
+.ico-broker { background: #f59e0b; clip-path: polygon(10% 20%, 90% 20%, 90% 80%, 10% 80%, 10% 20%, 20% 35%, 20% 65%, 80% 65%,
+  80% 35%, 20% 35%); }
+.sim-badge.broker { color: #fde68a; border-color: #d97706; background: #1f1505; }
+.broker-view .separation { border-left-color: #f59e0b; background: #1a1408; color: #fde9c0; }
+.state-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid #2a3440; font-size: 12px; }
+.state-chip.pos { border-color: #2d7f6a; color: #a7f3d0; }
+.state-chip.warn { border-color: #b45309; color: #fde68a; background: #1f1505; }
+.linkish { background: transparent; border: 1px solid #2a3440; border-radius: 6px; padding: 2px 8px; font-size: 12px; color: #9be7ff; }
+.broker-view .sim-badge.broker { white-space: normal; text-align: center; }
+.broker-view .results-table code { word-break: break-all; }

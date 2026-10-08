@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/broker-paper-check.schema.json",
+  "title": "Alpaca paper account check (Step 41, sanitized)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "check_id",
+    "contract",
+    "version",
+    "mode",
+    "endpoint",
+    "checked_at",
+    "account_fingerprint",
+    "account_status",
+    "currency",
+    "trading_blocked",
+    "account_blocked",
+    "trade_suspended_by_user",
+    "trading_allowed",
+    "market_open",
+    "clock_time_utc",
+    "next_open_utc",
+    "next_close_utc",
+    "credentials_recorded"
+  ],
+  "properties": {
+    "check_id": {
+      "type": "string",
+      "pattern": "^bpc-[0-9a-f]{24}$"
+    },
+    "contract": {
+      "const": "broker_paper_check"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "mode": {
+      "const": "alpaca_paper"
+    },
+    "endpoint": {
+      "const": "https://paper-api.alpaca.markets"
+    },
+    "checked_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "account_fingerprint": {
+      "type": "string",
+      "pattern": "^pacct-[0-9a-f]{24}$"
+    },
+    "account_status": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "currency": {
+      "type": "string",
+      "maxLength": 8
+    },
+    "trading_blocked": {
+      "type": "boolean"
+    },
+    "account_blocked": {
+      "type": "boolean"
+    },
+    "trade_suspended_by_user": {
+      "type": "boolean"
+    },
+    "trading_allowed": {
+      "type": "boolean"
+    },
+    "market_open": {
+      "type": "boolean"
+    },
+    "clock_time_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "next_open_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "next_close_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "credentials_recorded": {
+      "const": false
+    }
+  }
+}
