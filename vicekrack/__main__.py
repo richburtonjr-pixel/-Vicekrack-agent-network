@@ -92,6 +92,10 @@ def main():
         from .trading.cli import main as trading_main
         return trading_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"export-preview", "export-verify"}:
+        from .export_cli import main as export_main
+        return export_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"review-record", "review-list", "review-inspect"}:
         from .review_cli import main as review_main
         return review_main()

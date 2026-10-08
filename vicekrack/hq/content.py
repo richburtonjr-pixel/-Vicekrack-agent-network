@@ -76,7 +76,8 @@ NOTICE = ("Read-only display of one saved content production. Preview only: publ
 DEMO_NOTICE = "DEMO DATA: a synthetic production with no media files; not a saved run. " + NOTICE
 RESTRICTIONS = [
     "publishable: false. Every preview is preview-only and watermarked; this desk cannot change that.",
-    "The HQ records nothing: review decisions are made only with review-record (Step 37) and approve a preview only. No export, upload or publishing exists (portable export is deferred work).",
+    "The HQ records and exports nothing: review decisions are made only with review-record (Step 37) and approve a "
+    "preview only; local packages are made only with export-preview (Step 38). No upload or publishing exists.",
     "Claim status comes from the Verification stage; nothing here re-checks facts or rights.",
 ]
 VERIFICATION_LIMITS = [

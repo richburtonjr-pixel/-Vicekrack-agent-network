@@ -998,3 +998,34 @@ flowchart LR
   route or control writes reviews.
 - **Trust model:** local and self-declared. Labels are not identities, and records are not
   signed.
+
+## Step 38: portable preview packages
+
+- **Modules and schemas:**
+  - `vicekrack/export.py` (`PreviewExporter`, `render_page`, `verify_package`);
+  - `vicekrack/export_cli.py` (`export-preview`, `export-verify`);
+  - schemas `content-preview-package` (manifest), `content-review-summary` and
+    `content-provenance-summary` (both derived, `derived: true`).
+- **Inputs:** the same production lock as resume, quality checks and reviews. Each source
+  is read once through `safe_file` (inside its folder, no `..`, no links), and the bound
+  rows of the report's `binding` are compared with those bytes. Gates reuse
+  `verify_binding` and Step 37 `history`.
+- **Payload:** original bytes for the video, posters, script and quality report. Derived
+  JSON summaries keep source IDs and hashes. The page is rendered with `html.escape`
+  everywhere and inline CSS only; it has a restrictive CSP and no script.
+- **Publication:**
+  1. write to a staging directory with exclusive creates and fsync;
+  2. re-hash the staged files;
+  3. re-read the sources and the review history (a test seam `_between_checks` sits here);
+  4. rename to a fresh `pkg-<id>`, never over an existing one.
+- **Hash direction:** manifest → payload files. Nothing in the payload names the manifest's
+  hash, and the manifest does not list itself.
+- **Verification:** works on the package alone. It checks the inventory with `os.walk`
+  (no links), sizes and hashes, then the schemas. It also cross-checks the references:
+  - report ID, hash and binding digest against the manifest;
+  - payload files against the report's bound rows;
+  - the review summary against the purpose and privacy flags.
+
+  The page is checked with an HTML parser for scripts, handlers, active elements and
+  references outside the package.
+- **Trust model:** consistency only, no signatures. Snapshots are dated by `exported_at`.

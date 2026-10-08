@@ -150,6 +150,6 @@ inconsistent times make historical review status `unavailable`.
   label. There is no sign-in, signature or identity check.
 - **Local trust only.** Someone with write access to the folder can delete or forge review
   files consistently. Corruption checks catch inconsistent edits, not a careful forger.
-- **Not built:** publishing approval, exports, uploads, automatic revisions and any
-  dashboard write control. Portable export packages are still deferred (see the
-  [Roadmap](roadmap.md)).
+- **Not built:** publishing approval, uploads, automatic revisions and any dashboard write
+  control. Approved previews can be packaged locally with `export-preview --purpose
+  approved_preview` (Step 38, see [Portable preview packages](export.md)).
