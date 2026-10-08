@@ -360,7 +360,8 @@ class StaticSafetyTests(unittest.TestCase):
             self.assertEqual(re.findall(r"https?://[^\"' ]+", source), ["http://www.w3.org/2000/svg"] if name == "app.js" else [])
         app = sources["app.js"]
         self.assertEqual(app.count("window.fetch("), 1)                     # one GET helper
-        self.assertEqual(sorted(set(re.findall(r"\"(/api/[a-z]+)", app))), ["/api/scene", "/api/timelines"])
+        self.assertEqual(sorted(set(re.findall(r"\"(/api/[a-z/]+)", app))),        # Step 34 adds the results routes
+                         ["/api/results", "/api/results/at", "/api/results/summary", "/api/scene", "/api/timelines"])
         self.assertIn('method: "GET"', app)
         self.assertIn("MAX_POLLS = 900", app)
         self.assertIn("document.hidden", app)
@@ -384,7 +385,7 @@ class StaticSafetyTests(unittest.TestCase):
     def test_client_logic_in_node(self):
         result = subprocess.run(["node", str(ROOT / "tests/hq_client_test.js")], capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 11})
+        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 14})
 
 
 @unittest.skipUnless(os.environ.get("RUN_LOCAL_BROWSER_TESTS") == "1", "set RUN_LOCAL_BROWSER_TESTS=1 (needs Playwright + Chromium)")

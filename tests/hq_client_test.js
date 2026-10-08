@@ -156,4 +156,44 @@ test("movement is described honestly and never as activity when roaming", () => 
     details: { attempt: 1 } }, "Researcher").includes("not run again"));
 });
 
+test("Step 34: money keeps every digit, groups thousands and never rounds", () => {
+  assert.strictEqual(C.money("10000"), "$10,000.00");
+  assert.strictEqual(C.money("9996.00225"), "$9,996.00225");
+  assert.strictEqual(C.money("-3.99775"), "-$3.99775");
+  assert.strictEqual(C.money("-3.99775", true), "-$3.99775");
+  assert.strictEqual(C.money("1.5", true), "+$1.50");
+  assert.strictEqual(C.money("0", true), "$0.00");
+  assert.strictEqual(C.money("-0"), "$0.00");
+  assert.strictEqual(C.money("1234567.12345678"), "$1,234,567.12345678");
+  ["", "1e5", "NaN", "1,000", null, "12.", " 1"].forEach((bad) => assert.strictEqual(C.money(bad), "invalid"));
+});
+
+test("Step 34: percentages round half-even on the decimal text (display only)", () => {
+  const cases = { "0.125": "0.12", "0.135": "0.14", "0.1251": "0.13", "99.995": "100.00", "-0.0399775": "-0.04",
+    "-0.005": "0.00", "30": "30.00", "9.999": "10.00", "-1.005": "-1.00", "0.045095": "0.05" };
+  Object.keys(cases).forEach((value) => assert.strictEqual(C.roundText(value, 2), cases[value], value));
+  assert.strictEqual(C.percent("0.045095", true), "+0.05%");
+  assert.strictEqual(C.percent("-0.0399775", true), "-0.04%");
+  assert.strictEqual(C.percent("0", true), "0.00%");
+  assert.strictEqual(C.roundText("abc", 2), null);
+});
+
+test("Step 34: unavailable metrics stay unavailable (never zero) and positions never run ahead", () => {
+  assert.strictEqual(C.metricText({ status: "unavailable", value: null, reason: "no_closed_trades" }), "Unavailable (no closed trades)");
+  assert.strictEqual(C.metricText({ status: "available", value: "0", reason: null }, C.percent), "0.00%");
+  assert.strictEqual(C.metricText(null), "Unavailable (unknown)");
+  assert.strictEqual(C.resultsPosition(-1, 8, false), 0);
+  assert.strictEqual(C.resultsPosition(3, 8, false), 4);
+  assert.strictEqual(C.resultsPosition(50, 8, false), 8);
+  assert.strictEqual(C.resultsPosition(2, 8, true), 8);
+  assert.ok(C.validResults({ contract: "hq_results", version: "1.0", simulated: true, read_only: true, view: "index" }, "index"));
+  assert.ok(!C.validResults({ contract: "hq_results", version: "1.0", simulated: false, read_only: true, view: "index" }, "index"));
+  assert.ok(!C.validResults({ contract: "hq_results", version: "1.0", simulated: true, read_only: true, view: "index" }, "replay_position"));
+  assert.strictEqual(C.prose("a\u0000b".repeat(400)).length, 600);
+  const g = C.scale([{ at_utc: "2026-01-05T14:30:00Z", equity: "100" }, { at_utc: "2026-01-05T14:35:00Z", equity: "90" }], "equity",
+    100, 50, { l: 0, r: 0, t: 0, b: 0 }, [Date.parse("2026-01-05T14:30:00Z"), Date.parse("2026-01-05T15:30:00Z")]);
+  assert.ok(g.px(g.points[1].x) < 10);            // the fixed replay window keeps future time empty, not stretched
+  assert.strictEqual(C.nearestIndex([0, 10, 20], 14), 1);
+});
+
 console.log(JSON.stringify({ passed }));

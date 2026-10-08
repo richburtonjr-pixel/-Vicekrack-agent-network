@@ -131,4 +131,5 @@ consistency, and gives `report_corrupt` if edited.
   liquidity or market impact, long-only, one position at a time.
 - **Unrealized P&L ignores exit costs**, and open positions are not liquidated.
 - **Equity is sampled at bar closes only**; intrabar drawdown isn't measured.
-- No dashboards, optimization, live data or brokers.
+- No optimization, live data or brokers. The Living HQ [trading results desk](hq.md#trading-results-desk-step-34)
+  (Step 34) only displays saved reports; it never generates them.

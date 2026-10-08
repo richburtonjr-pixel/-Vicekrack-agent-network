@@ -832,3 +832,51 @@ flowchart LR
     occupancy for idle spots.
 - **Step 31 contracts are extended additively:** `stage_reused`, `details.attempt`, `wfr-`
   and `qr-` references, two timeline kinds, and the `none_saved` time basis.
+
+## Step 34: trading results desk
+
+```mermaid
+flowchart LR
+    TL[Step 31 loader: tl- / srun- timeline] --> C{correlate}
+    RUN[(Step 29 SimulationStore: srun-)] --> C
+    C -- every trading event equals the run's own order history --> F[fold events 1..N]
+    REP[(Step 30 AnalyticsStore: sarp-)] -- run, results, policy, dataset, account hashes --> A{match report}
+    RUN --> A
+    F --> AT["/api/results/at: portfolio after N events"]
+    A -- bar closes at or before the simulated time --> AT
+    RUN --> SUM["/api/results/summary: completed run"]
+    A --> SUM
+    AT --> UI[Results view / simulator station]
+    SUM --> UI
+```
+
+- `vicekrack/hq/results.py` builds three `hq_results` 1.0 documents
+  (`schemas/hq-results.schema.json`), each validated before it is sent:
+  - `index`: run identity, correlation, analytics status, whether intermediate state can
+    be shown, and outcome-free limitations. It holds no results;
+  - `replay_position`: the portfolio after the first N timeline events;
+  - `completed_run_summary`: end-of-run figures, clearly labelled.
+- **Correlation** (`correlate`): the timeline must be a trading `simulation` naming a
+  saved run. Each `order_decision` / `simulated_fill` event must equal what Step 31's
+  `order_event_fields` / `fill_event_fields` derive from the run's order history entry
+  (simulated time, reason codes, refs, details), in history order; dataset and run refs
+  must match. Anything else is `timeline_run_mismatch`. Analytics reports are matched by
+  content (`source` hashes and account figures), never by filename or time; claims that
+  fail are listed as `analytics_report_mismatch`, `analytics_report_inconsistent` or
+  `report_corrupt`. Two valid matches prefer the current analytics config, otherwise
+  `analytics_report_ambiguous`.
+- **No future data:** the position document is computed on the server from events
+  `1..N` only. Orders carry only the history entries seen so far (`pending` until their
+  fill event), and equity points only bars closed by that event's simulated time. Marks
+  are the last closed bar's close. Seeking is stateless.
+- **Unavailable instead of invented:** intermediate state needs a complete timeline with
+  no issues, every order history entry exactly once, non-decreasing simulated times, and
+  a fold that reproduces the run's ending cash, fees and realized P&L.
+- **Demo:** `hq/results_demo.py` is a small synthetic run matching the demo house's
+  simulator events (correlated with the same rules), clearly labelled.
+- **API:** `/api/results`, `/api/results/at` and `/api/results/summary` are GET-only,
+  exact-match routes with a strict query allowlist, fixed error codes and messages, and
+  the existing Host/Origin and CSP rules. They only load re-validated saved records.
+- **Client:** a Results view (charts drawn as inline SVG at their real width, data tables,
+  tile KPIs), opened from the simulator station, the trading inspector or **R**. It
+  requests only the latest replay position and ignores stale responses.

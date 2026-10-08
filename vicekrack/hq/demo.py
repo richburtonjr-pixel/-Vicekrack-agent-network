@@ -5,7 +5,8 @@ workflow orders and every event passes the same Step 31 payload validation as re
 - trading research: controller -> market scout -> trend -> strategy (fails) -> risk review
   (blocked) -> controller fails;
 - the Step 5 roles: orchestrator -> Researcher -> Analyst -> Reviewer -> orchestrator;
-- simulated order decisions and a fill at the simulator station;
+- simulated order decisions and a fill at the simulator station (Step 34: they match the demo results
+  desk's synthetic run in `results_demo.py` exactly);
 - the production pipeline: brief builder -> Creator -> script validator -> scene planner ->
   preview renderer -> pipeline done, then a quality check.
 Times and IDs are synthetic. It shows idle, working, waiting, blocked, completed and failed
@@ -28,6 +29,7 @@ def _id(prefix, name):
 
 DATASET = {"kind": "dataset", "id": _id("mds", "dataset")}
 ORDER_1, ORDER_2, FILL_1 = _id("sord", "order-1"), _id("sord", "order-2"), _id("sfil", "fill-1")
+SIGNAL_1, SIGNAL_2, RUN = _id("rsig", "signal-1"), _id("rsig", "signal-2"), _id("srun", "run")
 PRODUCTION = {"kind": "production", "id": _id("prod", "production")}
 ONE = {"attempt": 1}
 
@@ -55,18 +57,20 @@ SCRIPT = (
     (ENGINE, "replay", "stage_started", "started", [], [DATASET], {}, 0),
     (P + "pipeline", "pipeline", "stage_started", "started", [], [PRODUCTION], {}, None),
     (P + "brief", "brief", "stage_started", "started", [], [], ONE, None),
-    (ENGINE, "replay", "order_decision", "accepted", ["signal_accepted_by_policy"], [{"kind": "order", "id": ORDER_1}],
-     {"purpose": "entry", "side": "buy", "quantity": 10, "strategy": "ema-cross-3-5", "bar_sequence": 7}, 35),
+    (ENGINE, "replay", "order_decision", "accepted", ["signal_accepted_by_policy", "fills_at_next_available_open"],
+     [{"kind": "order", "id": ORDER_1}, {"kind": "research_signal", "id": SIGNAL_1}],
+     {"purpose": "entry", "side": "buy", "quantity": 10, "strategy": "ema-cross-3-5", "rule": None, "bar_sequence": 7}, 35),
     (P + "brief", "brief", "stage_completed", "completed", [], [], ONE, None),
     (P + "creator", "creator", "stage_started", "started", [], [], ONE, None),
     (ENGINE, "replay", "simulated_fill", "filled", ["filled_at_bar_open"],
      [{"kind": "fill", "id": FILL_1}, {"kind": "order", "id": ORDER_1}],
-     {"purpose": "entry", "side": "buy", "quantity": 10, "bar_sequence": 8}, 40),
+     {"purpose": "entry", "side": "buy", "quantity": 10, "bar_sequence": 8}, 35),
     (P + "creator", "creator", "stage_completed", "completed", [], [], ONE, None),
-    (ENGINE, "replay", "order_decision", "rejected", ["position_already_open"], [{"kind": "order", "id": ORDER_2}],
-     {"purpose": "entry", "side": "buy", "quantity": 10, "strategy": "breakout-3", "bar_sequence": 9}, 45),
+    (ENGINE, "replay", "order_decision", "rejected", ["position_already_open"],
+     [{"kind": "order", "id": ORDER_2}, {"kind": "research_signal", "id": SIGNAL_2}],
+     {"purpose": "entry", "side": "buy", "quantity": 10, "strategy": "breakout-3", "rule": None, "bar_sequence": 9}, 45),
     (P + "validate", "validate", "stage_started", "started", [], [], ONE, None),
-    (ENGINE, "replay", "stage_completed", "completed", [], [], {}, 50),
+    (ENGINE, "replay", "stage_completed", "completed", [], [{"kind": "simulation_run", "id": RUN}], {}, 50),
     (P + "validate", "validate", "stage_completed", "completed", [], [], ONE, None),
     (P + "plan", "plan", "stage_started", "started", [], [], ONE, None),
     (P + "plan", "plan", "stage_completed", "completed", [], [], ONE, None),
