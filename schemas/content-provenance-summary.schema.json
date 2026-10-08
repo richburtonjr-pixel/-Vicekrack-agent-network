@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "content_provenance_summary",
+  "description": "Step 38 DERIVED readable summary of a production's brief, sources and verification record, made at export time. Not the originals; their IDs and hashes are kept.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "derived",
+    "statement",
+    "sources_of_truth",
+    "brief",
+    "verification",
+    "evidence_at_export"
+  ],
+  "properties": {
+    "contract": {
+      "const": "content_provenance_summary"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "derived": {
+      "const": true
+    },
+    "statement": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "sources_of_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brief",
+        "verification_record"
+      ],
+      "properties": {
+        "brief": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sha256"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "verification_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sha256"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ver-[0-9a-f]{24}$"
+            },
+            "sha256": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "brief": {
+      "type": "object",
+      "required": [
+        "brief_id",
+        "claims",
+        "sources"
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "record_id",
+        "status",
+        "verified_at",
+        "limitations"
+      ]
+    },
+    "evidence_at_export": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "age_hours",
+        "max_age_days"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unavailable"
+          ]
+        },
+        "age_hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max_age_days": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1468,3 +1468,54 @@ automatic revision; the portable export package remains deferred.
 ![Human review decisions in the Content Results Desk](docs/images/hq/hq-step37-reviews-desktop.png)
 
 See [Human review](docs/review.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 38: portable, locally viewable preview packages
+
+`export-preview` copies one completed production into a self-contained folder you can open
+offline, move, and check later. Nothing is uploaded or published.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack export-preview PRODUCTION_ID --report REPORT_ID --purpose review_copy
+.\.venv\Scripts\python.exe -m vicekrack export-preview PRODUCTION_ID --report REPORT_ID --purpose approved_preview
+.\.venv\Scripts\python.exe -m vicekrack export-verify runtime\exports\pkg-...
+```
+
+- **Contents:**
+  - the preview MP4 (narration as rendered) and scene posters;
+  - the script;
+  - a derived source/provenance summary;
+  - the bound quality report (original bytes);
+  - a derived review snapshot;
+  - `index.html`, a static review page;
+  - `package.json`, a versioned manifest listing every other file's path, size and SHA-256.
+    It never lists itself.
+- **Purposes:** `review_copy` is marked **FOR REVIEW**. `approved_preview` needs a current
+  Step 37 approval of this exact report and binding, and keeps its acknowledgments. Neither
+  grants permission to publish: `publishable: false`, draft markings and the difference
+  between technical checks, factual verification and rights clearance are kept.
+- **Gates:** export is refused for any of these:
+  - a binding that no longer matches;
+  - a technical `fail`;
+  - a corrupted review history;
+  - a missing or changed artifact;
+  - an unsafe path or link.
+- **Consistent and atomic.** The export holds the production lock and reads every source
+  once. It re-verifies the copied bytes and re-checks every source before an atomic rename
+  to a new package ID. Concurrent changes refuse the export, and nothing is overwritten.
+- **Offline page:** escaped text, relative links only, no JavaScript, fonts, trackers or
+  remote resources.
+- **Privacy:** only allowlisted files are exported. Never included: production state,
+  configuration, credentials, environment data, raw exceptions and original narration
+  files. Reviewer labels and notes are left out unless you pass
+  `--include-reviewer-labels` / `--include-review-notes`.
+- **Verify anywhere:** `export-verify` checks the inventory, sizes, hashes, schemas and
+  internal references without the original production. Hashes are consistency checks,
+  **not signatures**.
+
+Review status and evidence freshness inside a package are snapshots at export time, not
+promises. Packages live in `runtime/exports/` (ignored by Git). Their scripts, media and
+any included review notes may contain sensitive content.
+
+![Approved preview package opened offline](docs/images/export/step38-package-desktop.png)
+
+See [Portable preview packages](docs/export.md) and the [Roadmap](docs/roadmap.md).

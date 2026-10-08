@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "content_preview_package",
+  "description": "Step 38 portable content-preview package manifest. Lists every payload file except itself (no circular hashes). Hashes are consistency checks, not signatures. publishable is always false; review and evidence status are snapshots at export time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "package_id",
+    "purpose",
+    "purpose_label",
+    "exported_at",
+    "production_id",
+    "source",
+    "snapshot_at_export",
+    "restrictions",
+    "statements",
+    "privacy",
+    "integrity",
+    "files"
+  ],
+  "properties": {
+    "contract": {
+      "const": "content_preview_package"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "package_id": {
+      "type": "string",
+      "pattern": "^pkg-[0-9a-f]{24}$"
+    },
+    "purpose": {
+      "enum": [
+        "review_copy",
+        "approved_preview"
+      ]
+    },
+    "purpose_label": {
+      "enum": [
+        "FOR REVIEW - not approved, not for publishing",
+        "APPROVED FOR PREVIEW ONLY - not approved for publishing"
+      ]
+    },
+    "exported_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "production_id": {
+      "type": "string",
+      "pattern": "^prod-[0-9a-f]{24}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quality_report_id",
+        "quality_report_sha256",
+        "binding_digest",
+        "preview_manifest_version",
+        "preview_manifest_sha256",
+        "approval_review_id"
+      ],
+      "properties": {
+        "quality_report_id": {
+          "type": "string",
+          "pattern": "^qr-[0-9a-f]{24}$"
+        },
+        "quality_report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "binding_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "preview_manifest_version": {
+          "enum": [
+            "1.0",
+            "1.1"
+          ]
+        },
+        "preview_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approval_review_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^rev-[0-9a-f]{24}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "snapshot_at_export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "technical_result",
+        "artifact_binding",
+        "review_history",
+        "current_preview_approval",
+        "evidence"
+      ],
+      "properties": {
+        "technical_result": {
+          "enum": [
+            "pass",
+            "needs_review"
+          ]
+        },
+        "artifact_binding": {
+          "const": "matching"
+        },
+        "review_history": {
+          "enum": [
+            "none_saved",
+            "available"
+          ]
+        },
+        "current_preview_approval": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "age_hours",
+            "max_age_days"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unavailable"
+              ]
+            },
+            "age_hours": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max_age_days": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "restrictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publishable",
+        "preview_only",
+        "draft",
+        "for_review",
+        "watermark"
+      ],
+      "properties": {
+        "publishable": {
+          "const": false
+        },
+        "preview_only": {
+          "const": true
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "for_review": {
+          "type": "boolean"
+        },
+        "watermark": {
+          "enum": [
+            "DRAFT - NOT FOR PRODUCTION",
+            "LOCAL PREVIEW - NOT FOR PUBLISHING"
+          ]
+        }
+      }
+    },
+    "statements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_labels_included",
+        "review_notes_included",
+        "narration_source_included",
+        "production_state_included",
+        "configuration_included"
+      ],
+      "properties": {
+        "reviewer_labels_included": {
+          "type": "boolean"
+        },
+        "review_notes_included": {
+          "type": "boolean"
+        },
+        "narration_source_included": {
+          "const": false
+        },
+        "production_state_included": {
+          "const": false
+        },
+        "configuration_included": {
+          "const": false
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash",
+        "manifest_lists_itself",
+        "note"
+      ],
+      "properties": {
+        "hash": {
+          "const": "sha256"
+        },
+        "manifest_lists_itself": {
+          "const": false
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 400
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "role",
+          "bytes",
+          "sha256",
+          "derived",
+          "source_id",
+          "source_sha256",
+          "index"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(index\\.html|media/preview\\.mp4|media/scene-[1-8]\\.png|content/script\\.json|content/provenance\\.json|quality/quality-report\\.json|review/review-summary\\.json)$"
+          },
+          "role": {
+            "enum": [
+              "video",
+              "poster",
+              "script",
+              "quality_report",
+              "provenance_summary",
+              "review_summary",
+              "review_page"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "derived": {
+            "type": "boolean"
+          },
+          "source_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Za-z0-9._:-]{1,80}$"
+          },
+          "source_sha256": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 8
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "approved_preview"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "approval_review_id": {
+                "type": "string",
+                "pattern": "^rev-[0-9a-f]{24}$"
+              }
+            }
+          },
+          "snapshot_at_export": {
+            "properties": {
+              "current_preview_approval": {
+                "const": true
+              }
+            }
+          },
+          "restrictions": {
+            "properties": {
+              "for_review": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "restrictions": {
+            "properties": {
+              "for_review": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
