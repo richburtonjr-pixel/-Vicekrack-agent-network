@@ -880,3 +880,61 @@ flowchart LR
 - **Client:** a Results view (charts drawn as inline SVG at their real width, data tables,
   tile KPIs), opened from the simulator station, the trading inspector or **R**. It
   requests only the latest replay position and ignores stale responses.
+
+## Step 35: content results desk
+
+```mermaid
+flowchart LR
+    ST[(Step 21 ProductionStore.read: state.json)] --> AV[Artifacts: path + hash + contract + chain]
+    AV --> LAT["/api/content/latest"]
+    TL[Step 31 loader: prod- / tl- production or quality timeline] --> EST{establish: completions proven by the timeline}
+    ST --> EST
+    EST --> AT["/api/content/at: artifacts proven at event N"]
+    AV --> AT
+    QR[(runtime/quality qr-*.json)] -- production_id + file name = report ID --> BIND[binding: stale / unverified]
+    ST --> BIND
+    BIND --> LAT
+    BIND --> AT
+    AV -- opaque med- IDs --> MED["/api/content/media: bounded byte ranges"]
+    LAT --> UI[Content results view / Creator room / production stations]
+    AT --> UI
+    MED --> UI
+```
+
+- `vicekrack/hq/content.py` builds `hq_content` 1.0 documents
+  (`schemas/hq-content.schema.json`), validated before they are sent:
+  - `at_position`: stages folded from events `1..N` and only the proven artifacts;
+  - `latest`: the saved state, recorded attempts (matched by run and correlation ID), all
+    artifacts and every matching quality report.
+- **Reads only.** `ProductionStore.read` (no lock: `inspect_production` would create a lock
+  file), artifact files, the verification record (with the production's own policy hash),
+  quality reports and event timelines. Nothing is written, locked, drafted, rendered,
+  probed or checked.
+- **`Artifacts`** re-implements the resume-time checks of Step 21 without raising:
+  - `safe_file` refuses absolute paths, `..`, backslashes and any symbolic link on the
+    way;
+  - files are size-bounded, then checked by SHA-256 against the state and by contract
+    validator;
+  - the chain is checked by IDs, embedded copies and hashes.
+  The first failure marks later artifacts `unavailable`.
+- **`establish`** decides at which event each saved artifact is proven to exist:
+  - reconstructed productions use their own trace;
+  - recorded attempts compare saved finish times with the attempt's window;
+  - quality timelines compare finish times with the check's start.
+  Any doubt makes historical viewing unavailable.
+- **Quality binding:** the Step 22 contract has no artifact hashes, so a report is `stale`
+  (it predates the artifacts or saw another status) or `unverified`, never current.
+- **Demo:** `hq/content_demo.py` loads a committed fixture (`content_demo.json`: a brief,
+  mock script and plan made once offline) and re-validates it on load. The demo house's
+  quality event now names its synthetic report.
+- **API:** two JSON routes and a media route, exact-match with strict query allowlists and
+  fixed error codes. Media uses opaque IDs, one read per request (the bytes that are
+  hashed are the bytes served), and single bounded ranges. The CSP adds
+  `media-src 'self'`. The server ignores a cancelled range write.
+- **Client:** a Content results view with tables for every section, poster grid and video
+  player. It keeps one `<video>` element across replay steps, so stepping doesn't reset
+  playback. Text is inserted with `textContent`. Links open only through `window.open`
+  with `noopener,noreferrer` after a click.
+- **CI:** a `browser` job installs `requirements-browser.txt` (render requirements +
+  pinned Playwright) and Chromium, then runs the whole network-blocked suite with
+  `RUN_LOCAL_RENDER_TESTS=1` and `RUN_LOCAL_BROWSER_TESTS=1`.

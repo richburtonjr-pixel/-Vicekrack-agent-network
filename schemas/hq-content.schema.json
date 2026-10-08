@@ -1,0 +1,3655 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hq_content",
+  "description": "Living HQ content results desk documents (Step 35): at_position (only what the timeline proves existed at that event) and latest (every artifact re-verified now). Read-only display data; publishable is always false.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "demo",
+        "read_only",
+        "timeline",
+        "production",
+        "restrictions",
+        "notice",
+        "view",
+        "label",
+        "stages",
+        "trace_entries",
+        "attempts",
+        "artifacts",
+        "quality"
+      ],
+      "properties": {
+        "contract": {
+          "const": "hq_content"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "demo": {
+          "type": "boolean"
+        },
+        "read_only": {
+          "const": true
+        },
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timeline_id",
+            "origin",
+            "kind",
+            "completeness",
+            "issues",
+            "event_count",
+            "time_basis",
+            "started_at"
+          ],
+          "properties": {
+            "timeline_id": {
+              "type": "string",
+              "pattern": "^(demo|tl-[0-9a-f]{24}|rtl-[0-9a-f]{24})$"
+            },
+            "origin": {
+              "enum": [
+                "demo",
+                "recorded",
+                "reconstructed"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "content_production",
+                "content_quality",
+                "hq_demo"
+              ]
+            },
+            "completeness": {
+              "enum": [
+                "complete",
+                "partial",
+                "open",
+                "interrupted"
+              ]
+            },
+            "issues": {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "$ref": "#/$defs/code"
+              }
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "time_basis": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/utc"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "production": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "production_id",
+            "status",
+            "created_at",
+            "updated_at",
+            "profile",
+            "record_id",
+            "selection_run_id",
+            "creator",
+            "narration",
+            "allow_draft_preview"
+          ],
+          "properties": {
+            "production_id": {
+              "$ref": "#/$defs/production_id"
+            },
+            "status": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "created_at": {
+              "$ref": "#/$defs/utc"
+            },
+            "updated_at": {
+              "$ref": "#/$defs/utc"
+            },
+            "profile": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "record_id": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "selection_run_id": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "creator": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "adapter",
+                "model",
+                "paid"
+              ],
+              "properties": {
+                "adapter": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "model": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "paid": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "narration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "configured",
+                "sha256"
+              ],
+              "properties": {
+                "configured": {
+                  "type": "boolean"
+                },
+                "sha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "allow_draft_preview": {
+              "type": "boolean"
+            }
+          }
+        },
+        "restrictions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "publishable",
+            "preview_only",
+            "draft",
+            "claims_unverified",
+            "allow_draft_preview",
+            "statements"
+          ],
+          "properties": {
+            "publishable": {
+              "const": false
+            },
+            "preview_only": {
+              "const": true
+            },
+            "draft": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "claims_unverified": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "allow_draft_preview": {
+              "type": "boolean"
+            },
+            "statements": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "notice": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "view": {
+          "const": "latest"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "status",
+              "attempts",
+              "started_at",
+              "finished_at",
+              "error_code"
+            ],
+            "properties": {
+              "stage": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "status": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "attempts": {
+                "type": "integer"
+              },
+              "started_at": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/utc"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "finished_at": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/utc"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/code"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "trace_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "timeline_id",
+              "kind",
+              "started_at",
+              "completeness",
+              "outcome",
+              "stages_run",
+              "stages_reused",
+              "failures"
+            ],
+            "properties": {
+              "timeline_id": {
+                "type": "string",
+                "pattern": "^(demo|tl-[0-9a-f]{24})$"
+              },
+              "kind": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "started_at": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/utc"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "completeness": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "stages_run": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                  "type": "string",
+                  "maxLength": 20
+                }
+              },
+              "stages_reused": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                  "type": "string",
+                  "maxLength": 20
+                }
+              },
+              "failures": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "stage",
+                    "codes"
+                  ],
+                  "properties": {
+                    "stage": {
+                      "type": "string",
+                      "maxLength": 20
+                    },
+                    "codes": {
+                      "type": "array",
+                      "maxItems": 40,
+                      "items": {
+                        "$ref": "#/$defs/code"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brief",
+            "script",
+            "validation",
+            "plan",
+            "preview",
+            "verification"
+          ],
+          "properties": {
+            "brief": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason",
+                "data"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "verified",
+                    "not_produced",
+                    "missing",
+                    "tampered",
+                    "mismatched",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "brief_id",
+                        "topic",
+                        "angle",
+                        "format",
+                        "language",
+                        "content_profile",
+                        "claims",
+                        "sources",
+                        "constraints",
+                        "provenance",
+                        "editorial"
+                      ],
+                      "properties": {
+                        "brief_id": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "topic": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "angle": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "format": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "language": {
+                          "type": "string",
+                          "maxLength": 10
+                        },
+                        "content_profile": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "claims": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "claim_id",
+                              "text",
+                              "status",
+                              "source_ids",
+                              "record_claim_id",
+                              "verification_status"
+                            ],
+                            "properties": {
+                              "claim_id": {
+                                "type": "string",
+                                "maxLength": 128
+                              },
+                              "text": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "status": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "source_ids": {
+                                "type": "array",
+                                "maxItems": 20,
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 128
+                                }
+                              },
+                              "record_claim_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 128
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "verification_status": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "sources": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "source_id",
+                              "title",
+                              "publisher",
+                              "kind",
+                              "url",
+                              "link_allowed",
+                              "accessed_at"
+                            ],
+                            "properties": {
+                              "source_id": {
+                                "type": "string",
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "publisher": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "link_allowed": {
+                                "type": "boolean"
+                              },
+                              "accessed_at": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/$defs/utc"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "constraints": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "avoid",
+                            "disclosures",
+                            "tone"
+                          ],
+                          "properties": {
+                            "avoid": {
+                              "type": "array",
+                              "maxItems": 5,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 100
+                              }
+                            },
+                            "disclosures": {
+                              "type": "array",
+                              "maxItems": 4,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 120
+                              }
+                            },
+                            "tone": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 60
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "created_by",
+                            "provider",
+                            "model",
+                            "created_at"
+                          ],
+                          "properties": {
+                            "created_by": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "provider": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "model": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "created_at": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/$defs/utc"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "editorial": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "script": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason",
+                "data"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "verified",
+                    "not_produced",
+                    "missing",
+                    "tampered",
+                    "mismatched",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "script_id",
+                        "title",
+                        "angle",
+                        "format",
+                        "duration_seconds",
+                        "beats",
+                        "captions",
+                        "audio",
+                        "disclosures",
+                        "sources",
+                        "provenance"
+                      ],
+                      "properties": {
+                        "script_id": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "title": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "angle": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "format": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "duration_seconds": {
+                          "type": "number"
+                        },
+                        "beats": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "beat",
+                              "start_seconds",
+                              "end_seconds",
+                              "narration",
+                              "on_screen_text",
+                              "claim_ids",
+                              "visual",
+                              "sound_cue"
+                            ],
+                            "properties": {
+                              "beat": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "start_seconds": {
+                                "type": "number"
+                              },
+                              "end_seconds": {
+                                "type": "number"
+                              },
+                              "narration": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "on_screen_text": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "claim_ids": {
+                                "type": "array",
+                                "maxItems": 8,
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 128
+                                }
+                              },
+                              "visual": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "description",
+                                  "preferred_method",
+                                  "fallback_methods",
+                                  "source_ids",
+                                  "avoid"
+                                ],
+                                "properties": {
+                                  "description": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "preferred_method": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  "fallback_methods": {
+                                    "type": "array",
+                                    "maxItems": 6,
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    }
+                                  },
+                                  "source_ids": {
+                                    "type": "array",
+                                    "maxItems": 20,
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 128
+                                    }
+                                  },
+                                  "avoid": {
+                                    "type": "array",
+                                    "maxItems": 5,
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    }
+                                  }
+                                }
+                              },
+                              "sound_cue": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 80
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "captions": {
+                          "type": "object"
+                        },
+                        "audio": {
+                          "type": "object"
+                        },
+                        "disclosures": {
+                          "type": "array",
+                          "maxItems": 4,
+                          "items": {
+                            "type": "string",
+                            "maxLength": 120
+                          }
+                        },
+                        "sources": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "source_id",
+                              "title",
+                              "publisher",
+                              "kind",
+                              "url",
+                              "link_allowed",
+                              "accessed_at"
+                            ],
+                            "properties": {
+                              "source_id": {
+                                "type": "string",
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "publisher": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "link_allowed": {
+                                "type": "boolean"
+                              },
+                              "accessed_at": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/$defs/utc"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "created_by",
+                            "provider",
+                            "model",
+                            "created_at"
+                          ],
+                          "properties": {
+                            "created_by": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "provider": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "model": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "created_at": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/$defs/utc"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "validation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason",
+                "data"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "verified",
+                    "not_produced",
+                    "missing",
+                    "tampered",
+                    "mismatched",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "draft",
+                        "claims_unverified",
+                        "claims_total"
+                      ],
+                      "properties": {
+                        "draft": {
+                          "type": "boolean"
+                        },
+                        "claims_unverified": {
+                          "type": "integer"
+                        },
+                        "claims_total": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "plan": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason",
+                "data"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "verified",
+                    "not_produced",
+                    "missing",
+                    "tampered",
+                    "mismatched",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "plan_id",
+                        "mode",
+                        "blocked_for_production",
+                        "unverified_claim_ids",
+                        "assets_produced",
+                        "available_methods",
+                        "duration_seconds",
+                        "scenes"
+                      ],
+                      "properties": {
+                        "plan_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "mode": {
+                          "enum": [
+                            "production",
+                            "draft"
+                          ]
+                        },
+                        "blocked_for_production": {
+                          "type": "boolean"
+                        },
+                        "unverified_claim_ids": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "string",
+                            "maxLength": 128
+                          }
+                        },
+                        "assets_produced": {
+                          "type": "boolean"
+                        },
+                        "available_methods": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "string",
+                            "maxLength": 40
+                          }
+                        },
+                        "duration_seconds": {
+                          "type": "number"
+                        },
+                        "scenes": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "index",
+                              "beat",
+                              "start_seconds",
+                              "end_seconds",
+                              "selected_method",
+                              "considered_methods",
+                              "narration",
+                              "on_screen_text",
+                              "poster"
+                            ],
+                            "properties": {
+                              "index": {
+                                "type": "integer"
+                              },
+                              "beat": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "start_seconds": {
+                                "type": "number"
+                              },
+                              "end_seconds": {
+                                "type": "number"
+                              },
+                              "selected_method": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "considered_methods": {
+                                "type": "array",
+                                "maxItems": 8,
+                                "items": {
+                                  "type": "object"
+                                }
+                              },
+                              "narration": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "on_screen_text": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "poster": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "index",
+                                  "status",
+                                  "reason",
+                                  "media_id"
+                                ],
+                                "properties": {
+                                  "index": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "status": {
+                                    "enum": [
+                                      "not_hash_bound",
+                                      "missing",
+                                      "tampered",
+                                      "not_produced"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/$defs/code"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "media_id": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/$defs/media_id"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "preview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason",
+                "data"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "verified",
+                    "not_produced",
+                    "missing",
+                    "tampered",
+                    "mismatched",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "video",
+                        "format",
+                        "audio_present",
+                        "narration",
+                        "publishable",
+                        "preview_only",
+                        "watermark",
+                        "limitations"
+                      ],
+                      "properties": {
+                        "video": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "sha256",
+                            "media_id",
+                            "bytes"
+                          ],
+                          "properties": {
+                            "sha256": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{64}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "media_id": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/$defs/media_id"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "bytes": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "format": {
+                          "type": "object"
+                        },
+                        "audio_present": {
+                          "type": "boolean"
+                        },
+                        "narration": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "configured",
+                            "sha256",
+                            "source_duration_seconds",
+                            "note"
+                          ],
+                          "properties": {
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "sha256": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{64}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "source_duration_seconds": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "note": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          }
+                        },
+                        "publishable": {
+                          "const": false
+                        },
+                        "preview_only": {
+                          "const": true
+                        },
+                        "watermark": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "limitations": {
+                          "type": "array",
+                          "maxItems": 12,
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "verification": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "record_id",
+                "status",
+                "reason",
+                "verified_at",
+                "claims",
+                "summary",
+                "flags",
+                "limitations"
+              ],
+              "properties": {
+                "record_id": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "status": {
+                  "enum": [
+                    "verified",
+                    "unavailable",
+                    "not_established_at_position"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/code"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verified_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/utc"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "claims": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "claim_id",
+                      "text",
+                      "status",
+                      "rationale_codes",
+                      "rationale",
+                      "primary_support",
+                      "independent_origins"
+                    ],
+                    "properties": {
+                      "claim_id": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 400
+                      },
+                      "status": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "rationale_codes": {
+                        "type": "array",
+                        "maxItems": 10,
+                        "items": {
+                          "type": "string",
+                          "maxLength": 64
+                        }
+                      },
+                      "rationale": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 400
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "primary_support": {},
+                      "independent_origins": {}
+                    }
+                  }
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "flags": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                },
+                "limitations": {
+                  "type": "array",
+                  "maxItems": 10,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                }
+              }
+            }
+          }
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reports",
+            "rejected_reports",
+            "unreadable_reports_skipped",
+            "binding_note",
+            "status"
+          ],
+          "properties": {
+            "reports": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "report_id",
+                  "checked_at",
+                  "result",
+                  "binding",
+                  "binding_reasons",
+                  "reasons",
+                  "counts",
+                  "checks",
+                  "scope",
+                  "notes"
+                ],
+                "properties": {
+                  "report_id": {
+                    "$ref": "#/$defs/report_id"
+                  },
+                  "checked_at": {
+                    "$ref": "#/$defs/utc"
+                  },
+                  "result": {
+                    "enum": [
+                      "pass",
+                      "needs_review",
+                      "fail"
+                    ]
+                  },
+                  "binding": {
+                    "enum": [
+                      "stale",
+                      "unverified"
+                    ]
+                  },
+                  "binding_reasons": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "$ref": "#/$defs/code"
+                    }
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "$ref": "#/$defs/code"
+                    }
+                  },
+                  "counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  },
+                  "checks": {
+                    "type": "array",
+                    "maxItems": 12,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "check_id",
+                        "status",
+                        "reasons",
+                        "details"
+                      ],
+                      "properties": {
+                        "check_id": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "status": {
+                          "enum": [
+                            "pass",
+                            "needs_review",
+                            "fail",
+                            "unavailable"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "maxItems": 40,
+                          "items": {
+                            "$ref": "#/$defs/code"
+                          }
+                        },
+                        "details": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  },
+                  "scope": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "technical_checks_only",
+                      "factual_accuracy_verified",
+                      "rights_cleared",
+                      "publishable",
+                      "permission_to_publish"
+                    ],
+                    "properties": {
+                      "technical_checks_only": {
+                        "const": true
+                      },
+                      "factual_accuracy_verified": {
+                        "const": false
+                      },
+                      "rights_cleared": {
+                        "const": false
+                      },
+                      "publishable": {
+                        "const": false
+                      },
+                      "permission_to_publish": {
+                        "const": false
+                      }
+                    }
+                  },
+                  "notes": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 300
+                    }
+                  }
+                }
+              }
+            },
+            "rejected_reports": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "report_id",
+                  "code"
+                ],
+                "properties": {
+                  "report_id": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "code": {
+                    "$ref": "#/$defs/code"
+                  }
+                }
+              }
+            },
+            "unreadable_reports_skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "binding_note": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "status": {
+              "enum": [
+                "available",
+                "rejected",
+                "none_saved"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "demo",
+        "read_only",
+        "timeline",
+        "production",
+        "restrictions",
+        "notice",
+        "view",
+        "position",
+        "positions",
+        "event",
+        "historical",
+        "stages",
+        "artifacts",
+        "quality"
+      ],
+      "properties": {
+        "contract": {
+          "const": "hq_content"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "demo": {
+          "type": "boolean"
+        },
+        "read_only": {
+          "const": true
+        },
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "timeline_id",
+            "origin",
+            "kind",
+            "completeness",
+            "issues",
+            "event_count",
+            "time_basis",
+            "started_at"
+          ],
+          "properties": {
+            "timeline_id": {
+              "type": "string",
+              "pattern": "^(demo|tl-[0-9a-f]{24}|rtl-[0-9a-f]{24})$"
+            },
+            "origin": {
+              "enum": [
+                "demo",
+                "recorded",
+                "reconstructed"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "content_production",
+                "content_quality",
+                "hq_demo"
+              ]
+            },
+            "completeness": {
+              "enum": [
+                "complete",
+                "partial",
+                "open",
+                "interrupted"
+              ]
+            },
+            "issues": {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "$ref": "#/$defs/code"
+              }
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "time_basis": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/utc"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "production": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "production_id",
+            "status",
+            "created_at",
+            "updated_at",
+            "profile",
+            "record_id",
+            "selection_run_id",
+            "creator",
+            "narration",
+            "allow_draft_preview"
+          ],
+          "properties": {
+            "production_id": {
+              "$ref": "#/$defs/production_id"
+            },
+            "status": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "created_at": {
+              "$ref": "#/$defs/utc"
+            },
+            "updated_at": {
+              "$ref": "#/$defs/utc"
+            },
+            "profile": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "record_id": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "selection_run_id": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "creator": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "adapter",
+                "model",
+                "paid"
+              ],
+              "properties": {
+                "adapter": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "model": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "paid": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "narration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "configured",
+                "sha256"
+              ],
+              "properties": {
+                "configured": {
+                  "type": "boolean"
+                },
+                "sha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "allow_draft_preview": {
+              "type": "boolean"
+            }
+          }
+        },
+        "restrictions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "publishable",
+            "preview_only",
+            "draft",
+            "claims_unverified",
+            "allow_draft_preview",
+            "statements"
+          ],
+          "properties": {
+            "publishable": {
+              "const": false
+            },
+            "preview_only": {
+              "const": true
+            },
+            "draft": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "claims_unverified": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "allow_draft_preview": {
+              "type": "boolean"
+            },
+            "statements": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "notice": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "view": {
+          "const": "at_position"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "positions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sequence",
+                "component",
+                "event_type",
+                "status",
+                "recorded_at"
+              ],
+              "properties": {
+                "sequence": {
+                  "type": "integer"
+                },
+                "component": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "event_type": {
+                  "$ref": "#/$defs/code"
+                },
+                "status": {
+                  "$ref": "#/$defs/code"
+                },
+                "recorded_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/utc"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "historical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reasons"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "available",
+                "unavailable"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "$ref": "#/$defs/code"
+              }
+            }
+          }
+        },
+        "stages": {
+          "type": "array",
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "events",
+              "state",
+              "last_event",
+              "reason_codes",
+              "attempt",
+              "reused",
+              "failures",
+              "recorded_at"
+            ],
+            "properties": {
+              "stage": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "events": {
+                "type": "integer"
+              },
+              "state": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "last_event": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/code"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "maxItems": 40,
+                "items": {
+                  "$ref": "#/$defs/code"
+                }
+              },
+              "attempt": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reused": {
+                "type": "boolean"
+              },
+              "failures": {
+                "type": "integer"
+              },
+              "recorded_at": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/utc"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "artifacts": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "brief",
+                "script",
+                "validation",
+                "plan",
+                "preview",
+                "verification"
+              ],
+              "properties": {
+                "brief": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "reason",
+                    "data"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "not_produced",
+                        "missing",
+                        "tampered",
+                        "mismatched",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "brief_id",
+                            "topic",
+                            "angle",
+                            "format",
+                            "language",
+                            "content_profile",
+                            "claims",
+                            "sources",
+                            "constraints",
+                            "provenance",
+                            "editorial"
+                          ],
+                          "properties": {
+                            "brief_id": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "topic": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "angle": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "format": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "language": {
+                              "type": "string",
+                              "maxLength": 10
+                            },
+                            "content_profile": {
+                              "type": "string",
+                              "maxLength": 128
+                            },
+                            "claims": {
+                              "type": "array",
+                              "maxItems": 8,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "claim_id",
+                                  "text",
+                                  "status",
+                                  "source_ids",
+                                  "record_claim_id",
+                                  "verification_status"
+                                ],
+                                "properties": {
+                                  "claim_id": {
+                                    "type": "string",
+                                    "maxLength": 128
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  "source_ids": {
+                                    "type": "array",
+                                    "maxItems": 20,
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 128
+                                    }
+                                  },
+                                  "record_claim_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 128
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "verification_status": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 40
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            "sources": {
+                              "type": "array",
+                              "maxItems": 20,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "source_id",
+                                  "title",
+                                  "publisher",
+                                  "kind",
+                                  "url",
+                                  "link_allowed",
+                                  "accessed_at"
+                                ],
+                                "properties": {
+                                  "source_id": {
+                                    "type": "string",
+                                    "maxLength": 128
+                                  },
+                                  "title": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "publisher": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 20
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "url": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 2048
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "link_allowed": {
+                                    "type": "boolean"
+                                  },
+                                  "accessed_at": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/$defs/utc"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            "constraints": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "avoid",
+                                "disclosures",
+                                "tone"
+                              ],
+                              "properties": {
+                                "avoid": {
+                                  "type": "array",
+                                  "maxItems": 5,
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
+                                "disclosures": {
+                                  "type": "array",
+                                  "maxItems": 4,
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  }
+                                },
+                                "tone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "provenance": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "created_by",
+                                "provider",
+                                "model",
+                                "created_at"
+                              ],
+                              "properties": {
+                                "created_by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "provider": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "model": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "created_at": {
+                                  "anyOf": [
+                                    {
+                                      "$ref": "#/$defs/utc"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "editorial": {
+                              "type": "object"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "script": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "reason",
+                    "data"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "not_produced",
+                        "missing",
+                        "tampered",
+                        "mismatched",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "script_id",
+                            "title",
+                            "angle",
+                            "format",
+                            "duration_seconds",
+                            "beats",
+                            "captions",
+                            "audio",
+                            "disclosures",
+                            "sources",
+                            "provenance"
+                          ],
+                          "properties": {
+                            "script_id": {
+                              "type": "string",
+                              "maxLength": 128
+                            },
+                            "title": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "angle": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "format": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "duration_seconds": {
+                              "type": "number"
+                            },
+                            "beats": {
+                              "type": "array",
+                              "maxItems": 8,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "beat",
+                                  "start_seconds",
+                                  "end_seconds",
+                                  "narration",
+                                  "on_screen_text",
+                                  "claim_ids",
+                                  "visual",
+                                  "sound_cue"
+                                ],
+                                "properties": {
+                                  "beat": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  "start_seconds": {
+                                    "type": "number"
+                                  },
+                                  "end_seconds": {
+                                    "type": "number"
+                                  },
+                                  "narration": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "on_screen_text": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 60
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "claim_ids": {
+                                    "type": "array",
+                                    "maxItems": 8,
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 128
+                                    }
+                                  },
+                                  "visual": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "description",
+                                      "preferred_method",
+                                      "fallback_methods",
+                                      "source_ids",
+                                      "avoid"
+                                    ],
+                                    "properties": {
+                                      "description": {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      "preferred_method": {
+                                        "type": "string",
+                                        "maxLength": 40
+                                      },
+                                      "fallback_methods": {
+                                        "type": "array",
+                                        "maxItems": 6,
+                                        "items": {
+                                          "type": "string",
+                                          "maxLength": 40
+                                        }
+                                      },
+                                      "source_ids": {
+                                        "type": "array",
+                                        "maxItems": 20,
+                                        "items": {
+                                          "type": "string",
+                                          "maxLength": 128
+                                        }
+                                      },
+                                      "avoid": {
+                                        "type": "array",
+                                        "maxItems": 5,
+                                        "items": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "sound_cue": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 80
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            "captions": {
+                              "type": "object"
+                            },
+                            "audio": {
+                              "type": "object"
+                            },
+                            "disclosures": {
+                              "type": "array",
+                              "maxItems": 4,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 120
+                              }
+                            },
+                            "sources": {
+                              "type": "array",
+                              "maxItems": 20,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "source_id",
+                                  "title",
+                                  "publisher",
+                                  "kind",
+                                  "url",
+                                  "link_allowed",
+                                  "accessed_at"
+                                ],
+                                "properties": {
+                                  "source_id": {
+                                    "type": "string",
+                                    "maxLength": 128
+                                  },
+                                  "title": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "publisher": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 20
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "url": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 2048
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "link_allowed": {
+                                    "type": "boolean"
+                                  },
+                                  "accessed_at": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/$defs/utc"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            "provenance": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "created_by",
+                                "provider",
+                                "model",
+                                "created_at"
+                              ],
+                              "properties": {
+                                "created_by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "provider": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "model": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "created_at": {
+                                  "anyOf": [
+                                    {
+                                      "$ref": "#/$defs/utc"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "validation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "reason",
+                    "data"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "not_produced",
+                        "missing",
+                        "tampered",
+                        "mismatched",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "draft",
+                            "claims_unverified",
+                            "claims_total"
+                          ],
+                          "properties": {
+                            "draft": {
+                              "type": "boolean"
+                            },
+                            "claims_unverified": {
+                              "type": "integer"
+                            },
+                            "claims_total": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "plan": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "reason",
+                    "data"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "not_produced",
+                        "missing",
+                        "tampered",
+                        "mismatched",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "plan_id",
+                            "mode",
+                            "blocked_for_production",
+                            "unverified_claim_ids",
+                            "assets_produced",
+                            "available_methods",
+                            "duration_seconds",
+                            "scenes"
+                          ],
+                          "properties": {
+                            "plan_id": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "mode": {
+                              "enum": [
+                                "production",
+                                "draft"
+                              ]
+                            },
+                            "blocked_for_production": {
+                              "type": "boolean"
+                            },
+                            "unverified_claim_ids": {
+                              "type": "array",
+                              "maxItems": 8,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 128
+                              }
+                            },
+                            "assets_produced": {
+                              "type": "boolean"
+                            },
+                            "available_methods": {
+                              "type": "array",
+                              "maxItems": 8,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 40
+                              }
+                            },
+                            "duration_seconds": {
+                              "type": "number"
+                            },
+                            "scenes": {
+                              "type": "array",
+                              "maxItems": 8,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "index",
+                                  "beat",
+                                  "start_seconds",
+                                  "end_seconds",
+                                  "selected_method",
+                                  "considered_methods",
+                                  "narration",
+                                  "on_screen_text",
+                                  "poster"
+                                ],
+                                "properties": {
+                                  "index": {
+                                    "type": "integer"
+                                  },
+                                  "beat": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  "start_seconds": {
+                                    "type": "number"
+                                  },
+                                  "end_seconds": {
+                                    "type": "number"
+                                  },
+                                  "selected_method": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  "considered_methods": {
+                                    "type": "array",
+                                    "maxItems": 8,
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "narration": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "on_screen_text": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 60
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "poster": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "index",
+                                      "status",
+                                      "reason",
+                                      "media_id"
+                                    ],
+                                    "properties": {
+                                      "index": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "status": {
+                                        "enum": [
+                                          "not_hash_bound",
+                                          "missing",
+                                          "tampered",
+                                          "not_produced"
+                                        ]
+                                      },
+                                      "reason": {
+                                        "anyOf": [
+                                          {
+                                            "$ref": "#/$defs/code"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "media_id": {
+                                        "anyOf": [
+                                          {
+                                            "$ref": "#/$defs/media_id"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "preview": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "reason",
+                    "data"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "not_produced",
+                        "missing",
+                        "tampered",
+                        "mismatched",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "video",
+                            "format",
+                            "audio_present",
+                            "narration",
+                            "publishable",
+                            "preview_only",
+                            "watermark",
+                            "limitations"
+                          ],
+                          "properties": {
+                            "video": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "sha256",
+                                "media_id",
+                                "bytes"
+                              ],
+                              "properties": {
+                                "sha256": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{64}$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "media_id": {
+                                  "anyOf": [
+                                    {
+                                      "$ref": "#/$defs/media_id"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "bytes": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "format": {
+                              "type": "object"
+                            },
+                            "audio_present": {
+                              "type": "boolean"
+                            },
+                            "narration": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "configured",
+                                "sha256",
+                                "source_duration_seconds",
+                                "note"
+                              ],
+                              "properties": {
+                                "configured": {
+                                  "type": "boolean"
+                                },
+                                "sha256": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{64}$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "source_duration_seconds": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "note": {
+                                  "type": "string",
+                                  "maxLength": 300
+                                }
+                              }
+                            },
+                            "publishable": {
+                              "const": false
+                            },
+                            "preview_only": {
+                              "const": true
+                            },
+                            "watermark": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "limitations": {
+                              "type": "array",
+                              "maxItems": 12,
+                              "items": {
+                                "type": "string",
+                                "maxLength": 200
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "verification": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "record_id",
+                    "status",
+                    "reason",
+                    "verified_at",
+                    "claims",
+                    "summary",
+                    "flags",
+                    "limitations"
+                  ],
+                  "properties": {
+                    "record_id": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "unavailable",
+                        "not_established_at_position"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/code"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "verified_at": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/utc"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "claims": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "claim_id",
+                          "text",
+                          "status",
+                          "rationale_codes",
+                          "rationale",
+                          "primary_support",
+                          "independent_origins"
+                        ],
+                        "properties": {
+                          "claim_id": {
+                            "type": "string",
+                            "maxLength": 128
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 400
+                          },
+                          "status": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "rationale_codes": {
+                            "type": "array",
+                            "maxItems": 10,
+                            "items": {
+                              "type": "string",
+                              "maxLength": 64
+                            }
+                          },
+                          "rationale": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 400
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "primary_support": {},
+                          "independent_origins": {}
+                        }
+                      }
+                    },
+                    "summary": {
+                      "anyOf": [
+                        {
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "flags": {
+                      "type": "array",
+                      "maxItems": 6,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    },
+                    "limitations": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 300
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quality": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reports",
+                "binding_note"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "not_in_timeline",
+                    "not_yet",
+                    "available",
+                    "referenced_report_unavailable"
+                  ]
+                },
+                "reports": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "report_id",
+                      "checked_at",
+                      "result",
+                      "binding",
+                      "binding_reasons",
+                      "reasons",
+                      "counts",
+                      "checks",
+                      "scope",
+                      "notes"
+                    ],
+                    "properties": {
+                      "report_id": {
+                        "$ref": "#/$defs/report_id"
+                      },
+                      "checked_at": {
+                        "$ref": "#/$defs/utc"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "needs_review",
+                          "fail"
+                        ]
+                      },
+                      "binding": {
+                        "enum": [
+                          "stale",
+                          "unverified"
+                        ]
+                      },
+                      "binding_reasons": {
+                        "type": "array",
+                        "maxItems": 40,
+                        "items": {
+                          "$ref": "#/$defs/code"
+                        }
+                      },
+                      "reasons": {
+                        "type": "array",
+                        "maxItems": 40,
+                        "items": {
+                          "$ref": "#/$defs/code"
+                        }
+                      },
+                      "counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "integer"
+                        }
+                      },
+                      "checks": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "check_id",
+                            "status",
+                            "reasons",
+                            "details"
+                          ],
+                          "properties": {
+                            "check_id": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "status": {
+                              "enum": [
+                                "pass",
+                                "needs_review",
+                                "fail",
+                                "unavailable"
+                              ]
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "maxItems": 40,
+                              "items": {
+                                "$ref": "#/$defs/code"
+                              }
+                            },
+                            "details": {
+                              "type": "object"
+                            }
+                          }
+                        }
+                      },
+                      "scope": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "technical_checks_only",
+                          "factual_accuracy_verified",
+                          "rights_cleared",
+                          "publishable",
+                          "permission_to_publish"
+                        ],
+                        "properties": {
+                          "technical_checks_only": {
+                            "const": true
+                          },
+                          "factual_accuracy_verified": {
+                            "const": false
+                          },
+                          "rights_cleared": {
+                            "const": false
+                          },
+                          "publishable": {
+                            "const": false
+                          },
+                          "permission_to_publish": {
+                            "const": false
+                          }
+                        }
+                      },
+                      "notes": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "string",
+                          "maxLength": 300
+                        }
+                      }
+                    }
+                  }
+                },
+                "binding_note": {
+                  "type": "string",
+                  "maxLength": 400
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "production_id": {
+      "type": "string",
+      "pattern": "^prod-[0-9a-f]{24}$"
+    },
+    "media_id": {
+      "type": "string",
+      "pattern": "^med-[0-9a-f]{24}$"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^qr-[0-9a-f]{12,64}$"
+    }
+  }
+}

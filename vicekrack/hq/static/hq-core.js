@@ -359,7 +359,23 @@
     return best;
   }
 
+  /* ---------------------------------------------------------------- content desk (Step 35) */
+  function validContent(doc, view) {
+    return !!doc && doc.contract === "hq_content" && doc.version === "1.0" && doc.read_only === true && doc.view === view &&
+      !!doc.restrictions && doc.restrictions.publishable === false && doc.restrictions.preview_only === true;
+  }
+  /* A clickable link only for a plain http(s) URL with a host and no credentials; null otherwise. */
+  function safeLink(url) {
+    if (typeof url !== "string" || url.length < 8 || url.length > 2048 || /[\u0000-\u0020\u007f]/.test(url)) { return null; }
+    var parsed;
+    try { parsed = new URL(url); } catch (error) { return null; }
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username ||
+        parsed.password) { return null; }
+    return parsed.href;
+  }
+
   return {
+    validContent: validContent, safeLink: safeLink,
     prose: prose, money: money, roundText: roundText, percent: percent, REASONS: REASONS, reasonText: reasonText, metricText: metricText,
     resultsPosition: resultsPosition, validResults: validResults, scale: scale, nearestIndex: nearestIndex,
     STATES: STATES, STATE_ORDER: STATE_ORDER, MODES: MODES, SPEEDS: SPEEDS, ID_PATTERN: ID_PATTERN,

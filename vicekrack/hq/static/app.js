@@ -555,6 +555,17 @@
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); openResults(); }
         });
       }
+      if (CONTENT_STATIONS.indexOf(station.station) >= 0) {  // Step 35: production stations open the content desk
+        cell.setAttribute("class", "ops-link");
+        cell.setAttribute("tabindex", "0");
+        cell.setAttribute("role", "button");
+        cell.setAttribute("aria-label", station.label + ": open the content results desk");
+        el("rect", { x: -8, y: -12, width: 94, height: 15, rx: 3, class: "ops-hit" }, cell);
+        cell.addEventListener("click", function (event) { event.stopPropagation(); openContent(); });
+        cell.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); openContent(); }
+        });
+      }
       S.ops[station.component] = { dot: dot, title: title, label: station.label };
     });
     S.opsCounters = svgText(board, -8, 79, "", { class: "ops-name counters" });
@@ -634,6 +645,7 @@
     renderEventRows();
     renderFeed();
     syncResults();
+    syncContent();
     if (stepped) { announce(); }
   }
 
@@ -764,6 +776,11 @@
         open.addEventListener("click", openResults);
         h("p", { class: "muted small" }, body, "Simulated results of the selected simulation run (read-only).");
       }
+      if (dept === "content") {
+        var openC = h("button", { type: "button", class: "action" }, body, "Open content results desk");
+        openC.addEventListener("click", openContent);
+        h("p", { class: "muted small" }, body, "Brief, script, scenes, preview and quality findings of the selected production (read-only).");
+      }
       if (dept) {
         h("h3", {}, body, "Timelines in this department");
         var picks = h("ul", { class: "mini-list" }, body);
@@ -823,6 +840,10 @@
         row(body, "References", refs);
       }
     }
+    if (S.selected === "creator") {
+      var openCreator = h("button", { type: "button", class: "action" }, body, "Open content results desk");
+      openCreator.addEventListener("click", openContent);
+    }
     h("h3", {}, body, "Role");
     row(body, "Inputs", meta.inputs);
     row(body, "Decisions", meta.decisions);
@@ -848,6 +869,13 @@
         b.addEventListener("click", openResults);
         return;
       }
+      if (CONTENT_STATIONS.indexOf(station.station) >= 0) {
+        h("span", { class: "station-open" }, b, "Open content results");
+        b.setAttribute("aria-label", station.label + " station, " + (station.has_activity ? style.label : "no recorded activity") +
+          ". Open the content results desk");
+        b.addEventListener("click", openContent);
+        return;
+      }
       b.setAttribute("aria-label", station.label + " station, " + (station.has_activity ? style.label : "no recorded activity"));
       b.addEventListener("click", function () { select("operations"); });
     });
@@ -864,6 +892,10 @@
       if (station.station === "simulator") {
         var open = h("button", { type: "button", class: "action" }, box, "Open trading results");
         open.addEventListener("click", openResults);
+      }
+      if (CONTENT_STATIONS.indexOf(station.station) >= 0) {
+        var openC = h("button", { type: "button", class: "action" }, box, "Open content results");
+        openC.addEventListener("click", openContent);
       }
       if (!station.has_activity) { h("p", { class: "muted small" }, box, "No recorded activity in this timeline"); return; }
       row(box, "Status", stateChip(states[station.component] || "idle"));
@@ -1010,15 +1042,17 @@
     Array.prototype.forEach.call(document.querySelectorAll(".view-btn"), function (b) {
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
-    var timeline = view === "timeline", results = view === "results";
+    var timeline = view === "timeline", results = view === "results", content = view === "content-results";
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
-    $("stage-wrap").hidden = timeline || results || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results);
-    document.body.classList.toggle("results-open", results);
+    $("content-view").hidden = !content;
+    $("stage-wrap").hidden = timeline || results || content || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content);
+    document.body.classList.toggle("results-open", results || content);
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
     R.renderedKey = null;
+    CT.renderedKey = null;
     renderStatuses(false);
   }
 
@@ -1290,7 +1324,7 @@
       var tr = h("tr", {}, body);
       cells.forEach(function (cell, n) {
         var td = h(n === 0 ? "th" : "td", n === 0 ? { scope: "row" } : {}, tr);
-        if (cell instanceof Node) { td.appendChild(cell); } else { td.textContent = C.plain(cell); }
+        if (cell instanceof Node) { td.appendChild(cell); } else { td.textContent = C.prose(cell); }
       });
     });
     if (!rows.length) {
@@ -1623,6 +1657,384 @@
     renderLimitations(body, R.tab === "summary" && R.summary ? R.summary.limitations : R.index.limitations);
   }
 
+  /* ------------------------------------------------------------------ content results desk (Step 35)
+   * Read-only. Two GET documents per content timeline: what the timeline proves existed at the replay
+   * position (the server withholds anything later), and the latest saved production re-verified now.
+   * Preview files come from /api/content/media through opaque IDs. All text is inserted with
+   * textContent; source URLs are shown as text and opened only by an explicit click. */
+  var CONTENT_STATIONS = ["production_pipeline", "brief_builder", "script_validator", "scene_planner", "preview_renderer",
+    "quality_checker"];
+  var CT = { timelineId: null, at: null, latest: null, tab: "position", wanted: null, inflightAt: false,
+    inflightLatest: false, error: null, generation: 0, renderedKey: null, video: null, videoId: null };
+
+  function contentAllowed() {
+    var t = S.scene && S.scene.timeline;
+    return !!t && (t.timeline_id === "demo" || /^prod-[0-9a-f]{24}$/.test(t.timeline_id) ||
+      (t.department === "content" && (t.kind === "content_production" || t.kind === "content_quality")));
+  }
+  function openContent() {
+    S.focusRoom = null;
+    setView("content-results");
+  }
+  function resetContent() {
+    CT.generation += 1;
+    CT.timelineId = null; CT.at = null; CT.latest = null; CT.error = null; CT.wanted = null;
+    CT.inflightAt = false; CT.inflightLatest = false; CT.renderedKey = null;
+  }
+  function syncContent() {
+    if (S.view !== "content-results" || !S.scene) { return; }
+    if (CT.timelineId !== S.timelineId) { resetContent(); CT.timelineId = S.timelineId; }
+    if (contentAllowed()) {
+      if (CT.tab === "latest") { loadLatest(); } else { requestContentAt(currentPosition()); }
+    }
+    renderContent();
+  }
+  function requestContentAt(position) {
+    CT.wanted = position;
+    if (CT.inflightAt || (CT.at && CT.at.position === position)) { return; }
+    CT.inflightAt = true;
+    var generation = CT.generation;
+    getJSON("/api/content/at?timeline=" + encodeURIComponent(CT.timelineId) + "&position=" + position).then(function (doc) {
+      if (generation !== CT.generation) { return; }
+      CT.inflightAt = false;
+      if (!C.validContent(doc, "at_position")) { throw new Error("invalid_content_results"); }
+      CT.error = null;
+      if (doc.position === CT.wanted) { CT.at = doc; renderContent(); } else { requestContentAt(CT.wanted); }
+    }).catch(function (error) {
+      if (generation !== CT.generation) { return; }
+      CT.inflightAt = false;
+      CT.error = C.plain(error.message);
+      renderContent();
+    });
+  }
+  function loadLatest() {
+    if (CT.latest || CT.inflightLatest) { return; }
+    CT.inflightLatest = true;
+    var generation = CT.generation;
+    getJSON("/api/content/latest?timeline=" + encodeURIComponent(CT.timelineId)).then(function (doc) {
+      if (generation !== CT.generation) { return; }
+      CT.inflightLatest = false;
+      if (!C.validContent(doc, "latest")) { throw new Error("invalid_content_results"); }
+      CT.error = null;
+      CT.latest = doc;
+      renderContent();
+    }).catch(function (error) {
+      if (generation !== CT.generation) { return; }
+      CT.inflightLatest = false;
+      CT.error = C.plain(error.message);
+      renderContent();
+    });
+  }
+  function setContentTab(tab) {
+    CT.tab = tab;
+    $("ct-tab-position").setAttribute("aria-pressed", tab === "position" ? "true" : "false");
+    $("ct-tab-latest").setAttribute("aria-pressed", tab === "latest" ? "true" : "false");
+    CT.renderedKey = null;
+    syncContent();
+  }
+
+  /* ---- pieces */
+  function mediaUrl(productionId, mediaId) {
+    return "/api/content/media?production=" + encodeURIComponent(productionId) + "&id=" + encodeURIComponent(mediaId);
+  }
+  function chip(text, tone) { return h("span", { class: "chip-inline " + (tone || "") }, null, text); }
+  function statusChip(status) {
+    var tone = { verified: "ok", pass: "ok", completed: "ok", needs_review: "warn", unverified: "warn", stale: "bad",
+      fail: "bad", failed: "bad", tampered: "bad", mismatched: "bad", missing: "bad", unavailable: "na",
+      not_produced: "na", not_established_at_position: "na", not_hash_bound: "warn", reused: "info" }[status] || "na";
+    return chip(C.words(status).toUpperCase(), tone);
+  }
+  function linkCell(source) {
+    var cell = h("span", { class: "source-link" });
+    h("code", {}, cell, source.url || "no URL");
+    var href = source.link_allowed ? C.safeLink(source.url) : null;
+    if (href) {
+      var open = h("button", { type: "button", class: "link small" }, cell, "Open ↗");
+      open.setAttribute("aria-label", "Open source in a new tab (leaves the HQ): " + C.plain(source.title || source.source_id));
+      open.addEventListener("click", function () { window.open(href, "_blank", "noopener,noreferrer"); });
+    } else if (source.url) {
+      h("span", { class: "muted small" }, cell, " (not a plain https link; shown as text only)");
+    }
+    return cell;
+  }
+  function block(parent, title, section, render) {
+    var box = h("section", { class: "content-block" }, parent);
+    var head = h("div", { class: "block-head" }, box);
+    h("h3", {}, head, title);
+    head.appendChild(statusChip(section.status));
+    if (section.status !== "verified") {
+      var text = { not_established_at_position: "Not established at this replay position: the timeline does not show it existing yet.",
+        not_produced: "Not produced", missing: "Missing: the saved file is gone.",
+        tampered: "Rejected: the file does not match the hash or contract saved for this production. Its content is not shown.",
+        mismatched: "Rejected: it does not match the rest of this production (IDs, claims or hashes). Its content is not shown.",
+        unavailable: "Unavailable because an earlier artifact was rejected." }[section.status] || C.words(section.status);
+      h("p", { class: "muted" }, box, text + (section.reason && section.reason !== section.status ? " (" + C.words(section.reason) + ")" : ""));
+      return box;
+    }
+    render(box, section.data);
+    return box;
+  }
+  function renderBrief(box, b) {
+    var facts = h("div", { class: "facts" }, box);
+    row(facts, "Topic", b.topic);
+    row(facts, "Angle", b.angle);
+    row(facts, "Brief", b.brief_id + " · " + b.format + " · " + b.language);
+    row(facts, "Created by", [b.provenance.created_by, b.provenance.provider, b.provenance.model].filter(Boolean).join(" · ") +
+      " · " + C.formatTime(b.provenance.created_at));
+    if (b.constraints.disclosures.length) { row(facts, "Disclosures", b.constraints.disclosures.join(" | ")); }
+    if (b.constraints.avoid.length) { row(facts, "Avoid", b.constraints.avoid.join(", ")); }
+    table(box, "Claims a script may state", ["Claim", "Text", "Status", "Sources", "Verification record claim"],
+      b.claims.map(function (c) {
+        return [c.claim_id, c.text, statusChip(c.status), c.source_ids.join(", "),
+          (c.record_claim_id || "-") + (c.verification_status ? " (" + c.verification_status + ")" : "")];
+      }));
+    table(box, "Sources and provenance (URLs are text; nothing is fetched)", ["Source", "Title", "Publisher · kind", "Accessed", "URL"],
+      b.sources.map(function (src) {
+        return [src.source_id, src.title || "-", (src.publisher || "-") + " · " + (src.kind || "-"),
+          src.accessed_at ? C.formatTime(src.accessed_at) : "-", linkCell(src)];
+      }));
+  }
+  function renderScript(box, sc) {
+    var facts = h("div", { class: "facts" }, box);
+    row(facts, "Title", sc.title);
+    row(facts, "Script", sc.script_id + " · " + sc.duration_seconds + " s");
+    row(facts, "Written by", [sc.provenance.created_by, sc.provenance.provider, sc.provenance.model].filter(Boolean).join(" · ") +
+      " · " + C.formatTime(sc.provenance.created_at));
+    if (sc.disclosures.length) { row(facts, "Disclosures", sc.disclosures.join(" | ")); }
+    table(box, "Script beats", ["Beat", "Time", "Narration", "On-screen text", "Claims", "Visual", "Sound cue"],
+      sc.beats.map(function (b) {
+        return [b.beat, b.start_seconds + "–" + b.end_seconds + " s", b.narration, b.on_screen_text || "-",
+          b.claim_ids.join(", ") || "-", b.visual.preferred_method + " (fallback " + (b.visual.fallback_methods.join(", ") || "none") +
+          "): " + b.visual.description, b.sound_cue || "-"];
+      }));
+  }
+  function renderVerification(parent, v) {
+    var box = h("section", { class: "content-block" }, parent);
+    var head = h("div", { class: "block-head" }, box);
+    h("h3", {}, head, "Verification record and its limits");
+    head.appendChild(statusChip(v.status));
+    var facts = h("div", { class: "facts" }, box);
+    row(facts, "Record", v.record_id);
+    if (v.status !== "verified") {
+      row(facts, "Status", v.status === "not_established_at_position" ? "Not established at this replay position" :
+        "Unavailable: " + C.words(v.reason || "unknown"));
+    } else {
+      row(facts, "Verified at", C.formatTime(v.verified_at));
+      if (v.summary) {
+        row(facts, "Summary", Object.keys(v.summary).map(function (k) { return C.words(k) + " " + v.summary[k]; }).join(" · "));
+      }
+      row(facts, "Flags", v.flags.length ? v.flags.map(C.words).join(", ") : "none");
+      table(box, "Claims in the record", ["Claim", "Text", "Status", "Rationale", "Primary support", "Independent origins"],
+        v.claims.map(function (c) {
+          return [c.claim_id, c.text, statusChip(c.status), (c.rationale || "") + (c.rationale_codes.length ? " [" +
+            c.rationale_codes.join(", ") + "]" : ""), String(c.primary_support), String(c.independent_origins)];
+        }));
+    }
+    var list = h("ul", { class: "plain-list" }, box);
+    v.limitations.forEach(function (text) { para("li", {}, list, text); });
+  }
+  function renderPlan(box, plan, productionId) {
+    var facts = h("div", { class: "facts" }, box);
+    row(facts, "Plan", plan.plan_id.slice(0, 16) + "… · mode " + plan.mode + (plan.blocked_for_production ? " · BLOCKED FOR PRODUCTION" : ""));
+    row(facts, "Methods available", plan.available_methods.join(", "));
+    if (plan.unverified_claim_ids.length) { row(facts, "Unverified claims", plan.unverified_claim_ids.join(", ")); }
+    var grid = h("ol", { class: "scenes" }, box);
+    plan.scenes.forEach(function (scene) {
+      var li = h("li", { class: "scene" }, grid);
+      var poster = scene.poster;
+      if (poster.media_id) {
+        var img = h("img", { src: mediaUrl(productionId, poster.media_id), loading: "lazy", width: "108", height: "192",
+          alt: "Scene " + scene.index + " poster: " + C.plain(scene.on_screen_text || scene.narration) }, li);
+        img.className = "poster";
+        h("span", { class: "poster-note" }, li, "Poster not hash-bound (the Step 13 manifest has no poster hashes)");
+      } else {
+        var none = h("div", { class: "poster none", role: "img",
+          "aria-label": "No poster for scene " + scene.index }, li);
+        h("span", {}, none, C.words(poster.reason || poster.status));
+      }
+      var meta = h("div", { class: "scene-meta" }, li);
+      h("strong", {}, meta, scene.index + " · " + scene.beat + " · " + scene.start_seconds + "–" + scene.end_seconds + " s");
+      h("span", {}, meta, scene.selected_method + " (considered: " + scene.considered_methods.map(function (m) {
+        return C.plain(m.method) + " " + C.words(m.status); }).join(", ") + ")");
+      h("span", { class: "muted" }, meta, scene.narration);
+    });
+  }
+  function renderPreview(box, preview, productionId, posterId) {
+    var wrap = h("div", { class: "player" }, box);
+    if (preview.video.media_id) {
+      if (CT.videoId !== preview.video.media_id) {        // keep one element so stepping the replay does not reset playback
+        CT.video = document.createElement("video");
+        CT.video.setAttribute("controls", "");
+        CT.video.setAttribute("preload", "metadata");
+        CT.video.setAttribute("playsinline", "");
+        CT.video.setAttribute("aria-label", "Local preview video (watermarked, not publishable)");
+        if (posterId) { CT.video.setAttribute("poster", mediaUrl(productionId, posterId)); }
+        CT.video.src = mediaUrl(productionId, preview.video.media_id);
+        CT.videoId = preview.video.media_id;
+        CT.videoNote = para("p", { class: "muted small", hidden: "hidden" }, null,
+          "This browser cannot play the H.264 MP4 preview (for example an open-source Chromium build). It plays in Chrome, " +
+          "Edge, Safari or Firefox with system codecs. The file was served and hash-checked; nothing is converted.");
+        var note = CT.videoNote;
+        CT.video.addEventListener("error", function () { note.hidden = false; });
+        if (!CT.video.canPlayType("video/mp4")) { note.hidden = false; }
+      }
+      var column = h("div", { class: "player-media" }, wrap);
+      column.appendChild(CT.video);
+      column.appendChild(CT.videoNote);
+    } else {
+      h("p", { class: "muted" }, wrap, "No video file.");
+    }
+    var side = h("div", { class: "facts" }, wrap);
+    row(side, "Watermark", preview.watermark);
+    row(side, "Format", preview.format.width + "×" + preview.format.height + " · " + preview.format.fps + " fps · " +
+      preview.format.duration_seconds + " s");
+    row(side, "Narration", preview.narration.note + (preview.narration.sha256 ? " (WAV " + preview.narration.sha256.slice(0, 12) + "…)" : ""));
+    row(side, "Audio track", preview.audio_present ? "present" : "none (silent)");
+    row(side, "Publishable", "false · preview only");
+    row(side, "Video hash", preview.video.sha256 ? preview.video.sha256.slice(0, 16) + "… (re-checked when served)" : "-");
+    if (preview.limitations.length) { row(side, "Renderer limits", preview.limitations.join("; ")); }
+  }
+  function renderQuality(parent, quality, latest) {
+    var box = h("section", { class: "content-block" }, parent);
+    h("h3", {}, box, "Step 22 quality findings");
+    var notes = { not_in_timeline: "This timeline contains no quality check. See Latest saved production for saved reports.",
+      not_yet: "No quality report had been saved yet at this replay position.",
+      none_saved: "No quality report is saved for this production. Nothing is checked automatically (run quality-report PRODUCTION_ID).",
+      rejected: "Every saved report for this production was rejected.",
+      referenced_report_unavailable: "The timeline names a report that is missing or failed validation." };
+    if (notes[quality.status]) { h("p", { class: "muted" }, box, notes[quality.status]); }
+    para("p", { class: "notice warn" }, box, quality.binding_note);
+    quality.reports.forEach(function (r) {
+      var card = h("div", { class: "report" }, box);
+      var head = h("div", { class: "block-head" }, card);
+      h("strong", {}, head, r.report_id + " · checked " + C.formatTime(r.checked_at));
+      head.appendChild(statusChip(r.result));
+      head.appendChild(statusChip(r.binding));
+      h("p", { class: "small" }, card, (r.binding === "stale" ? "STALE: " : "UNVERIFIED: ") +
+        r.binding_reasons.map(C.words).join("; "));
+      table(card, "Checks in " + r.report_id, ["Check", "Status", "Reasons"], r.checks.map(function (c) {
+        return [C.words(c.check_id), statusChip(c.status), c.reasons.length ? codeList(c.reasons) : "-"];
+      }));
+      h("p", { class: "muted small" }, card, "Scope: technical checks only · facts not verified · rights not cleared · " +
+        "publishable false · no permission to publish.");
+    });
+    if (latest && quality.rejected_reports && quality.rejected_reports.length) {
+      table(box, "Rejected quality reports", ["Report", "Why"], quality.rejected_reports.map(function (r) {
+        return [r.report_id, C.words(r.code)];
+      }));
+    }
+  }
+  function renderStagesAt(body, doc) {
+    table(body, "Production stages as recorded up to this position", ["Stage", "State", "Attempt", "Reused", "Failures",
+      "Last event", "Reason codes", "Recorded at"], doc.stages.map(function (s) {
+      return [s.stage, statusChip(s.state), s.attempt === null ? "-" : String(s.attempt),
+        s.reused ? "yes (finished in an earlier attempt)" : "no", String(s.failures), s.last_event ? C.words(s.last_event) : "-",
+        s.reason_codes.length ? codeList(s.reason_codes) : "-", s.recorded_at ? C.formatTime(s.recorded_at) : "-"];
+    }));
+  }
+  function renderStagesLatest(body, doc) {
+    table(body, "Saved production stages", ["Stage", "Status", "Attempts", "Started", "Finished", "Error"],
+      doc.stages.map(function (s) {
+        return [s.stage, statusChip(s.status), String(s.attempts), s.started_at ? C.formatTime(s.started_at) : "-",
+          s.finished_at ? C.formatTime(s.finished_at) : "-", s.error_code ? h("code", {}, null, s.error_code) : "-"];
+      }));
+    table(body, "Recorded attempts of this production (matched by run and correlation ID)", ["Timeline", "Kind", "Started",
+      "Completeness · outcome", "Stages run", "Stages reused", "Failures"], doc.attempts.map(function (a) {
+      return [a.timeline_id, C.words(a.kind), a.started_at ? C.formatTime(a.started_at) : "-", C.words(a.completeness) +
+        " · " + C.words(a.outcome || "-"), a.stages_run.join(", ") || "-", a.stages_reused.join(", ") || "-",
+        a.failures.length ? a.failures.map(function (f) { return f.stage + ": " + f.codes.join(", "); }).join("; ") : "-"];
+    }), "No recorded attempts (record with produce ... --record-events). The saved state above is still shown.");
+  }
+  function renderArtifacts(body, artifacts, productionId) {
+    block(body, "Story Brief", artifacts.brief, renderBrief);
+    renderVerification(body, artifacts.verification);
+    block(body, "Short Script", artifacts.script, renderScript);
+    block(body, "Validation", artifacts.validation, function (box, v) {
+      var facts = h("div", { class: "facts" }, box);
+      row(facts, "Draft", v.draft ? "YES: unverified claims, blocked for production" : "no");
+      row(facts, "Claims", v.claims_total + " total · " + v.claims_unverified + " unverified");
+    });
+    block(body, "Scene plan and posters", artifacts.plan, function (box, plan) { renderPlan(box, plan, productionId); });
+    var firstPoster = artifacts.plan.status === "verified" && artifacts.plan.data.scenes.length ?
+      artifacts.plan.data.scenes[0].poster.media_id : null;
+    block(body, "Local preview", artifacts.preview, function (box, preview) { renderPreview(box, preview, productionId, firstPoster); });
+  }
+
+  var CONTENT_ERRORS = {
+    production_not_found: "The production behind this timeline is not saved.",
+    invalid_production_state: "The saved production state failed validation, so nothing is shown.",
+    timeline_production_mismatch: "This timeline does not belong to the saved production, so they are not combined.",
+    content_not_production: "This timeline is not a content production."
+  };
+  function renderContent() {
+    if (S.view !== "content-results") { return; }
+    var doc = CT.tab === "latest" ? CT.latest : CT.at;
+    var key = [S.timelineId, CT.tab, currentPosition(), doc ? (doc.position === undefined ? "l" : doc.position) : "-",
+      CT.error, contentAllowed(), S.timelines.length].join("|");
+    if (key === CT.renderedKey) { return; }
+    CT.renderedKey = key;
+    var body = $("content-body"), where = $("content-where"), badge = $("content-badge");
+    clear(body);
+    if (!contentAllowed()) {
+      badge.textContent = "PREVIEW ONLY";
+      where.textContent = "";
+      h("p", { class: "notice" }, body, "The selected timeline (" + (S.scene ? C.words(S.scene.timeline.kind) : "none") +
+        ") is not a content production. Pick a production, a recorded produce attempt or a quality check:");
+      var picks = S.timelines.filter(function (t) {
+        return t.id === "demo" || t.kind === "content_production" || t.kind === "content_quality";
+      });
+      var list = h("ul", { class: "mini-list" }, body);
+      picks.forEach(function (t) {
+        var li = h("li", {}, list);
+        var b = h("button", { type: "button", class: "link" }, li, timelineName(t));
+        b.disabled = t.readable === false;
+        b.addEventListener("click", function () { loadScene(t.id).then(function () { setView("content-results"); }); });
+        h("span", { class: "muted small" }, li, t.origin);
+      });
+      return;
+    }
+    if (CT.error && !doc) {
+      h("p", { class: "notice warn" }, body, (CONTENT_ERRORS[CT.error] || "Could not load content results (" + CT.error + ").") +
+        " Nothing was changed.");
+      return;
+    }
+    if (!doc) { h("p", { class: "muted" }, body, "Loading content results..."); return; }
+    badge.textContent = doc.demo ? "DEMO DATA · SYNTHETIC · PREVIEW ONLY" : "SAVED PRODUCTION · PREVIEW ONLY";
+    badge.className = "sim-badge " + (doc.demo ? "demo" : "saved");
+    var position = currentPosition();
+    where.textContent = CT.tab === "latest" ? doc.label :
+      "At replay position " + position + " of " + S.scene.frames.length + (doc.event ? " · " + C.words(doc.event.component.split(".").pop()) +
+        " " + C.words(doc.event.event_type) + " · recorded " + (doc.event.recorded_at ? C.formatTime(doc.event.recorded_at) : "not recorded") : "");
+    var restriction = h("div", { class: "notice restriction-list" + (doc.restrictions.draft ? " draft" : "") }, body);
+    if (doc.restrictions.draft) { h("strong", {}, restriction, "DRAFT · NOT FOR PRODUCTION"); }
+    var items = h("ul", { class: "plain-list" }, restriction);
+    doc.restrictions.statements.forEach(function (text) { para("li", {}, items, text); });
+    var p = doc.production, facts = h("div", { class: "facts" }, body);
+    row(facts, "Production", p.production_id + " · " + C.words(p.status));
+    row(facts, "Timeline", (doc.demo ? "demo" : C.words(doc.timeline.origin)) + " · " + doc.timeline.timeline_id + " · " +
+      C.words(doc.timeline.kind) + " · " + C.words(doc.timeline.completeness));
+    row(facts, "Creator", p.creator.adapter + (p.creator.model ? " · " + p.creator.model : "") + (p.creator.paid ? " · paid" : " · offline"));
+    row(facts, "Narration", p.narration.configured ? "local WAV configured" : "none (silent storyboard)");
+    row(facts, "Evidence", "record " + p.record_id + " · selection " + p.selection_run_id);
+    if (CT.tab === "latest") {
+      renderStagesLatest(body, doc);
+      renderArtifacts(body, doc.artifacts, p.production_id);
+      renderQuality(body, doc.quality, true);
+      return;
+    }
+    if (doc.historical.status !== "available") {
+      var box = h("div", { class: "notice warn" }, body);
+      h("strong", {}, box, "Historical viewing is unavailable for this timeline.");
+      h("p", {}, box, "Reasons: " + doc.historical.reasons.map(C.words).join("; ") + ". The timeline cannot prove which saved " +
+        "artifacts existed at each event, so none are shown here. Latest saved production is still available.");
+      renderStagesAt(body, doc);
+      return;
+    }
+    renderStagesAt(body, doc);
+    renderArtifacts(body, doc.artifacts, p.production_id);
+    renderQuality(body, doc.quality, false);
+  }
+
   /* ------------------------------------------------------------------ data (GET only) */
   function getJSON(path) {
     return window.fetch(path, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
@@ -1723,6 +2135,8 @@
     $("btn-refresh").addEventListener("click", loadTimelines);
     $("res-tab-position").addEventListener("click", function () { setResultsTab("position"); });
     $("res-tab-summary").addEventListener("click", function () { setResultsTab("summary"); });
+    $("ct-tab-position").addEventListener("click", function () { setContentTab("position"); });
+    $("ct-tab-latest").addEventListener("click", function () { setContentTab("latest"); });
     var resizeTimer = null;
     window.addEventListener("resize", function () {           // redraw charts at the new width (text stays 1:1)
       window.clearTimeout(resizeTimer);
@@ -1744,6 +2158,7 @@
       else if (e.key === "m" || e.key === "M") { $("btn-motion").click(); }
       else if (e.key === "v" || e.key === "V") { $("btn-list").click(); }
       else if (e.key === "r" || e.key === "R") { if (S.view === "results") { setView("house"); } else { openResults(); } }
+      else if (e.key === "c" || e.key === "C") { if (S.view === "content-results") { setView("house"); } else { openContent(); } }
       else if (e.key === "Escape") { if (S.presenting) { setPresenting(false); } else { select(null); } }
       else if (S.presenting && /^[0-8]$/.test(e.key)) { focusRoom(e.key === "0" ? null : BOT_ROOMS[Number(e.key) - 1]); }
     });

@@ -29,6 +29,7 @@
         <button type="button" class="view-btn" data-view="trading" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading</button>
         <button type="button" class="view-btn" data-view="results" aria-pressed="false"><span class="ico ico-results" aria-hidden="true"></span>Results</button>
         <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
+        <button type="button" class="view-btn" data-view="content-results" aria-pressed="false"><span class="ico ico-film" aria-hidden="true"></span>Content results</button>
         <button type="button" class="view-btn" data-view="timeline" aria-pressed="false"><span class="ico ico-clock" aria-hidden="true"></span>Timeline</button>
       </nav>
       <section class="bot-list" aria-labelledby="bots-heading">
@@ -61,7 +62,7 @@
           <title id="stage-title">ViceKrack headquarters</title>
         </svg>
         <div class="legend" id="legend" aria-label="Status legend"></div>
-        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R results &middot; L labels &middot; Esc exit</div>
+        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R trading results &middot; C content results &middot; L labels &middot; Esc exit</div>
         <button type="button" class="present-exit" id="present-exit">Exit presentation</button>
       </section>
 
@@ -106,6 +107,25 @@
         </div>
         <p class="results-where" id="results-where" aria-live="polite"></p>
         <div id="results-body"></div>
+      </section>
+
+      <section class="results-view content-view" id="content-view" aria-labelledby="content-heading" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="content-heading">Content results desk</h2>
+            <p class="results-sub">One saved production, read-only. Nothing here drafts, renders, checks, approves, exports or publishes.</p>
+          </div>
+          <span class="sim-badge" id="content-badge">PREVIEW ONLY</span>
+        </div>
+        <div class="restriction" id="content-restriction" role="note">
+          <strong>publishable: false</strong> &middot; preview only &middot; not approved for publishing
+        </div>
+        <div class="results-tabs" role="group" aria-label="Which production state to show">
+          <button type="button" id="ct-tab-position" aria-pressed="true">At replay position</button>
+          <button type="button" id="ct-tab-latest" aria-pressed="false">Latest saved production</button>
+        </div>
+        <p class="results-where" id="content-where" aria-live="polite"></p>
+        <div id="content-body"></div>
       </section>
 
       <footer class="dock" id="dock" aria-label="Replay controls">
