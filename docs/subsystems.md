@@ -14,7 +14,7 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30 and 39]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30, 39 and 40]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
         T2[market/: offline datasets + replay, no account access]
         T3[indicators/: descriptive values on closed bars, no account access]
@@ -47,6 +47,9 @@ flowchart TB
   (`runtime/trading/signals/`), research-agent runs (`runtime/trading/agents/`) and
   simulation runs (`runtime/trading/simulation/`) and analytics reports
   (`runtime/trading/analytics/`), and Step 39 research sessions (`runtime/trading/sessions/`).
+- **Provider boundary:** `vicekrack/trading/providers/` (Step 40) is the only trading code
+  that may open a network connection, and only for `market-fetch --allow-network`. It
+  produces ordinary Step 25 datasets; nothing else imports it.
 - **Session boundary:** `vicekrack/trading/session/` (Step 39) only coordinates the market,
   research-agent, simulation and analytics modules in a fixed order. It never imports the
   account state, risk engine, order or journal modules, and passes no research output to

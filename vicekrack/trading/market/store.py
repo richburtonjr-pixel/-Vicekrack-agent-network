@@ -140,7 +140,9 @@ class MarketStore:
                 items.append({"dataset_id": d["dataset_id"], "symbol": d["symbol"], "interval": d["interval"],
                               "data_label": d["data_label"], "adapter": d["source"]["adapter"], "bars": d["bar_count"],
                               "first_start_utc": d["first_start_utc"], "last_start_utc": d["last_start_utc"],
-                              "gaps": d["gaps"]["gap_count"], "imported_at": d["imported_at"], "readable": True})
+                              "gaps": d["gaps"]["gap_count"], "imported_at": d["imported_at"], "readable": True,
+                              **({"provider": {k: d["source"]["provider"][k] for k in ("name", "feed", "adjustment")}}
+                                 if "provider" in d["source"] else {})})
             except TradingError:
                 items.append({"dataset_id": path.stem, "readable": False})
         return items

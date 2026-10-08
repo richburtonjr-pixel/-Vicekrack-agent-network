@@ -2249,6 +2249,41 @@
       else { setResultsTab("summary"); setView("results"); }
     });
   }
+  /* Step 40: where the historical bars came from, and how much of the requested range they cover. */
+  function duration(seconds) {
+    if (seconds === null || seconds === undefined) { return "not recorded"; }
+    var hours = Math.floor(seconds / 3600), minutes = Math.floor((seconds % 3600) / 60);
+    return hours ? hours + " h " + minutes + " min" : minutes + " min";
+  }
+  function renderDataSource(body, doc) {
+    var box = h("section", { class: "data-source", "aria-label": "Historical data source" }, body);
+    h("h3", {}, box, "Historical data source");
+    var ds = doc.data_source;
+    if (!ds) {
+      h("p", { class: "notice warn" }, box, "The dataset could not be re-validated (" + C.words(doc.data_source_problem || "unknown") +
+        "), so its source is not shown.");
+      return;
+    }
+    var facts = h("div", { class: "facts" }, box);
+    row(facts, "Source", C.words(ds.adapter) + " · " + ds.source_name + " · labelled " + C.words(ds.data_label) +
+      " · not verified as authentic");
+    if (ds.provider) {
+      var p = ds.provider;
+      row(facts, "Provider", p.name + " · feed " + p.feed + " · adjustment " + p.adjustment + " · " + p.timeframe + " bars");
+      row(facts, "Requested", p.requested_start_date + " → " + p.requested_end_date + " (New York dates)");
+      row(facts, "Retrieved", C.formatTime(p.retrieved_at) + " (wall clock; not market time) · " + p.responses +
+        (p.responses === 1 ? " response" : " responses"));
+    }
+    var c = ds.coverage;
+    row(facts, "Coverage", C.formatTime(c.first_start_utc) + " → " + C.formatTime(c.last_available_utc) + " · " + c.bars + " bars");
+    row(facts, "Gaps", c.gap_count + (c.gap_count === 1 ? " gap · " : " gaps · ") + c.missing_intervals +
+      (c.missing_intervals === 1 ? " missing interval" : " missing intervals") + " (no market calendar: nights, " +
+      "weekends and holidays count as gaps; nothing was filled in)");
+    if (c.uncovered_before_first_seconds !== null) {
+      row(facts, "Uncovered", duration(c.uncovered_before_first_seconds) + " before the first bar · " +
+        duration(c.uncovered_after_last_seconds) + " after the last bar, within the requested dates");
+    }
+  }
   function renderSession() {
     var body = $("session-body"), doc = SS.doc, badge = $("session-badge");
     clear(body);
@@ -2273,6 +2308,7 @@
     if (doc.integrity.status === "failed") {
       h("p", { class: "notice warn" }, body, "A saved artifact failed validation, so no results or links are shown for this session.");
     }
+    renderDataSource(body, doc);
     var research = doc.time_domains.historical_research;
     para("p", { class: "separation" }, body, research ?
       "Research conclusions are historical research as of " + C.formatTime(research.as_of_utc) + " (simulated time" +

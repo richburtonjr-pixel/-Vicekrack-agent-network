@@ -396,3 +396,9 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
 .sessions-view .tile-value { white-space: normal; overflow-wrap: anywhere; }
 /* The session summary is not the house timeline: hide that timeline's replay controls and data badge here. */
 .sessions-open .dock, .sessions-open .timeline-strip, .sessions-open #mode-badge { display: none; }
+
+/* Step 40: historical data source in the Sessions view */
+.data-source { margin: 10px 0; padding: 10px 12px; border: 1px solid #1f2a36; border-left: 4px solid #64748b; border-radius: 10px;
+  background: #0d1218; }
+.data-source h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.data-source .v { overflow-wrap: anywhere; }

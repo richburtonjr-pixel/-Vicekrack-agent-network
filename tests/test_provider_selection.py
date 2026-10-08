@@ -74,4 +74,4 @@ class ProviderSelectionTests(unittest.TestCase):
 
     def test_env_template_contains_only_blank_credentials(self):
         self.assertEqual((ROOT / ".env.example").read_text().splitlines(),
-                         ["OPENAI_API_KEY=", "ANTHROPIC_API_KEY="])
+                         ["OPENAI_API_KEY=", "ANTHROPIC_API_KEY=", "APCA_API_KEY_ID=", "APCA_API_SECRET_KEY="])

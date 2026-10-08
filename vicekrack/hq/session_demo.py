@@ -38,7 +38,7 @@ def demo_session():
     window = run["replay"]
     demo_link = {"available": True, "timeline_id": "demo", "origin": "demo", "reason": None}
     return {
-        "contract": "hq_session", "version": "1.0", "origin": "demo", "session_id": "demo", "read_only": True,
+        "contract": "hq_session", "version": "1.1", "origin": "demo", "session_id": "demo", "read_only": True,
         "simulated": True, "status": "completed", "live": False, "summary_source": "demo",
         "manifest_id": _id("tsm", "session-manifest"), "integrity": {"status": "demo", "problem": None},
         "dataset": {"dataset_id": DATASET["id"], "symbol": "DEMO", "interval": "5m", "data_label": "synthetic"},
@@ -78,4 +78,10 @@ def demo_session():
         "continuity": CONTINUITY,
         "commands": ["python -m vicekrack trading-session-list", "python -m vicekrack trading-session-inspect SESSION_ID"],
         "notice": NOTICE,
+        "data_source": {"adapter": "synthetic_fixture", "data_label": "synthetic", "source_name": "synthetic-demo",
+                        "verified_as_authentic": False, "provider": None,
+                        "coverage": {"first_start_utc": window["start_utc"], "last_available_utc": AS_OF, "bars": 12,
+                                     "uncovered_before_first_seconds": None, "uncovered_after_last_seconds": None,
+                                     "gap_count": 0, "missing_intervals": 0, "calendar": "none"}},
+        "data_source_problem": None,
     }

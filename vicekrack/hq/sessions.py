@@ -94,6 +94,36 @@ def _timeline_link(name, stage, expected_run, root):
     return {"available": False, "timeline_id": None, "origin": None, "reason": reason, "label": LINK_LABELS[name]}
 
 
+def data_source(dataset):
+    """Historical-data provenance and coverage of a validated Step 25 dataset (any adapter)."""
+    source, gaps = dataset["source"], dataset["gaps"]
+    provider = source.get("provider")
+    coverage = provider["coverage"] if provider else None
+    return {
+        "adapter": source["adapter"], "data_label": dataset["data_label"], "source_name": source["name"],
+        "verified_as_authentic": False,
+        "provider": None if provider is None else {
+            "name": provider["name"], "feed": provider["feed"], "adjustment": provider["adjustment"],
+            "timeframe": provider["timeframe"], "requested_start_date": provider["requested"]["start_date"],
+            "requested_end_date": provider["requested"]["end_date"], "retrieved_at": provider["retrieved_at"],
+            "retrieval_meaning": provider["retrieval_meaning"], "responses": len(provider["responses"])},
+        "coverage": {"first_start_utc": dataset["first_start_utc"], "last_available_utc": dataset["last_available_utc"],
+                     "bars": dataset["bar_count"],
+                     "uncovered_before_first_seconds": coverage["uncovered_before_first_seconds"] if coverage else None,
+                     "uncovered_after_last_seconds": coverage["uncovered_after_last_seconds"] if coverage else None,
+                     "gap_count": gaps["gap_count"], "missing_intervals": gaps["missing_intervals"], "calendar": "none"},
+    }
+
+
+def _data_source(dataset_id, root):
+    from ..trading.market.store import MarketStore
+    try:
+        return data_source(MarketStore(root).load(dataset_id)), None   # re-validated, read-only
+    except NetworkError as error:
+        return None, error.code if error.code in ("dataset_not_found", "dataset_corrupt", "invalid_dataset_id") \
+            else "dataset_unavailable"
+
+
 def session_document(session_id, root=None):
     if not SESSION.match(str(session_id)):
         raise NetworkError("invalid_session_id", "Use demo or a tss- session ID.")
@@ -153,7 +183,7 @@ def session_document(session_id, root=None):
     if view["status"] in ("failed", "interrupted"):
         commands.append(f"python -m vicekrack trading-session-resume {session_id}")
     document = {
-        "contract": "hq_session", "version": "1.0", "origin": "saved", "session_id": session_id, "read_only": True,
+        "contract": "hq_session", "version": "1.1", "origin": "saved", "session_id": session_id, "read_only": True,
         "simulated": True, "status": view["status"], "live": view["live"],
         "summary_source": "manifest" if manifest is not None else "checkpoint",
         "manifest_id": manifest["manifest_id"] if manifest else None,
@@ -163,4 +193,5 @@ def session_document(session_id, root=None):
         "links": links,
         "results": results, "continuity": CONTINUITY, "commands": commands, "notice": NOTICE,
     }
+    document["data_source"], document["data_source_problem"] = _data_source(view["dataset"]["dataset_id"], root)
     return check(document)

@@ -12,6 +12,8 @@ Rules:
   market calendar is applied, so nights, weekends and holidays appear as gaps.
 - A bar becomes available at `available_at_utc` (its close: start + interval, or the next
   local midnight for `1d`).
+- Step 40: datasets fetched from Alpaca (`alpaca_historical`) must also pass the provider
+  provenance checks in `providers/alpaca.validate_provider`.
 
 Error messages name the row and column, never the value.
 """
@@ -236,6 +238,11 @@ def validate_dataset(dataset):
         fail("dataset_invalid", "The market dataset identity or settings are inconsistent.")
     if dataset["source"]["adapter"] == "synthetic_fixture" and dataset["data_label"] != "synthetic":
         fail("dataset_invalid", "Synthetic fixtures must be labelled synthetic.")
+    if dataset["source"]["adapter"] == "alpaca_historical":
+        from ..providers.alpaca import validate_provider       # pure checks; never opens a connection
+        validate_provider(dataset)
+    elif "provider" in dataset["source"]:
+        fail("dataset_invalid", "Only provider-fetched datasets carry provider provenance.")
 
 
 def expand_bar(dataset, index):
