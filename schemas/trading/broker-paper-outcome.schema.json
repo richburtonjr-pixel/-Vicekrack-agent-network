@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/broker-paper-outcome.schema.json",
+  "title": "Answer to the paper submission request (Step 41)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "intent_id",
+    "client_order_id",
+    "state",
+    "recorded_at",
+    "reason",
+    "http_status",
+    "broker_code",
+    "broker_order_id"
+  ],
+  "properties": {
+    "contract": {
+      "const": "broker_paper_outcome"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "intent_id": {
+      "type": "string",
+      "pattern": "^bpi-[0-9a-f]{24}$"
+    },
+    "client_order_id": {
+      "type": "string",
+      "pattern": "^vk-[0-9a-f]{24}$"
+    },
+    "state": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "unknown"
+      ]
+    },
+    "recorded_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    "http_status": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        }
+      ]
+    },
+    "broker_code": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "broker_order_id": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{8,64}$"
+        }
+      ]
+    }
+  }
+}

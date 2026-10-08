@@ -1116,3 +1116,51 @@ flowchart LR
 - **HQ:** `sessions.data_source()` loads the session's dataset through `MarketStore.load`
   (re-validated, read-only) and adds the provenance and coverage to the session summary.
   `app.js` renders it.
+
+## Step 41: Alpaca paper broker
+
+- **Modules:** `vicekrack/trading/broker/`:
+  - `client.py` (`AlpacaPaperClient`, `check_endpoint`, `order_view`, `Ambiguous`);
+  - `store.py` (`BrokerPaperStore`);
+  - `orders.py` (`PaperBroker`, `order_terms`, `derive`, `summary`);
+  - `cli.py`.
+
+  HTTP goes through Step 40's `urllib_transport`, now able to send POST and DELETE: HTTPS
+  only, certificate verification, no redirects, a byte cap and a timeout.
+  `check_endpoint` allows only `https://paper-api.alpaca.markets/` and
+  `https://data.alpaca.markets/` URLs. Override environment variables are refused.
+- **Storage:** `runtime/trading/broker-paper/`. Every record is published once with
+  temp file + fsync + exclusive link and re-validated on read. Contracts:
+  - `broker_paper_intent`, `_check`, `_submission`, `_outcome`, `_observation`, `_cancel`
+    and `_event` (all 1.0);
+  - `broker_paper_config` 1.0, which has no endpoint field.
+
+  An OS lock (`operation.lock`) serializes submit, status and cancel.
+- **Submission sequence:**
+  1. Under the lock: load the intent (integrity re-checked), check the consent phrase, and
+     refuse if a submission exists.
+  2. Local gates: the kill switch, expiry, reconciliation of all intents, the daily cap.
+  3. Network gates: account, clock, asset, quote, positions and open orders.
+  4. Exclusive `submission.json`, then one POST.
+  5. Save `outcome.json` (accepted, rejected or unknown). If accepted, save an observation
+     from the response as well.
+- **State:** `derive()` recomputes the state from the files on every read; nothing caches
+  it. `Ambiguous` (timeouts, 5xx, unreadable answers, oversized bodies) is the only path to
+  `unknown`.
+- **Sanitizing:**
+  - accounts are reduced to a fingerprint, status flags and an in-memory buying power;
+  - orders are reduced to `order_view`;
+  - error bodies are reduced to Alpaca's numeric code.
+
+  `reject_trading_secrets` runs on every write (credential-like field names, shapes and
+  active environment secret values).
+- **HQ:** `vicekrack/hq/broker.py` serves `hq_broker_paper` / `hq_broker_paper_intent` 1.0
+  (`GET /api/broker-paper`, `/api/broker-paper/intent?id=`). It re-reads the saved records
+  and never contacts Alpaca, takes the lock or writes. `app.js` adds the read-only **Paper
+  broker** view: an amber badge, hidden replay controls and no order controls.
+- **Separation:**
+  - the broker package imports nothing from the simulator, agents, signals, market, session
+    or Step 24 state;
+  - no other trading package imports it (tests check both);
+  - the Step 40 network-isolation test now forbids `urllib.request` and `urllib.error`
+    outside `providers/alpaca.py`.

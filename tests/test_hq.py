@@ -361,7 +361,7 @@ class StaticSafetyTests(unittest.TestCase):
         app = sources["app.js"]
         self.assertEqual(app.count("window.fetch("), 1)                     # one GET helper
         self.assertEqual(sorted(set(re.findall(r"\"(/api/[a-z/]+)", app))),        # Step 34 adds the results routes
-                         ["/api/content/at", "/api/content/latest", "/api/content/media", "/api/results",
+                         ["/api/broker", "/api/content/at", "/api/content/latest", "/api/content/media", "/api/results",
                           "/api/results/at", "/api/results/summary", "/api/scene", "/api/session", "/api/sessions",
                       "/api/timelines"])                                   # Step 39 adds the read-only session routes
         # Step 35: source links open only on an explicit click, in a new tab without opener or referrer.

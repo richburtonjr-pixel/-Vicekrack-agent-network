@@ -32,6 +32,7 @@
         <button type="button" class="view-btn" data-view="content-results" aria-pressed="false"><span class="ico ico-film" aria-hidden="true"></span>Content results</button>
         <button type="button" class="view-btn" data-view="timeline" aria-pressed="false"><span class="ico ico-clock" aria-hidden="true"></span>Timeline</button>
         <button type="button" class="view-btn" data-view="sessions" aria-pressed="false"><span class="ico ico-session" aria-hidden="true"></span>Sessions</button>
+        <button type="button" class="view-btn" data-view="broker" aria-pressed="false"><span class="ico ico-broker" aria-hidden="true"></span>Paper broker</button>
       </nav>
       <section class="bot-list" aria-labelledby="bots-heading">
         <h2 id="bots-heading">Rooms</h2>
@@ -63,7 +64,7 @@
           <title id="stage-title">ViceKrack headquarters</title>
         </svg>
         <div class="legend" id="legend" aria-label="Status legend"></div>
-        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R trading results &middot; C content results &middot; S sessions &middot; L labels &middot; Esc exit</div>
+        <div class="present-hint" id="present-hint">Presentation mode &middot; 1&ndash;8 focus a room &middot; 0 overview &middot; R trading results &middot; C content results &middot; S sessions &middot; B paper broker &middot; L labels &middot; Esc exit</div>
         <button type="button" class="present-exit" id="present-exit">Exit presentation</button>
       </section>
 
@@ -143,6 +144,20 @@
           <button type="button" class="action" id="btn-sessions-refresh">Refresh list</button>
         </div>
         <div id="session-body"></div>
+      </section>
+
+      <section class="results-view broker-view" id="broker-view" aria-labelledby="broker-heading" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="broker-heading">Paper broker (Alpaca paper account)</h2>
+            <p class="results-sub">Saved broker-paper orders as of their last explicit status refresh. Read-only: this view cannot prepare, submit, refresh or cancel orders. Not simulation results.</p>
+          </div>
+          <span class="sim-badge broker" id="broker-badge">ALPACA PAPER &middot; NOT SIMULATION &middot; NO REAL MONEY</span>
+        </div>
+        <div class="session-pick">
+          <button type="button" class="action" id="btn-broker-refresh">Reload saved records</button>
+        </div>
+        <div id="broker-body"></div>
       </section>
 
       <footer class="dock" id="dock" aria-label="Replay controls">

@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/hq-broker-paper.schema.json",
+  "title": "Living HQ paper-broker status (Step 41, read-only)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "read_only",
+    "broker_paper",
+    "simulated",
+    "real_money",
+    "notice",
+    "kill_switch",
+    "last_check",
+    "intents",
+    "total",
+    "shown_limit",
+    "unreadable",
+    "unreconciled",
+    "open_orders",
+    "commands"
+  ],
+  "properties": {
+    "contract": {
+      "const": "hq_broker_paper"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "read_only": {
+      "const": true
+    },
+    "broker_paper": {
+      "const": true
+    },
+    "simulated": {
+      "const": false
+    },
+    "real_money": {
+      "const": false
+    },
+    "notice": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+    },
+    "kill_switch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engaged",
+        "source"
+      ],
+      "properties": {
+        "engaged": {
+          "type": "boolean"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          ]
+        }
+      }
+    },
+    "last_check": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "checked_at",
+            "account_fingerprint",
+            "account_status",
+            "trading_allowed",
+            "market_open",
+            "clock_time_utc"
+          ],
+          "properties": {
+            "checked_at": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            "account_fingerprint": {
+              "type": "string",
+              "pattern": "^pacct-[0-9a-f]{24}$"
+            },
+            "account_status": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "trading_allowed": {
+              "type": "boolean"
+            },
+            "market_open": {
+              "type": "boolean"
+            },
+            "clock_time_utc": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          }
+        }
+      ]
+    },
+    "intents": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent_id",
+          "created_at",
+          "symbol",
+          "side",
+          "qty",
+          "limit_price",
+          "max_notional",
+          "state",
+          "terminal",
+          "reconciled",
+          "outcome",
+          "broker_status",
+          "filled_qty",
+          "filled_avg_price",
+          "submitted_at",
+          "last_observed_at",
+          "observations",
+          "cancel_requests"
+        ],
+        "properties": {
+          "intent_id": {
+            "type": "string",
+            "pattern": "^bpi-[0-9a-f]{24}$"
+          },
+          "created_at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+          },
+          "symbol": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9.]{0,9}$"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limit_price": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+          },
+          "max_notional": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+          },
+          "state": {
+            "enum": [
+              "prepared",
+              "prepared_expired",
+              "unknown",
+              "mismatch",
+              "other_broker_state",
+              "accepted",
+              "partially_filled",
+              "filled",
+              "canceled",
+              "expired",
+              "rejected",
+              "not_placed",
+              "cancel_pending",
+              "cancel_requested",
+              "done_for_day"
+            ]
+          },
+          "terminal": {
+            "type": "boolean"
+          },
+          "reconciled": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "unknown",
+                  "no_answer_recorded"
+                ]
+              }
+            ]
+          },
+          "broker_status": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "maxLength": 30
+              }
+            ]
+          },
+          "filled_qty": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+          },
+          "filled_avg_price": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,8})?$"
+              }
+            ]
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+              }
+            ]
+          },
+          "last_observed_at": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+              }
+            ]
+          },
+          "observations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cancel_requests": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shown_limit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unreadable": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent_id",
+          "code"
+        ],
+        "properties": {
+          "intent_id": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        }
+      }
+    },
+    "unreconciled": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "open_orders": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  }
+}

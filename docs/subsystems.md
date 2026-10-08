@@ -14,7 +14,7 @@ flowchart TB
     subgraph Content[Content pipeline: Steps 1-22]
         C1[Scout -> Verification -> Selection -> Creator -> Scene plan -> Preview -> Production -> Quality]
     end
-    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30, 39 and 40]
+    subgraph Trading[Trading subsystem: vicekrack/trading, Steps 23-30 and 39-41]
         T1[Contracts -> Paper account state + lock -> Risk engine -> Paper order intent -> Journal]
         T2[market/: offline datasets + replay, no account access]
         T3[indicators/: descriptive values on closed bars, no account access]
@@ -50,6 +50,10 @@ flowchart TB
 - **Provider boundary:** `vicekrack/trading/providers/` (Step 40) is the only trading code
   that may open a network connection, and only for `market-fetch --allow-network`. It
   produces ordinary Step 25 datasets; nothing else imports it.
+- **Paper-broker boundary:** `vicekrack/trading/broker/` (Step 41) is the only code that
+  sends orders, and only to the Alpaca PAPER endpoint through explicit, consented commands.
+  Its storage (`runtime/trading/broker-paper/`) is separate from Step 24 local paper accounts
+  and the Step 29 simulator, and no other trading package imports it.
 - **Session boundary:** `vicekrack/trading/session/` (Step 39) only coordinates the market,
   research-agent, simulation and analytics modules in a fixed order. It never imports the
   account state, risk engine, order or journal modules, and passes no research output to
