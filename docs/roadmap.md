@@ -49,21 +49,22 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 33 | Shared | Accurate agent activity: rooms show only their actual roles (Step 5 Researcher/Analyst/Reviewer, production Creator); automated stages and controllers as labelled operations stations; optional event recording for the Step 5 workflow, production pipeline and quality report with explicit resume handling (`stage_reused`, attempt numbers, shared correlation), fail-closed recording that keeps committed results and never repeats paid calls; read-only reconstruction of saved workflow runs; department timeline filters, attempt grouping, honest movement labels and idle-spot occupancy | #33 |
 | 34 | Shared | Read-only trading results desk in the Living HQ: saved Step 29 runs and Step 30 reports correlated with timelines by validated IDs and hashes (mismatches rejected, missing data explicit); portfolio at a replay position built server-side from events up to that position only (no future fills, final P&L or end-of-run statistics), or `unavailable` when the timeline cannot support it; separate completed-run summary with `unavailable` metrics kept; equity/drawdown charts, accessible tables, limitations, simulator-station integration, presentation mode; labelled demo results | #34 |
 | 35 | Shared | Read-only content results desk in the Living HQ: saved productions with stages, attempts, failures and reuse; Story Brief, sources (text links, explicit open only), verification limits, script beats, scene plan with posters, local preview player with optional narration, Step 22 findings; artifacts re-verified by path, hash, contract and chain (tampered/mismatched/missing rejected); replay view shows only what the timeline proves existed, otherwise historical viewing unavailable; quality reports shown as unverified or stale, never current; opaque-ID media route with bounded byte ranges; Creator room and production stations open it; dedicated real-browser CI job for both desks | #35 |
-| 36 | Content | Verifiable content artifacts: preview manifest 1.1 with a SHA-256 and size for every scene poster (video hashing kept), every file, path, size and hash validated before publication; quality report 1.1 binds the exact artifacts and configuration it inspected (safe IDs and hashes only) from one snapshot, detects changes during inspection, never hashes reports (no circularity); legacy manifests and reports stay readable as `not hash-bound` and `unverified`, never upgraded; `quality-binding REPORT_ID` re-checks a saved report read-only; Living HQ shows separate artifact binding, technical result and evidence freshness labels and re-validates on load and when serving | this PR |
+| 36 | Content | Verifiable content artifacts: preview manifest 1.1 with a SHA-256 and size for every scene poster (video hashing kept), every file, path, size and hash validated before publication; quality report 1.1 binds the exact artifacts and configuration it inspected (safe IDs and hashes only) from one snapshot, detects changes during inspection, never hashes reports (no circularity); legacy manifests and reports stay readable as `not hash-bound` and `unverified`, never upgraded; `quality-binding REPORT_ID` re-checks a saved report read-only; Living HQ shows separate artifact binding, technical result and evidence freshness labels and re-validates on load and when serving | #36 |
+| 37 | Content | Human review decisions for content previews: append-only `content_review` records (`approved_for_preview`, `changes_requested`, `rejected`) tied to a quality report's ID and hash and the exact binding digest, with a self-declared reviewer label, time, acknowledgments and bounded notes; matching binding required, approval blocked on `fail` or unknown evidence freshness, explicit acknowledgment of needs_review, unavailable checks, draft restrictions and stale evidence; re-validated under the production lock before saving, refused on changes during review; explicit supersession, concurrent writers refused, atomic exclusive writes, corrupted history visible; applicability and evidence freshness computed on every read; `review-record`, `review-list`, `review-inspect`; read-only review history in the Content Results Desk with replay visibility rules | this PR |
 
 ## Deferred work
 
-### Content: human review and export package (deferred)
+### Content: human review (implemented in Step 37) and export package (deferred)
 
-This was first proposed as Step 23 and set aside when trading took that slot. It is not
-built. A future content step would:
-- collect a finished production, its quality report, its verification record and its
-  sources into one reviewable package;
-- record an explicit human decision (approve / request changes / reject), with reviewer
-  notes;
-- export approved packages for manual upload. There would be **no automatic
-  publishing**: previews stay `publishable: false` until a human approves them, and
-  approval is still not a rights clearance.
+First proposed as Step 23 and set aside when trading took that slot.
+- **Human review: implemented in Step 37.** Explicit, append-only decisions
+  (`approved_for_preview`, `changes_requested`, `rejected`) tied to a bound quality report
+  and the exact artifacts it inspected (see [Human review](review.md)). Approval accepts the
+  preview only; `publishable` stays `false`.
+- **Portable export package: still deferred.** A future content step would collect a
+  finished, approved production with its quality report, review record, verification
+  record and sources into one portable package for manual upload. There would be **no
+  automatic publishing**, and approval is still not a rights clearance.
 
 Other content work that is deferred and not scheduled:
 - Voice generation beyond Step 14's optional local narration file, and music or sound
@@ -83,9 +84,9 @@ read-only trading and content results desks. The content desk only displays save
 productions: it adds no review decision, export or publishing, so the human review and
 export package below is still deferred. Step 36 made content artifacts verifiable
 (poster hashes in new preview manifests, quality reports bound to the exact files they
-inspected); it is integrity evidence only and adds no approval, export or publishing, so
-the human review and export package is **still deferred**. All earlier content tests
-still pass.
+inspected); it is integrity evidence only. Step 37 added explicit human review decisions on
+top of that binding. The portable export package is **still deferred**, and there is still
+no publishing. All earlier content tests still pass.
 
 ### Trading: not started, and out of scope until explicitly requested
 
@@ -131,7 +132,8 @@ the visual, read-only Living HQ on top of it (see [Living HQ](hq.md)). Step 33 a
 recording for the Step 5 workflow, content productions and quality reports, with
 role-accurate rooms. Step 34 added a read-only trading results desk for saved simulations, and Step 35 a
 read-only content results desk for saved productions. Step 36 lets that desk re-check
-whether a saved quality report still matches the files it inspected.
+whether a saved quality report still matches the files it inspected, and Step 37 shows the
+human review history there (read-only).
 Still not built:
 - live event recording for the paper journal and the other commands;
 - liveness across machines, and streaming instead of polling;

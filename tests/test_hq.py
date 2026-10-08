@@ -390,7 +390,7 @@ class StaticSafetyTests(unittest.TestCase):
     def test_client_logic_in_node(self):
         result = subprocess.run(["node", str(ROOT / "tests/hq_client_test.js")], capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 16})
+        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 17})
 
 
 @unittest.skipUnless(os.environ.get("RUN_LOCAL_BROWSER_TESTS") == "1", "set RUN_LOCAL_BROWSER_TESTS=1 (needs Playwright + Chromium)")

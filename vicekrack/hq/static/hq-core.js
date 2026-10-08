@@ -199,6 +199,11 @@
     if (value === null || value === undefined) { return ""; }
     return String(value).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 600);
   }
+  /* Review notes (Step 37): user text, shown as text only. Keeps line breaks and tabs; bounded. */
+  function noteText(value) {
+    if (value === null || value === undefined) { return ""; }
+    return String(value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").slice(0, 2000);
+  }
   function words(code) { return plain(code).replace(/_/g, " "); }
   function formatTime(stamp) {
     if (!stamp) { return "not recorded"; }
@@ -376,7 +381,7 @@
 
   return {
     validContent: validContent, safeLink: safeLink,
-    prose: prose, money: money, roundText: roundText, percent: percent, REASONS: REASONS, reasonText: reasonText, metricText: metricText,
+    prose: prose, noteText: noteText, money: money, roundText: roundText, percent: percent, REASONS: REASONS, reasonText: reasonText, metricText: metricText,
     resultsPosition: resultsPosition, validResults: validResults, scale: scale, nearestIndex: nearestIndex,
     STATES: STATES, STATE_ORDER: STATE_ORDER, MODES: MODES, SPEEDS: SPEEDS, ID_PATTERN: ID_PATTERN,
     stateStyle: stateStyle, intentFor: intentFor, Replay: Replay, Graph: Graph, hashSeed: hashSeed, rng: rng,
