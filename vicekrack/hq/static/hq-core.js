@@ -224,7 +224,7 @@
   var SESSION_PATTERN = /^(demo|tss-[0-9a-f]{24})$/;
   var SESSION_STAGES = ["dataset_validation", "research_analysis", "simulation", "performance_analytics", "hq_summary"];
   function validSession(doc) {
-    if (!doc || doc.contract !== "hq_session" || doc.version !== "1.0" || doc.read_only !== true || doc.simulated !== true ||
+    if (!doc || doc.contract !== "hq_session" || doc.version !== "1.1" || doc.read_only !== true || doc.simulated !== true ||
         !SESSION_PATTERN.test(doc.session_id) || !Array.isArray(doc.stages) || doc.stages.length !== 5 || !doc.links) {
       return false;
     }

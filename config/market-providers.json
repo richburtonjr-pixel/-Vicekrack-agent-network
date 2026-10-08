@@ -1,0 +1,33 @@
+{
+  "config_version": "1.0",
+  "description": "Opt-in historical market-data providers (Step 40). Network access only with --allow-network; credentials only from environment variables; historical completed bars only; no streaming, no orders.",
+  "alpaca": {
+    "feeds": [
+      "iex",
+      "sip"
+    ],
+    "adjustments": [
+      "raw",
+      "split",
+      "dividend",
+      "all"
+    ],
+    "earliest_date": "2016-01-01",
+    "limits": {
+      "timeout_seconds": 20,
+      "max_pages": 20,
+      "page_limit": 10000,
+      "max_response_bytes": 8000000,
+      "max_total_bytes": 40000000,
+      "max_bars": 100000,
+      "max_range_days": {
+        "1m": 7,
+        "5m": 31,
+        "15m": 62,
+        "30m": 92,
+        "1h": 183,
+        "1d": 3660
+      }
+    }
+  }
+}

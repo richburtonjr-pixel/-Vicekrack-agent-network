@@ -1075,3 +1075,44 @@ flowchart LR
 - **Isolation:** the package imports no paper-account, risk-engine, intent or journal code
   and makes no network or provider calls (source-checked in tests). `open_recorder` gained
   an optional `correlation_id` argument; existing callers are unchanged.
+
+## Step 40: opt-in historical provider adapter (Alpaca)
+
+- **Modules:** `vicekrack/trading/providers/`:
+  - `alpaca.py` (`AlpacaHistoricalAdapter`, `urllib_transport`, `validate_provider`);
+  - `cli.py` (`market-fetch`).
+
+  This is the only trading package with network code. A test checks that `urllib` and
+  `socket` appear nowhere else under `vicekrack/trading/`, and that agents, the simulator,
+  analytics, signals, indicators and sessions never import `providers`.
+- **Interface:** the adapter implements the Step 25 `MarketDataAdapter.read()` →
+  `(rows, source, defaults)` and goes through the unchanged `MarketStore.import_dataset`
+  and `build_dataset`. So alignment, order, duplicates, OHLC, gaps, availability, hashing
+  and atomic exclusive publication are the same code as for CSV and fixtures.
+- **Fetch sequence:**
+  1. Validate the inputs: symbol, interval, explicit feed and adjustment, date range, the
+     historical-only rule and range bounds.
+  2. Read the credentials (environment only).
+  3. Fetch up to `max_pages` pages through an injectable `transport`. The default is an
+     HTTPS GET with certificate verification, no redirects, a timeout and a byte cap.
+  4. Parse JSON numbers as text and keep them exact (`plain_decimal`).
+  5. Check every bar's time is inside the request and closed by retrieval time.
+  6. Record the provider provenance.
+  7. Build the dataset, then publish it.
+- **Schemas:**
+  - `market-dataset.schema.json` gains an optional `source.provider` block, and
+    `alpaca_historical` joins every adapter enum (additive; version 1.0 unchanged);
+  - `market-providers-config` is new;
+  - `hq-session` moves to 1.1 with `data_source` and `data_source_problem`.
+- **Identity and tamper checks:**
+  - `file_sha256 = sha256({request_sha256, response hashes})`, so the dataset ID depends on
+    the feed, adjustment, range and bytes.
+  - `bars.validate_dataset` calls `validate_provider` on every load. It re-derives the
+    request hash and file hash and checks the coverage, label, timezone, currency and
+    page accounting.
+  - Provider provenance is refused on any other adapter.
+- **Secrets:** the trading secret scan now also treats `*_KEY_ID` environment values as
+  credentials, so a provider echoing a key ID can't be stored.
+- **HQ:** `sessions.data_source()` loads the session's dataset through `MarketStore.load`
+  (re-validated, read-only) and adds the provenance and coverage to the session summary.
+  `app.js` renders it.

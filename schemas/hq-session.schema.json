@@ -23,14 +23,16 @@
     "results",
     "continuity",
     "commands",
-    "notice"
+    "notice",
+    "data_source",
+    "data_source_problem"
   ],
   "properties": {
     "contract": {
       "const": "hq_session"
     },
     "version": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "origin": {
       "enum": [
@@ -784,6 +786,187 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 800
+    },
+    "data_source": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "adapter",
+            "data_label",
+            "source_name",
+            "verified_as_authentic",
+            "provider",
+            "coverage"
+          ],
+          "properties": {
+            "adapter": {
+              "enum": [
+                "synthetic_fixture",
+                "local_csv",
+                "alpaca_historical"
+              ]
+            },
+            "data_label": {
+              "enum": [
+                "synthetic",
+                "historical",
+                "delayed",
+                "unknown"
+              ]
+            },
+            "source_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "verified_as_authentic": {
+              "const": false
+            },
+            "provider": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "feed",
+                    "adjustment",
+                    "timeframe",
+                    "requested_start_date",
+                    "requested_end_date",
+                    "retrieved_at",
+                    "retrieval_meaning",
+                    "responses"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "alpaca"
+                    },
+                    "feed": {
+                      "enum": [
+                        "iex",
+                        "sip"
+                      ]
+                    },
+                    "adjustment": {
+                      "enum": [
+                        "raw",
+                        "split",
+                        "dividend",
+                        "all"
+                      ]
+                    },
+                    "timeframe": {
+                      "type": "string",
+                      "maxLength": 10
+                    },
+                    "requested_start_date": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "requested_end_date": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "retrieved_at": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                    },
+                    "retrieval_meaning": {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    "responses": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "coverage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "first_start_utc",
+                "last_available_utc",
+                "bars",
+                "uncovered_before_first_seconds",
+                "uncovered_after_last_seconds",
+                "gap_count",
+                "missing_intervals",
+                "calendar"
+              ],
+              "properties": {
+                "first_start_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "last_available_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "bars": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "uncovered_before_first_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  ]
+                },
+                "uncovered_after_last_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  ]
+                },
+                "gap_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "missing_intervals": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "calendar": {
+                  "const": "none"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "data_source_problem": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
     }
   }
 }

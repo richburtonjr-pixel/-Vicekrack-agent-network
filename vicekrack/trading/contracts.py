@@ -36,6 +36,7 @@ SCHEMAS = {
     "simulation_policy": "simulation-policy", "simulation_order": "simulation-order", "simulation_fill": "simulation-fill",
     "simulation_position": "simulation-position", "cash_ledger_entry": "cash-ledger-entry", "simulation_run": "simulation-run",
     "simulation_analytics_report": "simulation-analytics-report", "analytics_config": "analytics-config",
+    "market_providers_config": "market-providers-config",
     "trading_session_config": "trading-session-config", "trading_session": "trading-session",
     "trading_session_checkpoint": "trading-session-checkpoint",
     "trading_session_dataset_check": "trading-session-dataset-check",
@@ -46,7 +47,7 @@ FUTURE_SKEW = timedelta(seconds=5)
 CREDENTIAL_FIELDS = ("apikey", "apisecret", "secretkey", "privatekey", "passphrase", "password", "token",
                      "accesstoken", "accountnumber", "brokerkey", "clientsecret", "authorization")
 CREDENTIAL_SHAPES = re.compile(r"(?<![A-Za-z0-9])sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----")
-SECRET_ENV = re.compile(r"(KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE)$")
+SECRET_ENV = re.compile(r"(KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE|KEY_ID)$")
 
 
 @lru_cache(maxsize=None)

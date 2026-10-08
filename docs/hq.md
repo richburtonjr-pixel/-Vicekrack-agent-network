@@ -508,3 +508,15 @@ Decisions are recorded only with `review-record` (see [Human review](review.md))
   session.
 - **Read-only:** there is no control that starts, resumes or retries a session. Commands
   are shown as text. See [Trading research sessions](trading-session.md).
+
+### Historical data source (Step 40)
+
+Each session summary has a **Historical data source** panel, built from the session's
+dataset after it is re-validated:
+- the adapter, the source name and the label (never verified as authentic);
+- for provider datasets: the provider, feed, adjustment, timeframe and requested dates,
+  the retrieval time (wall clock, not market time) and the number of responses;
+- coverage: the first bar, the last close, the bar count, the uncovered time before and
+  after, and the gaps (no market calendar).
+
+If the dataset no longer validates, the panel says so and shows nothing from it.

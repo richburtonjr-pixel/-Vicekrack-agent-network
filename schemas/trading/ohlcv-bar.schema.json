@@ -170,7 +170,8 @@
         "adapter": {
           "enum": [
             "synthetic_fixture",
-            "local_csv"
+            "local_csv",
+            "alpaca_historical"
           ]
         },
         "name": {

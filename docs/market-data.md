@@ -124,8 +124,10 @@ Historical replay can't bypass freshness checks or change an account:
 
 ## Limitations
 
-- **Two adapters only:** synthetic fixtures and local CSV. There are no live, delayed or
-  vendor feeds and no network access.
+- **Offline adapters:** synthetic fixtures and local CSV. Step 40 adds one opt-in
+  historical provider adapter, Alpaca ([Historical market data from Alpaca](market-providers.md)).
+  There are still no live or streaming feeds, and network access happens only in
+  `market-fetch --allow-network`.
 - **No calendars or corporate actions:** there are no market calendars, holidays,
   splits, dividends or currency conversion, and only one symbol per dataset.
 - **Labels are not checked:** they are the importer's declaration and are never

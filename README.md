@@ -86,7 +86,8 @@ choose another combination, without changing the task or orchestrator. Keep mode
 for mock. Real providers require a model supporting structured JSON and account access.
 The included models are gpt-4.1-mini and claude-sonnet-4-6.
 
-`.env.example` contains only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries. The
+`.env.example` contains only blank OPENAI_API_KEY and ANTHROPIC_API_KEY entries (and, since
+Step 40, blank APCA_API_KEY_ID and APCA_API_SECRET_KEY for the optional Alpaca download). The
 application reads process environment variables; it does not load .env files. Never put
 credentials into task JSON, registry entries, prompts, or source control.
 
@@ -1565,3 +1566,66 @@ No live feeds, brokers, real orders, AI calls, optimization or scheduling.
 ![A recorded session in the Living HQ Sessions view](docs/images/session/step39-session-recorded-desktop.png)
 
 See [Trading research sessions](docs/trading-session.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 40: historical market data from Alpaca (opt-in)
+
+`market-fetch` downloads **completed historical bars** for one US stock from Alpaca, once.
+It stores them as an immutable dataset labelled `historical`, which every existing
+command (including Step 39 sessions) can use offline.
+- **Nothing else connects:** no streaming, polling, orders, broker paper orders or AI
+  calls.
+- **Live access is unverified:** this step was tested only with mocked Alpaca responses.
+  No real request was made, because no credentials were available or authorized.
+
+**1. Account and feed.** You need Alpaca Trading API keys, and a subscription that covers
+the feed you request:
+- `iex` is available on the free Basic plan;
+- full-market `sip` history needs an entitlement, and on Basic it excludes the latest 15
+  minutes.
+
+Check your own account; nothing here assumes a feed is free or available. Details are in
+[docs/market-providers.md](docs/market-providers.md).
+
+**2. Credentials (environment only, hidden input, removed afterwards).** PowerShell:
+
+```powershell
+$env:APCA_API_KEY_ID = [System.Net.NetworkCredential]::new('', (Read-Host 'Alpaca key ID' -AsSecureString)).Password
+$env:APCA_API_SECRET_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Alpaca secret key' -AsSecureString)).Password
+```
+
+Bash: `read -r -s -p 'Alpaca key ID: ' APCA_API_KEY_ID; export APCA_API_KEY_ID`, and the
+same for `APCA_API_SECRET_KEY`. Never put keys in files, config, Git or chat.
+
+**3. Import** (`--feed` and `--adjustment` are required; `--end` must be before today):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-fetch --provider alpaca --symbol AAPL --interval 5m --start 2026-09-14 --end 2026-09-18 --feed iex --adjustment raw --allow-network
+Remove-Item Env:APCA_API_KEY_ID, Env:APCA_API_SECRET_KEY
+.\.venv\Scripts\python.exe -m vicekrack market-inspect DATASET_ID --bars 5
+```
+
+**4. Session and HQ** (offline; no keys needed):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack trading-session-start DATASET_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack hq-serve        # Sessions view (or press S) -> "Historical data source"
+```
+
+- **Recorded with each dataset:**
+  - the provider, feed and adjustment;
+  - the requested range and the actual coverage;
+  - the retrieval time, labelled as wall clock and never as market time;
+  - the interval, the New York timezone, and the request and per-response SHA-256 hashes.
+
+  Credentials are never recorded.
+- **How the bars are kept:**
+  - Prices stay exact decimals, and more than 8 decimal places is rejected, never rounded.
+  - Gaps are reported, never filled in.
+  - Unfinished bars, duplicates and out-of-order bars are rejected.
+- **Bounded and atomic:** requests, pages, bytes, bars and time are all bounded. There are
+  no automatic retries and no fallback to another feed. Nothing is saved unless the whole
+  download validates.
+
+![Sessions view showing the historical data source of a dataset fetched from a mocked Alpaca response](docs/images/providers/step40-session-data-source.png)
+
+See [Historical market data from Alpaca](docs/market-providers.md) and the [Roadmap](docs/roadmap.md).

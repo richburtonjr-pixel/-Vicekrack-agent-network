@@ -224,7 +224,7 @@ test("Step 35: content documents must be read-only and never publishable", () =>
 test("Step 39: session summaries must be read-only; links open only server-checked timelines", () => {
   const stages = ["dataset_validation", "research_analysis", "simulation", "performance_analytics", "hq_summary"]
     .map((stage) => ({ stage, attempts: [] }));
-  const ok = { contract: "hq_session", version: "1.0", read_only: true, simulated: true, session_id: "demo", stages, links: {} };
+  const ok = { contract: "hq_session", version: "1.1", read_only: true, simulated: true, session_id: "demo", stages, links: {} };
   assert.ok(C.validSession(ok));
   assert.ok(C.validSession(Object.assign({}, ok, { session_id: "tss-" + "a".repeat(24) })));
   assert.ok(!C.validSession(Object.assign({}, ok, { read_only: false })));
