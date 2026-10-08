@@ -365,3 +365,34 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
   .player-media { max-width: 260px; justify-self: center; }
   .scenes { grid-template-columns: 1fr; }
 }
+
+/* Step 39: trading research sessions (read-only) */
+.ico-session { background: #5eead4; clip-path: polygon(0 40%, 18% 40%, 18% 20%, 38% 20%, 38% 40%, 62% 40%, 62% 20%, 82% 20%, 82% 40%,
+  100% 40%, 100% 60%, 82% 60%, 82% 80%, 62% 80%, 62% 60%, 38% 60%, 38% 80%, 18% 80%, 18% 60%, 0 60%); }
+.session-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 8px; font-size: 13px; }
+.session-pick select { flex: 1 1 320px; min-width: 0; max-width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.domains { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 10px 0; }
+.domain { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid #1f2a36; border-left-width: 4px;
+  border-radius: 10px; background: #0d1218; min-width: 0; }
+.domain-historical_data { border-left-color: #64748b; }
+.domain-historical_research { border-left-color: #818cf8; }
+.domain-simulated_execution { border-left-color: #2dd4bf; }
+.domain-wall_clock { border-left-color: #e9a15b; }
+.domain-value { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.session-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin: 6px 0 4px; }
+.session-link { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.session-link .action { margin: 0; text-align: left; }
+.session-link .action:disabled { opacity: 0.5; cursor: not-allowed; }
+.session-link .small { overflow-wrap: anywhere; }
+.attempts { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.commands { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.commands code { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .domains, .session-links { grid-template-columns: 1fr; }
+  .session-pick select { flex-basis: 100%; }
+}
+.session-pick .action { margin: 0; }
+.sessions-view .tile-value { white-space: normal; overflow-wrap: anywhere; }
+/* The session summary is not the house timeline: hide that timeline's replay controls and data badge here. */
+.sessions-open .dock, .sessions-open .timeline-strip, .sessions-open #mode-badge { display: none; }

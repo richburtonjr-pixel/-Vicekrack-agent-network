@@ -1,0 +1,789 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/hq-session.schema.json",
+  "title": "Living HQ trading session summary (Step 39), read-only",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "origin",
+    "session_id",
+    "read_only",
+    "simulated",
+    "status",
+    "live",
+    "summary_source",
+    "manifest_id",
+    "integrity",
+    "dataset",
+    "time_domains",
+    "stages",
+    "links",
+    "results",
+    "continuity",
+    "commands",
+    "notice"
+  ],
+  "properties": {
+    "contract": {
+      "const": "hq_session"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "origin": {
+      "enum": [
+        "demo",
+        "saved"
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^(demo|tss-[0-9a-f]{24})$"
+    },
+    "read_only": {
+      "const": true
+    },
+    "simulated": {
+      "const": true
+    },
+    "status": {
+      "enum": [
+        "running",
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "live": {
+      "type": "boolean"
+    },
+    "summary_source": {
+      "enum": [
+        "manifest",
+        "checkpoint",
+        "demo"
+      ]
+    },
+    "manifest_id": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^tsm-[0-9a-f]{24}$"
+        }
+      ]
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "problem"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "failed",
+            "demo"
+          ]
+        },
+        "problem": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "code"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "dataset_validation",
+                    "research_analysis",
+                    "simulation",
+                    "performance_analytics",
+                    "hq_summary"
+                  ]
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "symbol",
+        "interval",
+        "data_label"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^mds-[0-9a-f]{24}$"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "data_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        }
+      }
+    },
+    "time_domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "historical_data",
+        "historical_research",
+        "simulated_execution",
+        "wall_clock"
+      ],
+      "properties": {
+        "historical_data": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "first_start_utc",
+                "last_available_utc",
+                "label"
+              ],
+              "properties": {
+                "first_start_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "last_available_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                }
+              }
+            }
+          ]
+        },
+        "historical_research": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "as_of_utc",
+                "relation_to_simulation",
+                "used_by_simulation",
+                "label"
+              ],
+              "properties": {
+                "as_of_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "relation_to_simulation": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "enum": [
+                        "before_simulation_start",
+                        "during_simulation_window",
+                        "at_or_after_simulation_end"
+                      ]
+                    }
+                  ]
+                },
+                "used_by_simulation": {
+                  "const": false
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                }
+              }
+            }
+          ]
+        },
+        "simulated_execution": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_utc",
+                "end_utc",
+                "label"
+              ],
+              "properties": {
+                "start_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "end_utc": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                }
+              }
+            }
+          ]
+        },
+        "wall_clock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_created_at",
+            "label"
+          ],
+          "properties": {
+            "session_created_at": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stage",
+          "position",
+          "label",
+          "time_domain",
+          "status",
+          "verification",
+          "record_kind",
+          "record_id",
+          "attempts"
+        ],
+        "properties": {
+          "stage": {
+            "enum": [
+              "dataset_validation",
+              "research_analysis",
+              "simulation",
+              "performance_analytics",
+              "hq_summary"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "time_domain": {
+            "enum": [
+              "historical_data",
+              "historical_research",
+              "simulated_execution",
+              "derived_from_simulation",
+              "wall_clock"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "verification": {
+            "enum": [
+              "verified",
+              "failed",
+              "not_applicable",
+              "not_checked_after_earlier_failure",
+              "demo"
+            ]
+          },
+          "record_kind": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              }
+            ]
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^(tsdc|rar|srun|sarp|tsm|mds)-[0-9a-f]{24}$"
+              }
+            ]
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "attempt",
+                "reason",
+                "outcome",
+                "started_at",
+                "ended_at",
+                "error_code",
+                "timeline_id",
+                "timeline_outcome"
+              ],
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "reason": {
+                  "enum": [
+                    "first_run",
+                    "retry_after_failure",
+                    "retry_after_interruption"
+                  ]
+                },
+                "outcome": {
+                  "enum": [
+                    "running",
+                    "completed",
+                    "failed",
+                    "interrupted",
+                    "recovered"
+                  ]
+                },
+                "started_at": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "ended_at": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                    }
+                  ]
+                },
+                "error_code": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                    }
+                  ]
+                },
+                "timeline_id": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^tl-[0-9a-f]{24}$"
+                    }
+                  ]
+                },
+                "timeline_outcome": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "research_rooms",
+        "simulator_station",
+        "analytics_desk"
+      ],
+      "properties": {
+        "research_rooms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "available",
+            "timeline_id",
+            "origin",
+            "reason",
+            "label"
+          ],
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "timeline_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(demo|(tl|rar|srun)-[0-9a-f]{24})$"
+                }
+              ]
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "enum": [
+                    "recorded",
+                    "reconstructed",
+                    "demo"
+                  ]
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                }
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "simulator_station": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "available",
+            "timeline_id",
+            "origin",
+            "reason",
+            "label"
+          ],
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "timeline_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(demo|(tl|rar|srun)-[0-9a-f]{24})$"
+                }
+              ]
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "enum": [
+                    "recorded",
+                    "reconstructed",
+                    "demo"
+                  ]
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                }
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "analytics_desk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "available",
+            "timeline_id",
+            "origin",
+            "reason",
+            "label"
+          ],
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "timeline_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(demo|(tl|rar|srun)-[0-9a-f]{24})$"
+                }
+              ]
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "enum": [
+                    "recorded",
+                    "reconstructed",
+                    "demo"
+                  ]
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                }
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        }
+      }
+    },
+    "results": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "research_verdict",
+            "fills",
+            "orders_created",
+            "orders_rejected",
+            "ending_equity",
+            "net_return",
+            "closed_trades",
+            "kill_switch_engaged"
+          ],
+          "properties": {
+            "research_verdict": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              ]
+            },
+            "fills": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "orders_created": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "orders_rejected": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "ending_equity": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                }
+              ]
+            },
+            "net_return": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                }
+              ]
+            },
+            "closed_trades": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "kill_switch_engaged": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "continuity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      }
+    },
+    "notice": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+    }
+  }
+}

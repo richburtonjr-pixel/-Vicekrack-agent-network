@@ -491,3 +491,20 @@ Decisions are recorded only with `review-record` (see [Human review](review.md))
   narration WAV separately, only the audio inside the preview.
 - **Still to come:** trading controls, publishing, AI calls and multi-user access are not
   part of the HQ.
+
+## Sessions view (Step 39)
+
+**Sessions** (or the `S` key) shows Step 39 trading research sessions, read-only:
+- **The list:** the synthetic demo session first, then saved sessions.
+- **Each summary:**
+  - status (`running` only while a process holds the session lock);
+  - where the summary comes from (verified manifest or checkpoint) and the integrity check;
+  - the four time domains and the results;
+  - the five stages, with every attempt's wall-clock start and end.
+- **Links:** they open the research rooms, the Simulator station or the analytics desk
+  (results desk, completed-run summary) for timelines the server checked.
+- **What's hidden:** while this view is open, the house timeline's replay dock and data
+  badge are hidden, because they belong to the house's loaded timeline, not to the
+  session.
+- **Read-only:** there is no control that starts, resumes or retries a session. Commands
+  are shown as text. See [Trading research sessions](trading-session.md).

@@ -1,7 +1,8 @@
 /* ViceKrack Living HQ (Step 32): read-only visual Command Center.
  *
  * Safety rules for this file:
- * - Only GET requests to /api/timelines and /api/scene. No other network use.
+ * - Only GET requests to the read-only /api/ routes (timelines, scene, results, content, sessions). No other
+ *   network use.
  * - All text from the server is inserted with textContent / setAttribute, never as HTML.
  * - Status shown for a room always comes from the scene frame at the replay position (or the
  *   "now" data). Bot movement is decoration: it can lag behind, but it never changes a status.
@@ -1043,14 +1044,18 @@
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
+    var sessions = view === "sessions";
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
-    $("stage-wrap").hidden = timeline || results || content || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results && !content);
-    document.body.classList.toggle("results-open", results || content);
+    $("sessions-view").hidden = !sessions;
+    $("stage-wrap").hidden = timeline || results || content || sessions || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions);
+    document.body.classList.toggle("results-open", results || content || sessions);
+    document.body.classList.toggle("sessions-open", sessions);       // replay controls belong to the house timeline
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
+    if (sessions) { loadSessions(); }
     R.renderedKey = null;
     CT.renderedKey = null;
     renderStatuses(false);
@@ -2184,6 +2189,151 @@
     }, POLL_MS);
   }
 
+
+  /* ------------------------------------------------------------------ Step 39: trading sessions (read-only)
+   * Only GET /api/sessions and /api/session. The links below open views the HQ already has
+   * (house rooms, simulator station, results desk) for timelines the server checked; nothing here
+   * starts, resumes or changes a session. */
+  var SS = { items: [], id: "demo", doc: null, error: null, generation: 0 };
+  var DOMAIN_TITLES = { historical_data: "Historical data", historical_research: "Historical research",
+    simulated_execution: "Simulated execution", wall_clock: "Wall clock (this computer)" };
+  function loadSessions() {
+    return getJSON("/api/sessions").then(function (data) {
+      SS.items = Array.isArray(data.items) ? data.items.filter(function (i) { return C.SESSION_PATTERN.test(i.session_id); }) : [];
+    }).catch(function () {
+      SS.items = [{ session_id: "demo", readable: true, status: "completed", symbol: "DEMO", origin: "demo" }];
+    }).then(function () {
+      if (!SS.items.some(function (i) { return i.session_id === SS.id; })) { SS.id = "demo"; }
+      renderSessionPicker();
+      return loadSession(SS.id);
+    });
+  }
+  function sessionName(item) {
+    if (item.session_id === "demo") { return "Demo session (synthetic)"; }
+    if (item.readable === false) { return item.session_id + " · unreadable (" + C.words(item.code || "invalid") + ")"; }
+    return item.session_id + " · " + item.symbol + " " + item.interval + " · " + C.words(item.status) + " · " +
+      item.stages_completed + "/5 stages";
+  }
+  function renderSessionPicker() {
+    var select = $("session-select");
+    clear(select);
+    SS.items.forEach(function (item) {
+      var option = h("option", { value: item.session_id }, select, sessionName(item));
+      if (item.readable === false) { option.disabled = true; }
+      if (item.session_id === SS.id) { option.selected = true; }
+    });
+  }
+  function loadSession(id) {
+    if (!C.SESSION_PATTERN.test(id)) { return Promise.resolve(); }
+    SS.generation += 1;
+    var generation = SS.generation;
+    SS.id = id;
+    return getJSON("/api/session?id=" + encodeURIComponent(id)).then(function (doc) {
+      if (generation !== SS.generation) { return; }
+      if (!C.validSession(doc)) { throw new Error("invalid_session_summary"); }
+      SS.doc = doc; SS.error = null;
+      renderSession();
+    }).catch(function (error) {
+      if (generation !== SS.generation) { return; }
+      SS.doc = null; SS.error = error.message;
+      renderSession();
+    });
+  }
+  function openSessionLink(name) {
+    var id = SS.doc ? C.sessionLink(SS.doc.links[name]) : null;
+    if (!id) { return; }
+    loadScene(id).then(function () {
+      S.focusRoom = null;
+      if (name === "research_rooms") { setView("trading"); select("market_scout"); }
+      else if (name === "simulator_station") { setView("house"); select("operations"); }
+      else { setResultsTab("summary"); setView("results"); }
+    });
+  }
+  function renderSession() {
+    var body = $("session-body"), doc = SS.doc, badge = $("session-badge");
+    clear(body);
+    if (!doc) {
+      badge.textContent = "SIMULATED";
+      badge.className = "sim-badge";
+      h("p", { class: "notice warn" }, body, "This session could not be shown (" + C.words(SS.error || "unknown") +
+        "). Nothing was changed. Use python -m vicekrack trading-session-inspect for details.");
+      return;
+    }
+    var demo = doc.origin === "demo";
+    badge.textContent = demo ? "DEMO DATA · SYNTHETIC · SIMULATED" : "SAVED SESSION · SIMULATED";
+    badge.className = "sim-badge " + (demo ? "demo" : "saved");
+    var facts = h("div", { class: "facts" }, body);
+    row(facts, "Session", idCode(doc.session_id === "demo" ? "demo" : doc.session_id));
+    row(facts, "Status", C.words(doc.status) + (doc.live ? " · a process holds the session lock now" : " · no process is running it"));
+    row(facts, "Dataset", doc.dataset.symbol + " · " + doc.dataset.interval + " · " + doc.dataset.data_label + " · " + doc.dataset.dataset_id);
+    row(facts, "Summary source", doc.summary_source === "manifest" ? "verified session manifest " + doc.manifest_id :
+      doc.summary_source === "checkpoint" ? "verified checkpoint and completed artifacts (no manifest yet)" : "demo (synthetic)");
+    row(facts, "Integrity", doc.integrity.status === "failed" ? "FAILED at " + C.words(doc.integrity.problem.stage) + ": " +
+      C.words(doc.integrity.problem.code) : C.words(doc.integrity.status));
+    if (doc.integrity.status === "failed") {
+      h("p", { class: "notice warn" }, body, "A saved artifact failed validation, so no results or links are shown for this session.");
+    }
+    var research = doc.time_domains.historical_research;
+    para("p", { class: "separation" }, body, research ?
+      "Research conclusions are historical research as of " + C.formatTime(research.as_of_utc) + " (simulated time" +
+      (research.relation_to_simulation ? ", " + C.words(research.relation_to_simulation) : "") +
+      "). The simulator decided with its own policy and never received them; they authorize nothing." :
+      "No research stage has completed. The simulator never uses research conclusions.");
+
+    var domains = h("div", { class: "domains" }, body);
+    ["historical_data", "historical_research", "simulated_execution", "wall_clock"].forEach(function (key) {
+      var d = doc.time_domains[key], card = h("div", { class: "domain domain-" + key }, domains);
+      h("span", { class: "tile-label" }, card, DOMAIN_TITLES[key]);
+      if (!d) { h("span", { class: "domain-value muted" }, card, "Not available yet"); return; }
+      var value = key === "historical_data" ? C.formatTime(d.first_start_utc) + " → " + C.formatTime(d.last_available_utc) :
+        key === "historical_research" ? "as of " + C.formatTime(d.as_of_utc) :
+        key === "simulated_execution" ? C.formatTime(d.start_utc) + " → " + C.formatTime(d.end_utc) :
+        "session created " + C.formatTime(d.session_created_at);
+      h("span", { class: "domain-value" }, card, value);
+      para("span", { class: "tile-note" }, card, d.label);
+    });
+
+    var linkBox = h("div", { class: "session-links", role: "group", "aria-label": "Open related read-only views" }, body);
+    ["research_rooms", "simulator_station", "analytics_desk"].forEach(function (name) {
+      var link = doc.links[name], id = C.sessionLink(link);
+      var wrap = h("div", { class: "session-link" }, linkBox);
+      var button = h("button", { type: "button", class: "action", "data-link": name }, wrap, "Open " + link.label);
+      button.disabled = !id;
+      button.addEventListener("click", function () { openSessionLink(name); });
+      h("span", { class: "muted small" }, wrap, id ? C.words(link.origin) + " timeline " + id +
+        (link.reason ? " (" + C.words(link.reason) + ")" : "") : "Unavailable: " + C.words(link.reason || "unknown"));
+    });
+
+    if (doc.results) {
+      var tiles = h("div", { class: "tiles" }, body);
+      var r = doc.results;
+      tile(tiles, "Research verdict", r.research_verdict ? C.words(r.research_verdict) : "Not available", "research only");
+      tile(tiles, "Simulated fills", r.fills === null ? "Not available" : String(r.fills), r.orders_created === null ? null :
+        r.orders_created + " orders · " + r.orders_rejected + " rejected");
+      tile(tiles, "Ending equity", r.ending_equity === null ? "Not available" : C.money(r.ending_equity), "simulated");
+      tile(tiles, "Net return", r.net_return === null ? "Not available" : C.money(r.net_return, true), "simulated, not annualized",
+        r.net_return === null ? "na" : signedTone(r.net_return));
+      tile(tiles, "Closed trades", r.closed_trades === null ? "Not available" : String(r.closed_trades), null);
+      tile(tiles, "Kill switch", r.kill_switch_engaged === null ? "Not available" : r.kill_switch_engaged ? "Engaged" : "Not engaged", "simulation only");
+    }
+
+    table(body, "Stages (fixed order; each keeps its own record and timestamps)",
+      ["Stage", "Time domain", "Status", "Attempts (wall clock)", "Record", "Verification"],
+      doc.stages.map(function (stage) {
+        var attempts = h("ul", { class: "attempts" });
+        stage.attempts.forEach(function (a) { h("li", {}, attempts, C.attemptText(a)); });
+        if (!stage.attempts.length) { h("li", { class: "muted" }, attempts, "Not started"); }
+        return [stage.position + ". " + stage.label, C.words(stage.time_domain), C.words(stage.status), attempts,
+          idCode(stage.record_id), C.words(stage.verification)];
+      }));
+    para("p", { class: "muted small" }, body, doc.continuity);
+    var commands = h("div", { class: "notice" }, body);
+    h("strong", {}, commands, "Commands (run in a terminal; this page cannot run them)");
+    var list = h("ul", { class: "commands" }, commands);
+    doc.commands.forEach(function (command) { h("code", {}, h("li", {}, list), command); });
+    para("p", { class: "muted small" }, body, doc.notice);
+  }
+
   /* ------------------------------------------------------------------ controls */
   function toggle(id, key) {
     S[key] = !S[key];
@@ -2215,6 +2365,8 @@
     $("btn-present").addEventListener("click", function () { setPresenting(!S.presenting); });
     $("present-exit").addEventListener("click", function () { setPresenting(false); });
     $("btn-refresh").addEventListener("click", loadTimelines);
+    $("btn-sessions-refresh").addEventListener("click", loadSessions);
+    $("session-select").addEventListener("change", function (e) { loadSession(e.target.value); });
     $("res-tab-position").addEventListener("click", function () { setResultsTab("position"); });
     $("res-tab-summary").addEventListener("click", function () { setResultsTab("summary"); });
     $("ct-tab-position").addEventListener("click", function () { setContentTab("position"); });
@@ -2241,6 +2393,7 @@
       else if (e.key === "v" || e.key === "V") { $("btn-list").click(); }
       else if (e.key === "r" || e.key === "R") { if (S.view === "results") { setView("house"); } else { openResults(); } }
       else if (e.key === "c" || e.key === "C") { if (S.view === "content-results") { setView("house"); } else { openContent(); } }
+      else if (e.key === "s" || e.key === "S") { S.focusRoom = null; setView(S.view === "sessions" ? "house" : "sessions"); }
       else if (e.key === "Escape") { if (S.presenting) { setPresenting(false); } else { select(null); } }
       else if (S.presenting && /^[0-8]$/.test(e.key)) { focusRoom(e.key === "0" ? null : BOT_ROOMS[Number(e.key) - 1]); }
     });

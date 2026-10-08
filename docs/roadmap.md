@@ -8,7 +8,7 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 |---|---|---|
 | **Shared infrastructure** | Orchestration, providers, persistence, checks and safety rules used by both subsystems | `vicekrack/` core modules, `scripts/`, CI |
 | **Content** | Research → verify → select → write → plan → preview → produce → quality-check short vertical videos | `vicekrack/` content modules |
-| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals, a deterministic research-agent workflow and an offline execution simulator | `vicekrack/trading/` |
+| **Trading** | Paper-only risk foundation: contracts, limits, persistent paper state, journal, offline market data, replay, descriptive indicators and research-only signals, a deterministic research-agent workflow, an offline execution simulator, read-only analytics and controlled end-to-end research sessions | `vicekrack/trading/` |
 
 ## Completed steps
 
@@ -51,7 +51,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 35 | Shared | Read-only content results desk in the Living HQ: saved productions with stages, attempts, failures and reuse; Story Brief, sources (text links, explicit open only), verification limits, script beats, scene plan with posters, local preview player with optional narration, Step 22 findings; artifacts re-verified by path, hash, contract and chain (tampered/mismatched/missing rejected); replay view shows only what the timeline proves existed, otherwise historical viewing unavailable; quality reports shown as unverified or stale, never current; opaque-ID media route with bounded byte ranges; Creator room and production stations open it; dedicated real-browser CI job for both desks | #35 |
 | 36 | Content | Verifiable content artifacts: preview manifest 1.1 with a SHA-256 and size for every scene poster (video hashing kept), every file, path, size and hash validated before publication; quality report 1.1 binds the exact artifacts and configuration it inspected (safe IDs and hashes only) from one snapshot, detects changes during inspection, never hashes reports (no circularity); legacy manifests and reports stay readable as `not hash-bound` and `unverified`, never upgraded; `quality-binding REPORT_ID` re-checks a saved report read-only; Living HQ shows separate artifact binding, technical result and evidence freshness labels and re-validates on load and when serving | #36 |
 | 37 | Content | Human review decisions for content previews: append-only `content_review` records (`approved_for_preview`, `changes_requested`, `rejected`) tied to a quality report's ID and hash and the exact binding digest, with a self-declared reviewer label, time, acknowledgments and bounded notes; matching binding required, approval blocked on `fail` or unknown evidence freshness, explicit acknowledgment of needs_review, unavailable checks, draft restrictions and stale evidence; re-validated under the production lock before saving, refused on changes during review; explicit supersession, concurrent writers refused, atomic exclusive writes, corrupted history visible; applicability and evidence freshness computed on every read; `review-record`, `review-list`, `review-inspect`; read-only review history in the Content Results Desk with replay visibility rules | #37 |
-| 38 | Content | Portable, locally viewable preview packages: `export-preview` (purposes `review_copy` and `approved_preview`) copies an allowlisted set (preview MP4, posters, script, derived provenance summary, bound quality report, derived review snapshot) plus a static offline HTML page (escaped, relative links, no JavaScript or remote resources) and a versioned manifest of every payload file's path, size and SHA-256; gates on matching binding, no technical fail, intact review history and present unchanged artifacts, and a current approval for `approved_preview`; reviewer labels and notes excluded unless explicitly included; consistent snapshot under the production lock, copied bytes re-verified, concurrent changes refused, atomic publish without overwrite; `export-verify` checks a moved package without the production (inventory, sizes, hashes, schemas, references); hashes are consistency checks, not signatures | this PR |
+| 38 | Content | Portable, locally viewable preview packages: `export-preview` (purposes `review_copy` and `approved_preview`) copies an allowlisted set (preview MP4, posters, script, derived provenance summary, bound quality report, derived review snapshot) plus a static offline HTML page (escaped, relative links, no JavaScript or remote resources) and a versioned manifest of every payload file's path, size and SHA-256; gates on matching binding, no technical fail, intact review history and present unchanged artifacts, and a current approval for `approved_preview`; reviewer labels and notes excluded unless explicitly included; consistent snapshot under the production lock, copied bytes re-verified, concurrent changes refused, atomic publish without overwrite; `export-verify` checks a moved package without the production (inventory, sizes, hashes, schemas, references); hashes are consistency checks, not signatures | #38 |
+| 39 | Trading | Controlled end-to-end trading research session: `trading-session-start/-resume/-list/-inspect` run the existing components in a fixed five-stage order (validate dataset → research agents → simulation → analytics → HQ summary); records dataset, configuration snapshots, component versions and artifact hashes; research labelled with its exact simulated as-of time and never passed to the simulator (identical to a standalone run); fixed stage limit, explicit failures, no automatic retries, attempt limit; atomic checkpoints with a hash chain, artifacts published once, OS lock against concurrent runs, crash recovery that adopts published artifacts instead of re-running them, resume refused on tampered artifacts, changed configuration or component versions; append-only registration in the existing stores; optional event recording with the session's correlation ID; versioned session manifest and a read-only Living HQ Sessions view linking research rooms, simulator station and analytics desk without merging timelines; synthetic demo session | this PR |
 
 ## Deferred work
 
@@ -117,7 +118,10 @@ upload or publishing. All earlier content tests still pass.
 - More analytics: comparisons across runs, risk-adjusted ratios and benchmarks. Step 30
   reports are read-only descriptions of one run; Step 34 only displays them (with charts)
   in the Living HQ.
-- Background or scheduled execution.
+- Background or scheduled execution. Step 39 sessions run only when a person starts or
+  resumes them, in the foreground, with no automatic retries.
+- Comparing sessions, multi-dataset or multi-symbol sessions, and strategy optimization
+  across sessions. A Step 39 session is one dataset and one fixed configuration.
 - Trading controls of any kind. Step 34's results desk is display-only: it cannot run a
   simulation, generate analytics, engage or release a kill switch, or touch accounts.
 
@@ -136,7 +140,9 @@ recording for the Step 5 workflow, content productions and quality reports, with
 role-accurate rooms. Step 34 added a read-only trading results desk for saved simulations, and Step 35 a
 read-only content results desk for saved productions. Step 36 lets that desk re-check
 whether a saved quality report still matches the files it inspected, and Step 37 shows the
-human review history there (read-only).
+human review history there (read-only). Step 39 added a read-only Sessions view that links a
+trading research session's research rooms, simulator station and analytics desk; it cannot
+start or resume sessions.
 Still not built:
 - live event recording for the paper journal and the other commands;
 - liveness across machines, and streaming instead of polling;

@@ -1029,3 +1029,49 @@ flowchart LR
   The page is checked with an HTML parser for scripts, handlers, active elements and
   references outside the package.
 - **Trust model:** consistency only, no signatures. Snapshots are dated by `exported_at`.
+
+## Step 39: trading research sessions
+
+- **Modules:** `vicekrack/trading/session/`:
+  - `runner.py` (`SessionRunner`, `load_inputs`, `verify_artifact`);
+  - `store.py` (`SessionStore`: folder creation by atomic rename, OS lock, chained
+    checkpoints, exclusive artifact publication);
+  - `manifest.py` (`trading_session_manifest` 1.0);
+  - `view.py` (read-only `describe`/`list_sessions`);
+  - `cli.py`.
+- **Schemas** (`schemas/trading/`): `trading-session-config`, `trading-session`,
+  `trading-session-checkpoint`, `trading-session-dataset-check` and
+  `trading-session-manifest`, plus `schemas/hq-session.schema.json`.
+- **Stage protocol:**
+  1. checkpoint the attempt as `running`;
+  2. run the existing component (optionally with a Step 31 recorder that carries the
+     session's correlation ID);
+  3. close the recorder;
+  4. publish the artifact (exclusive link);
+  5. register the record in its store (save, or verify an identical `already_present`);
+  6. checkpoint `completed`.
+
+  Any `TradingError` checkpoints `failed` with its code and stops. Other exceptions are
+  left unhandled, so a crash leaves the attempt `running`.
+- **Resume:** the checks run in this order:
+  1. the record hash and checkpoint chain, under the lock;
+  2. the configuration and component versions (`load_inputs` is re-read and compared);
+  3. the dataset provenance;
+  4. every completed artifact (file hash plus contract validator plus cross-links).
+
+  A `running` stage with an artifact is adopted (`recovered`); without one it becomes
+  `interrupted` and is re-run as a new attempt.
+- **Separation:** `_run_stage` passes the simulator only the dataset, the policy, the shared
+  configuration and its kill switch; a test asserts the exact keyword set. The
+  research-agent run is never an input to stages 3–4.
+- **HQ:** `vicekrack/hq/sessions.py` builds `hq_session` 1.0 from `view.describe`:
+  - the manifest when the session completed, the checkpoint otherwise;
+  - each link is checked with `events.cli.load_timeline` against the session's own run ID;
+  - an integrity failure suppresses results and links.
+
+  The demo comes from `vicekrack/hq/session_demo.py`. Routes: `GET /api/sessions` and
+  `GET /api/session?id=`. `app.js` adds the Sessions view; its links reuse `loadScene`, the
+  rooms, the Simulator station and the results desk.
+- **Isolation:** the package imports no paper-account, risk-engine, intent or journal code
+  and makes no network or provider calls (source-checked in tests). `open_recorder` gained
+  an optional `correlation_id` argument; existing callers are unchanged.

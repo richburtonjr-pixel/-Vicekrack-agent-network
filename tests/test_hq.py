@@ -362,7 +362,8 @@ class StaticSafetyTests(unittest.TestCase):
         self.assertEqual(app.count("window.fetch("), 1)                     # one GET helper
         self.assertEqual(sorted(set(re.findall(r"\"(/api/[a-z/]+)", app))),        # Step 34 adds the results routes
                          ["/api/content/at", "/api/content/latest", "/api/content/media", "/api/results",
-                          "/api/results/at", "/api/results/summary", "/api/scene", "/api/timelines"])
+                          "/api/results/at", "/api/results/summary", "/api/scene", "/api/session", "/api/sessions",
+                      "/api/timelines"])                                   # Step 39 adds the read-only session routes
         # Step 35: source links open only on an explicit click, in a new tab without opener or referrer.
         self.assertEqual(app.count("window.open("), 1)
         self.assertIn('window.open(href, "_blank", "noopener,noreferrer")', app)
@@ -390,7 +391,7 @@ class StaticSafetyTests(unittest.TestCase):
     def test_client_logic_in_node(self):
         result = subprocess.run(["node", str(ROOT / "tests/hq_client_test.js")], capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 17})
+        self.assertEqual(json.loads(result.stdout.strip().splitlines()[-1]), {"passed": 18})
 
 
 @unittest.skipUnless(os.environ.get("RUN_LOCAL_BROWSER_TESTS") == "1", "set RUN_LOCAL_BROWSER_TESTS=1 (needs Playwright + Chromium)")

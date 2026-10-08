@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/trading-session-config.schema.json",
+  "title": "Trading research session configuration (Step 39)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_version",
+    "description",
+    "research",
+    "simulation",
+    "limits"
+  ],
+  "properties": {
+    "config_version": {
+      "const": "1.0"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "research": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "as_of",
+        "strategies"
+      ],
+      "properties": {
+        "as_of": {
+          "anyOf": [
+            {
+              "const": "dataset_end"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          ]
+        },
+        "strategies": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "start",
+        "end",
+        "step_seconds"
+      ],
+      "properties": {
+        "policy": {
+          "type": "string",
+          "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          ]
+        },
+        "step_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 86400
+            }
+          ]
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_attempts_per_stage"
+      ],
+      "properties": {
+        "max_attempts_per_stage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    }
+  }
+}

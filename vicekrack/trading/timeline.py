@@ -27,13 +27,15 @@ EVENT_CODES = {"event_persistence_failed", "event_limit_reached", "event_duplica
                "invalid_event_transition", "event_timeline_exists", "event_storage_full"}
 
 
-def open_recorder(kind, root=None):
-    """A persistent Recorder for one trading command; storage errors become TradingErrors."""
+def open_recorder(kind, root=None, correlation_id=None):
+    """A persistent Recorder for one trading command; storage errors become TradingErrors.
+    A Step 39 session passes its own correlation ID so its stage timelines can be grouped."""
     from ..events.sink import Recorder
     from ..events.store import EventStore
     components = AGENT_COMPONENTS if kind == "research_agent_workflow" else SIM_COMPONENTS
     try:
-        return Recorder(department="trading", kind=kind, components=components, store=EventStore(root))
+        return Recorder(department="trading", kind=kind, components=components, correlation_id=correlation_id,
+                        store=EventStore(root))
     except NetworkError as error:
         raise TradingError(error.code, error.message) from None
 

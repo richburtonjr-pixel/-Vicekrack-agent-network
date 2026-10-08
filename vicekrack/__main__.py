@@ -64,6 +64,11 @@ def main():
         from .events.cli import main as events_main
         return events_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"trading-session-start", "trading-session-resume", "trading-session-list",
+                                             "trading-session-inspect"}:
+        from .trading.session.cli import main as session_main
+        return session_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"analytics-generate", "analytics-inspect", "analytics-list"}:
         from .trading.analytics.cli import main as analytics_main
         return analytics_main()

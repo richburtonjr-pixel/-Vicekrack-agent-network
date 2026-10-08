@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/trading/trading-session.schema.json",
+  "title": "Trading research session record (Step 39, immutable)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "session_id",
+    "correlation_id",
+    "created_at",
+    "mode",
+    "simulated",
+    "paper_account_access",
+    "broker",
+    "notice",
+    "dataset",
+    "inputs",
+    "versions",
+    "stages",
+    "record_sha256"
+  ],
+  "properties": {
+    "contract": {
+      "const": "trading_session"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^tss-[0-9a-f]{24}$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^cor-[0-9a-f]{24}$"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "mode": {
+      "const": "offline_simulation"
+    },
+    "simulated": {
+      "const": true
+    },
+    "paper_account_access": {
+      "const": false
+    },
+    "broker": {
+      "type": "null"
+    },
+    "notice": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "bars_sha256",
+        "source_file_sha256",
+        "symbol",
+        "interval",
+        "timezone",
+        "data_label"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^mds-[0-9a-f]{24}$"
+        },
+        "bars_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "data_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_config",
+        "market_data",
+        "indicators",
+        "research_signals",
+        "research_agents",
+        "simulation_policy",
+        "analytics"
+      ],
+      "properties": {
+        "session_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "market_data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "indicators": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "research_signals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "research_agents": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "simulation_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        },
+        "analytics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "document"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^config/[A-Za-z0-9._-]{1,80}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "document": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_runner",
+        "session_manifest",
+        "market_dataset",
+        "research_agent_run",
+        "research_handlers",
+        "simulation_run",
+        "simulation_analytics_report"
+      ],
+      "properties": {
+        "session_runner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "session_manifest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "market_dataset": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "research_agent_run": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "research_handlers": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "simulation_run": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "simulation_analytics_report": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        }
+      }
+    },
+    "stages": {
+      "const": [
+        "dataset_validation",
+        "research_analysis",
+        "simulation",
+        "performance_analytics",
+        "hq_summary"
+      ]
+    },
+    "record_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

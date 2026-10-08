@@ -1,0 +1,17 @@
+{
+  "config_version": "1.0",
+  "description": "Controlled end-to-end trading research session (Step 39): validate dataset, research agents, simulation, analytics, HQ summary. Offline and simulated only; research conclusions never authorize or feed simulated orders.",
+  "research": {
+    "as_of": "dataset_end",
+    "strategies": null
+  },
+  "simulation": {
+    "policy": "config/simulation.paper.json",
+    "start": null,
+    "end": null,
+    "step_seconds": null
+  },
+  "limits": {
+    "max_attempts_per_stage": 3
+  }
+}

@@ -1519,3 +1519,49 @@ any included review notes may contain sensitive content.
 ![Approved preview package opened offline](docs/images/export/step38-package-desktop.png)
 
 See [Portable preview packages](docs/export.md) and the [Roadmap](docs/roadmap.md).
+
+## Step 39: controlled trading research sessions
+
+One explicit command runs the existing trading components on one stored dataset, in a
+fixed order:
+
+**validate dataset → research agents → simulation → performance analytics → Living HQ summary**
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-import --adapter synthetic --fixture synth1-5m-reclaim
+.\.venv\Scripts\python.exe -m vicekrack trading-session-start DATASET_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack trading-session-list
+.\.venv\Scripts\python.exe -m vicekrack trading-session-inspect SESSION_ID
+.\.venv\Scripts\python.exe -m vicekrack trading-session-resume SESSION_ID
+.\.venv\Scripts\python.exe -m vicekrack hq-serve        # then open Sessions (or press S)
+```
+
+- **Reuses the existing code.** Stages call the Step 25 dataset loader, the Step 28
+  research workflow, the Step 29 simulator and the Step 30 analytics. Their records are
+  also saved, append-only, in the usual stores.
+- **Research never drives the simulator.** Research is labelled with its exact simulated
+  as-of time, and nothing from it is passed to the simulator. The simulator decides with
+  its own policy, so its run is identical to a standalone `sim-run`.
+- **Labelled time domains:** historical data, historical research, simulated execution and
+  wall clock are always shown separately.
+- **Everything is recorded:** the dataset, every configuration snapshot, the component
+  versions and every artifact hash.
+- **Controlled:**
+  - fixed stages, explicit failure codes and an attempt limit;
+  - no automatic retries;
+  - atomic checkpoints and an OS lock against concurrent runs;
+  - duplicates refused.
+- **Explicit resume** continues from the first incomplete stage after re-validating
+  everything. It refuses if an artifact was tampered with, a configuration or component
+  version changed, or the dataset changed.
+- **Crash recovery:** if a stage published its artifact but its checkpoint wasn't saved,
+  resume adopts the artifact instead of running the stage again.
+- **Living HQ:** a read-only Sessions view with a synthetic demo session. It links each
+  session's research rooms, simulator station and analytics desk, and keeps each stage's
+  timeline separate. It cannot start or resume sessions.
+
+No live feeds, brokers, real orders, AI calls, optimization or scheduling.
+
+![A recorded session in the Living HQ Sessions view](docs/images/session/step39-session-recorded-desktop.png)
+
+See [Trading research sessions](docs/trading-session.md) and the [Roadmap](docs/roadmap.md).
