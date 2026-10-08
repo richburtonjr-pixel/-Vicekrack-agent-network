@@ -50,3 +50,22 @@ Normalization keeps only the sample data, pads it with digital silence to exactl
 Muxing is one extra call through the existing `invoke()` wrapper (argument list, no shell, 90-second timeout, suppressed diagnostics, provider keys excluded from the environment). It maps only the concatenated video and the normalized audio, copies the video stream, encodes AAC at 48 kHz, and passes `-map_metadata -1 -map_chapters -1`. No `-shortest`, `-t` or audio filters are used. The existing full decode check then covers both streams. The staged `silent.mp4` and `narration.wav` are deleted before publication; on any failure the whole staging directory is removed and nothing is published. AAC encoder padding can make the decoded audio a few milliseconds longer than 15 seconds; no samples are removed.
 
 Posters keep the same watermark band; only the subtitle changes from "SILENT STORYBOARD" to "LOCAL NARRATION STORYBOARD". The manifest stays `preview_only: true` and `publishable: false`, and adds `audio` metadata plus limitations noting that narration is user-supplied and its rights, consent and content are not verified. There is still no voice generation, captions synced to speech, word timing, lip sync, music, provider call or publishing.
+
+## Step 36: preview manifest 1.1
+
+New previews write manifest version **1.1** (`schemas/preview-manifest.schema.json`):
+- the video keeps `video_sha256` and adds `video_bytes`;
+- every scene adds `poster_sha256` and `poster_bytes`.
+
+Before the staging directory is renamed into place, the renderer checks that every file the
+manifest names exists inside the package, is a regular file reached without a symbolic
+link, is within its size limit, matches its recorded size and SHA-256, and (for posters)
+starts with the PNG signature. If anything fails, the package is discarded with
+`invalid_render_output` and nothing is published. The production pipeline checks the same
+again before it records the preview stage.
+
+**Older previews (1.0)** stay valid and readable. Their posters are reported as
+`not hash-bound` and are never upgraded. Completed stages never re-run, so an older
+preview **cannot be regenerated in place**: start a new production (`produce`) to get a
+1.1 manifest with poster hashes. Hashes prove byte identity only, not facts, rights or
+permission to publish; the manifest stays `publishable: false`.

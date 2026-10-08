@@ -1357,7 +1357,8 @@ narration); and the Step 22 quality findings, including `unavailable` checks.
   is never shown.
 - **Quality reports are never shown as current.** The Step 22 report stores no artifact
   hashes, so it is **unverified**, or **stale** when it provably predates the artifacts.
-  No check runs automatically.
+  No check runs automatically. (Step 36 adds hash-bound reports that can be shown as
+  matching; see below.)
 - **Media** is served only for validated files of the selected production, through opaque
   IDs with bounded byte ranges; paths, traversal and symbolic links are refused.
 - **Read-only.** Opening the desk runs no agents, drafting, rendering, checks or providers,
@@ -1369,3 +1370,48 @@ and phone sizes.
 ![Content results desk at a replay position, saved production](docs/images/hq/hq-step35-saved-replay-mid.png)
 
 See [Living HQ](docs/hq.md#content-results-desk-step-35) and the [Roadmap](docs/roadmap.md).
+
+## Step 36: verifiable content artifacts and quality-report binding
+
+New previews and quality reports now record **exactly which bytes** they cover.
+
+- **Preview manifest 1.1** adds a SHA-256 and size for every scene poster (and the video
+  size). The renderer checks every file, path, size and hash before the preview is
+  published; a package that does not verify is never published.
+- **Quality report 1.1** adds a `binding`: the production state, brief, script, scene
+  plan, preview manifest, video, each poster, the verification record and the narration
+  input (hash only), plus the configuration files used, each as a safe reference and
+  SHA-256. No credentials and no absolute paths are stored. Every file is read once into a
+  snapshot; the checks use those bytes, and everything is re-hashed afterwards. If
+  anything changed while the checks ran, the binding is `changed_during_inspection`, a
+  pass becomes `needs_review`, and the report is never shown as bound.
+- **No circularity.** Manifests never name reports, and a report never hashes itself or
+  any other report.
+- **Re-check a saved report** (read-only; nothing is checked again or written):
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack quality-report PRODUCTION_ID   # a new, bound report
+.\.venv\Scripts\python.exe -m vicekrack quality-binding REPORT_ID      # matching | changed | legacy_unverified | unavailable
+```
+
+- **Living HQ** shows three separate labels per report: **Artifact binding** (matching,
+  changed, legacy/unverified, unavailable), **Technical result** (pass, needs_review,
+  fail, unavailable) and **Evidence freshness** (at check time, and now). Binding is
+  re-validated whenever the desk loads or serves a file. Posters from a 1.1 manifest are
+  shown as hash-verified. Nothing runs from the dashboard; `publishable: false` and the
+  replay visibility rules are unchanged.
+- **Older data stays as it was.** Reports saved before Step 36 stay `unverified`
+  (`legacy_unverified`), and posters in a 1.0 manifest stay `not hash-bound`. Nothing is
+  upgraded, rewritten or attested after the fact. Running `quality-report` again on an
+  older production gives a new bound report that records the poster bytes it saw, but the
+  old manifest still has no poster hashes. Completed stages never re-run, so **an older
+  preview cannot be regenerated in place: produce a new production** to get poster hashes
+  in its manifest.
+
+Matching hashes prove byte identity only. They do not prove facts, evidence freshness,
+rights clearance or permission to publish. Human review and export are still deferred.
+
+![Quality report with separate binding, technical result and freshness labels](docs/images/hq/hq-step36-binding-desktop.png)
+
+See [Quality report](docs/quality.md#step-36-artifact-binding), [Preview](docs/preview.md)
+and the [Roadmap](docs/roadmap.md).

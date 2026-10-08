@@ -22,6 +22,9 @@ Safety model
   `produced` only after the preview is saved.
 - State and traces contain stage names, timestamps, hashes, paths and fixed error codes:
   no prompts, credentials, environment values or raw exceptions.
+- Step 36: a preview whose manifest is version 1.1 (poster hashes) is accepted only if every
+  file it names verifies (`artifact_binding.check_package`), both when the stage saves it and
+  when a resume re-checks it. Legacy 1.0 manifests are checked exactly as before.
 - Step 33: optional execution events (ContentEvents). The pipeline controller and each
   stage record start, completion and failure; stages finished in an earlier attempt are
   `stage_reused`. "started" is recorded before the intent checkpoint, results after they
@@ -43,6 +46,7 @@ from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 
+from .artifact_binding import check_package
 from .content_events import DISABLED, PIPELINE, REUSED, STAGE_COMPONENTS, EventFailure, retry_reason
 from .creator import draft_short_script, drafter_for, load_creator_config
 from .errors import NetworkError
@@ -589,9 +593,12 @@ class Pipeline:
             if "preview" in done:
                 artifacts = state["stages"][4]["artifacts"]
                 self._hashed(state, artifacts["preview_file"], artifacts["video_sha256"])
-                manifest = read_json(self._hashed(state, artifacts["manifest_file"], artifacts["manifest_sha256"]))
+                manifest_path = self._hashed(state, artifacts["manifest_file"], artifacts["manifest_sha256"])
+                manifest = read_json(manifest_path)
                 if manifest.get("plan_id") != plan["plan_id"] or manifest.get("publishable") is not False:
                     raise NetworkError("artifact_tampered", "The saved preview does not match the plan.")
+                if manifest.get("version") == "1.1" and check_package(manifest_path.parent, manifest) is not None:
+                    raise NetworkError("artifact_tampered", "A bound preview file (video or poster) changed.")
         except NetworkError as error:
             if error.code in ("artifact_tampered", "artifact_missing"):
                 raise
@@ -666,6 +673,9 @@ class Pipeline:
         video, manifest = Path(result["preview_file"]).resolve(), Path(result["manifest_file"]).resolve()
         if not video.is_relative_to(folder) or not manifest.is_relative_to(folder):
             raise NetworkError("invalid_render_output", "Preview output is outside the production folder.")
+        document = read_json(manifest)
+        if isinstance(document, dict) and document.get("version") == "1.1" and check_package(manifest.parent, document) is not None:
+            raise NetworkError("invalid_render_output", "The preview package did not verify against its manifest.")
         return {"preview_file": str(video.relative_to(folder)), "video_sha256": _sha256_file(video),
                 "manifest_file": str(manifest.relative_to(folder)), "manifest_sha256": _sha256_file(manifest),
                 "blocked_for_production": bool(result["source_blocked_for_production"]),

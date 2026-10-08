@@ -74,7 +74,7 @@ class PreviewTests(unittest.TestCase):
         self.assertNotIn('ANTHROPIC_API_KEY',kwargs['env'])
 
     def fake_card(self,plan,scene,path,modules):
-        path.write_bytes(b'fixture png')
+        path.write_bytes(b'\x89PNG\r\n\x1a\nfixture png')
 
     def fake_invoke(self,exe,args,cwd):
         if args[-1]=='preview.mp4': (cwd/'preview.mp4').write_bytes(b'fixture-video'*100)

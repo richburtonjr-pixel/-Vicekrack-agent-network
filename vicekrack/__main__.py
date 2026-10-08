@@ -92,7 +92,7 @@ def main():
         from .trading.cli import main as trading_main
         return trading_main()
 
-    if len(sys.argv) > 1 and sys.argv[1] in {"quality-report", "quality-list"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"quality-report", "quality-list", "quality-binding"}:
         from .quality_cli import main as quality_main
         return quality_main()
 
