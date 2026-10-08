@@ -114,9 +114,16 @@ def check(document):
 
 
 # ---------------------------------------------------------------- safe files
+def norm(relative):
+    """Saved relative paths use the separator of the computer that saved them (Windows writes
+    backslashes); both are treated as separators, and every part is then checked."""
+    return relative.replace("\\", "/") if isinstance(relative, str) else relative
+
+
 def safe_file(folder, relative, max_bytes):
     """(path, None) for a regular file inside `folder` reached without any symbolic link, else (None, code)."""
-    if not isinstance(relative, str) or not relative or len(relative) > 300 or "\\" in relative or "\x00" in relative:
+    relative = norm(relative)
+    if not isinstance(relative, str) or not relative or len(relative) > 300 or "\x00" in relative or ":" in relative:
         return None, "path_invalid"
     parts = PurePosixPath(relative).parts
     if PurePosixPath(relative).is_absolute() or any(p in ("..", ".", "") for p in parts):
@@ -295,12 +302,12 @@ class Artifacts:
                 or bool(manifest.get("audio_present")) != (self.state["config"]["narration"] is not None)):
             self._set("manifest", "mismatched", "manifest_not_matching_plan")
             return
-        self.manifest, self.manifest_dir = manifest, str(PurePosixPath(artifacts["manifest_file"]).parent)
+        self.manifest, self.manifest_dir = manifest, str(PurePosixPath(norm(artifacts["manifest_file"])).parent)
         self._set("manifest", "verified", sha256=artifacts["manifest_sha256"])
 
     def _check_video(self, *_):
         artifacts = self.stages["preview"]["artifacts"]
-        if PurePosixPath(artifacts["preview_file"]).parent != PurePosixPath(self.manifest_dir):
+        if PurePosixPath(norm(artifacts["preview_file"])).parent != PurePosixPath(self.manifest_dir):
             self._set("video", "mismatched", "video_not_beside_manifest")
             return
         path, status, reason = self._hashed("preview", "preview_file", "video_sha256", MAX_VIDEO_BYTES)
@@ -308,8 +315,8 @@ class Artifacts:
             self._set("video", status, reason)
             return
         self.video_path = path
-        identifier = media_id(self.state["production_id"], artifacts["preview_file"], artifacts["video_sha256"])
-        self.media[identifier] = {"path": artifacts["preview_file"], "kind": "video", "sha256": artifacts["video_sha256"]}
+        identifier = media_id(self.state["production_id"], norm(artifacts["preview_file"]), artifacts["video_sha256"])
+        self.media[identifier] = {"path": norm(artifacts["preview_file"]), "kind": "video", "sha256": artifacts["video_sha256"]}
         self._set("video", "verified", sha256=artifacts["video_sha256"], media_id=identifier, bytes=path.stat().st_size)
         self.posters = []
         for scene in self.manifest["scenes"][:8]:

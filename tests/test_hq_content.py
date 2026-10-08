@@ -216,9 +216,27 @@ class TamperTests(ContentBase):
         (poster_dir / "scene-3.png").symlink_to(self.root / "outside.mp4")
         self.assertEqual(content.safe_file(poster_dir, "scene-3.png", 10 ** 9), (None, "path_invalid"))
 
+    def test_windows_saved_paths_are_accepted_and_still_checked(self):
+        self.make()
+        state = self.state()
+        for key in ("preview_file", "manifest_file"):              # how Windows saves them: backslash separators
+            state["stages"][4]["artifacts"][key] = state["stages"][4]["artifacts"][key].replace("/", "\\")
+        ProductionStore(self.root).write(state)
+        doc = self.latest()
+        self.assertEqual(doc["artifacts"]["preview"]["status"], "verified")
+        video_id = doc["artifacts"]["preview"]["data"]["video"]["media_id"]
+        self.assertEqual(get(f"/api/content/media?production={self.pid}&id={video_id}", self.root)[0], 200)
+        state["stages"][4]["artifacts"]["preview_file"] = "previews\\..\\..\\state.json"
+        ProductionStore(self.root).write(state)
+        doc = self.latest()
+        self.assertIn(doc["artifacts"]["preview"]["status"], ("mismatched", "tampered"))
+        self.assertNotIn("med-", json.dumps(doc["artifacts"]["preview"]))
+        self.assertEqual(content.safe_file(self.folder, "previews\\..\\..\\state.json", 10 ** 9), (None, "path_invalid"))
+
     def test_safe_file_rejects_escapes(self):
         self.make()
-        for relative in ("../state.json", "/etc/passwd", "a/../../x", "..", "", "x\\y", "previews/./x", "a\x00b", None):
+        for relative in ("../state.json", "/etc/passwd", "a/../../x", "..", "", "..\\state.json", "C:\\x", "C:x",
+                         "\\\\server\\share", "previews/./x", "a\x00b", None):
             self.assertEqual(content.safe_file(self.folder, relative, 10 ** 9)[0], None, relative)
 
     def test_tampered_state_is_rejected(self):
