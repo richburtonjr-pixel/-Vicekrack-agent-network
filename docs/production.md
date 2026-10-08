@@ -183,3 +183,6 @@ default).
 After a production completes, run `python -m vicekrack quality-report PRODUCTION_ID` to
 check its artifacts, provenance, evidence freshness, timing and actual media. The report
 never changes the production and never makes it publishable. See [Quality report](quality.md).
+
+To view a saved production in the Living HQ, see the [content results desk](hq.md#content-results-desk-step-35) (Step 35). It is read-only: it
+never resumes, renders or checks anything.

@@ -103,3 +103,6 @@ never repairs, retries, re-renders, re-verifies or publishes.
   vertical format.
 - **Unreachable draft path.** Selection only passes verified claims, so draft productions
   are not reachable through normal use. The draft checks are covered by tests.
+
+To view a saved production and its quality reports in the Living HQ, see the [content results desk](hq.md#content-results-desk-step-35) (Step 35). It is read-only: it
+never resumes, renders or checks anything.

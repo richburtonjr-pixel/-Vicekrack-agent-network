@@ -9,6 +9,9 @@ Routes (GET only; everything else is 405):
   /api/results?timeline=ID                    Step 34 results desk index for a simulation timeline (no results)
   /api/results/at?timeline=ID&position=N      the portfolio after the first N events (nothing later)
   /api/results/summary?timeline=ID            the completed run summary (end-of-run results)
+  /api/content/at?timeline=ID&position=N      Step 35: what a content timeline proves existed after N events
+  /api/content/latest?timeline=ID             Step 35: the latest saved production, re-verified now
+  /api/content/media?production=PROD&id=MED   Step 35: one validated preview file (bounded byte ranges)
 
 Boundaries:
 - The Host header must be this loopback server (127.0.0.1 or localhost on its port);
@@ -30,6 +33,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from ..errors import NetworkError
 from .demo import demo_scene
+from .content import content_at, content_latest, media_file
 from .results import results_at, results_index, results_summary
 from .scene import scene_from_view
 
@@ -43,6 +47,24 @@ MAX_TIMELINES = 200
 RESULTS_ROUTES = {"/api/results": {"timeline"}, "/api/results/at": {"timeline", "position"},
                   "/api/results/summary": {"timeline"}}
 POSITION = re.compile(r"^(0|[1-9][0-9]{0,5})$")
+CONTENT_ROUTES = {"/api/content/at": {"timeline", "position"}, "/api/content/latest": {"timeline"}}
+MEDIA_ROUTE = "/api/content/media"
+MAX_RANGE_BYTES = 4 * 1024 * 1024          # one response never carries more than this
+MAX_FULL_BYTES = 8 * 1024 * 1024           # larger files are only served as byte ranges
+RANGE = re.compile(r"^bytes=(\d{0,15})-(\d{0,15})$")
+CONTENT_ERRORS = {
+    "content_not_production": (422, "Content results exist only for productions (prod-, or a recorded produce/quality timeline)."),
+    "content_production_missing": (404, "This timeline does not name a saved production."),
+    "production_not_found": (404, "The production behind this timeline is not saved."),
+    "invalid_production_state": (409, "The saved production state failed validation, so nothing is shown."),
+    "timeline_production_mismatch": (409, "The timeline does not belong to this production, so they are not combined."),
+    "content_position_out_of_range": (400, "The replay position is outside this timeline."),
+    "invalid_content_request": (400, "Use timeline=ID, plus position=N (a whole number) for /api/content/at."),
+    "invalid_media_request": (400, "Use production=prod-... and id=med-...."),
+    "media_not_found": (404, "No validated preview file with this ID in this production."),
+    "media_changed": (409, "The preview file changed after it was checked; reload the desk."),
+    "invalid_content_results": (500, "The content results could not be shown safely."),
+}
 # Fixed status and message per results code: never exception text, paths or values.
 RESULTS_ERRORS = {
     "results_not_simulation": (422, "Trading results exist only for simulation timelines (srun- or a recorded sim-run)."),
@@ -56,13 +78,15 @@ RESULTS_ERRORS = {
 }
 HEADERS = {
     "Content-Security-Policy": ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-                                "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"),
+                                "media-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; "
+                                "frame-ancestors 'none'"),
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY",
     "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
-STATUS_TEXT = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
-               409: "Conflict", 422: "Unprocessable Content", 500: "Internal Server Error"}
+STATUS_TEXT = {200: "OK", 206: "Partial Content", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
+               409: "Conflict", 413: "Content Too Large", 416: "Range Not Satisfiable", 422: "Unprocessable Content",
+               500: "Internal Server Error"}
 
 
 def _json(status, document):
@@ -140,6 +164,51 @@ def _results(path, query_text, root):
     return results_at(timeline, int(query["position"][0]), root)
 
 
+def _content(path, query_text, root):
+    query = parse_qs(query_text, max_num_fields=3, keep_blank_values=True)
+    if set(query) != CONTENT_ROUTES[path] or any(len(v) != 1 for v in query.values()) or not TIMELINE.match(query["timeline"][0]):
+        raise NetworkError("invalid_content_request", "x")
+    if path == "/api/content/latest":
+        return content_latest(query["timeline"][0], root)
+    if not POSITION.match(query["position"][0]):
+        raise NetworkError("invalid_content_request", "x")
+    return content_at(query["timeline"][0], int(query["position"][0]), root)
+
+
+def _media(query_text, headers, root):
+    """One validated preview file; a single `bytes=` range at most MAX_RANGE_BYTES long."""
+    query = parse_qs(query_text, max_num_fields=3, keep_blank_values=True)
+    if set(query) != {"production", "id"} or any(len(v) != 1 for v in query.values()):
+        raise NetworkError("invalid_media_request", "x")
+    data, content_type = media_file(query["production"][0], query["id"][0], root)
+    size = len(data)
+    base = {**HEADERS, "Content-Type": content_type, "Accept-Ranges": "bytes",
+            "Content-Disposition": "inline"}
+    wanted = headers.get("range")
+    if wanted is None:
+        if size > MAX_FULL_BYTES:
+            return 413, {**base, "Content-Type": "application/json; charset=utf-8"}, json.dumps(
+                {"error": {"code": "media_range_required", "message": "Request this file in byte ranges."}}).encode()
+        return 200, base, data
+    match = RANGE.match(wanted.strip())
+    if match is None or match.group(1) == match.group(2) == "":
+        return 416, {**base, "Content-Range": f"bytes */{size}"}, b""
+    first, last = match.groups()
+    if first == "":                                       # suffix range: the last N bytes
+        length = int(last)
+        if length == 0:
+            return 416, {**base, "Content-Range": f"bytes */{size}"}, b""
+        start, end = max(0, size - length), size - 1
+    else:
+        start = int(first)
+        end = int(last) if last != "" else size - 1
+        if start >= size or end < start:
+            return 416, {**base, "Content-Range": f"bytes */{size}"}, b""
+        end = min(end, size - 1)
+    end = min(end, start + MAX_RANGE_BYTES - 1)
+    return 206, {**base, "Content-Range": f"bytes {start}-{end}/{size}"}, data[start:end + 1]
+
+
 def respond(method, target, headers, *, port, root=None):
     """(status, headers, body) for one request. `headers` keys must be lower-case."""
     if method != "GET":
@@ -172,9 +241,16 @@ def respond(method, target, headers, *, port, root=None):
             return _json(200, scene(values[0], root))
         if path in RESULTS_ROUTES:
             return _json(200, _results(path, parts.query, root))
+        if path in CONTENT_ROUTES:
+            return _json(200, _content(path, parts.query, root))
+        if path == MEDIA_ROUTE:
+            return _media(parts.query, headers, root)
     except NetworkError as error:
         if error.code in RESULTS_ERRORS:
             status, message = RESULTS_ERRORS[error.code]
+            return _error(status, error.code, message)
+        if error.code in CONTENT_ERRORS:
+            status, message = CONTENT_ERRORS[error.code]
             return _error(status, error.code, message)
         status = 404 if error.code.endswith("not_found") else 422 if error.code.startswith("invalid") else 409
         return _error(status, error.code, "The timeline could not be loaded safely.")

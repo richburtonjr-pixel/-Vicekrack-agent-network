@@ -1329,3 +1329,43 @@ station (or the **Results** view, or press **R**) to open the selected run's res
 ![Results desk at a replay position, saved simulation](docs/images/hq/hq-step34-saved-replay-position.png)
 
 See [Living HQ](docs/hq.md#trading-results-desk-step-34) and the [Roadmap](docs/roadmap.md).
+
+## Step 35: content results desk in the Living HQ
+
+The Living HQ now shows **saved content productions**: a read-only desk opened from the
+**Creator** room, any production operations station (pipeline, brief builder, script
+validator, scene planner, preview renderer, quality checker), the **Content results** view
+or the **C** key.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack produce SELECTION_RUN_ID RECORD_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack quality-report PRODUCTION_ID --record-events
+.\.venv\Scripts\python.exe -m vicekrack hq-serve
+```
+
+It shows stages, attempts, failures and reused stages; the Story Brief, claims, sources
+(URLs as text, opened only by an explicit click) and the verification record's limits;
+the script beats; the scene plan with its posters; the local preview video (with optional
+narration); and the Step 22 quality findings, including `unavailable` checks.
+**publishable: false** is displayed prominently, with draft restrictions when they apply.
+
+- **At replay position** shows only what the timeline proves existed at that event. A
+  later script, preview or quality report is never shown early. When a timeline cannot
+  prove it, historical viewing is marked unavailable.
+- **Latest saved production** re-verifies every artifact now (path, hash, contract and
+  chain). Tampered, mismatched or missing files are rejected and explained; their content
+  is never shown.
+- **Quality reports are never shown as current.** The Step 22 report stores no artifact
+  hashes, so it is **unverified**, or **stale** when it provably predates the artifacts.
+  No check runs automatically.
+- **Media** is served only for validated files of the selected production, through opaque
+  IDs with bounded byte ranges; paths, traversal and symbolic links are refused.
+- **Read-only.** Opening the desk runs no agents, drafting, rendering, checks or providers,
+  and changes no file. There is no approval, export, upload or publishing.
+
+A new CI job runs the house, trading desk and content desk in a real Chromium on desktop
+and phone sizes.
+
+![Content results desk at a replay position, saved production](docs/images/hq/hq-step35-saved-replay-mid.png)
+
+See [Living HQ](docs/hq.md#content-results-desk-step-35) and the [Roadmap](docs/roadmap.md).

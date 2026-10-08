@@ -196,4 +196,22 @@ test("Step 34: unavailable metrics stay unavailable (never zero) and positions n
   assert.strictEqual(C.nearestIndex([0, 10, 20], 14), 1);
 });
 
+test("Step 35: only plain http(s) links with a host and no credentials are clickable", () => {
+  assert.strictEqual(C.safeLink("https://official.example.com/news/a?b=1"), "https://official.example.com/news/a?b=1");
+  assert.strictEqual(C.safeLink("http://example.org"), "http://example.org/");
+  ["javascript:alert(1)", "JavaScript:alert(1)", "data:text/html,x", "https://user:pw@example.com/", "ftp://example.com/",
+    "https://", "//example.com/x", " https://example.com", "https://exa mple.com/", "vbscript:x", null, 42,
+    "https://example.com/" + "a".repeat(2100)].forEach((url) => assert.strictEqual(C.safeLink(url), null, String(url)));
+});
+
+test("Step 35: content documents must be read-only and never publishable", () => {
+  const ok = { contract: "hq_content", version: "1.0", read_only: true, view: "latest",
+    restrictions: { publishable: false, preview_only: true } };
+  assert.ok(C.validContent(ok, "latest"));
+  assert.ok(!C.validContent(ok, "at_position"));
+  assert.ok(!C.validContent(Object.assign({}, ok, { restrictions: { publishable: true, preview_only: true } }), "latest"));
+  assert.ok(!C.validContent(Object.assign({}, ok, { read_only: false }), "latest"));
+  assert.ok(!C.validContent(null, "latest"));
+});
+
 console.log(JSON.stringify({ passed }));

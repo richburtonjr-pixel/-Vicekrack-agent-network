@@ -47,7 +47,8 @@ its contracts stay subject-neutral. See [Subsystem boundaries](subsystems.md).
 | 31 | Shared | Structured execution events (`execution_event` 1.0) and bounded timelines: optional recording in the research-agent workflow and simulator (stage started/completed/blocked/failed, order decisions, simulated fills), recorded vs reconstructed timelines with no invented times, read-only adapters for saved trading runs and content productions, display-state transition rules, atomic per-department storage with duplicate/concurrency/retention rules, explicit failure on persistence errors, list/inspect/replay CLI | #31 |
 | 32 | Shared | ViceKrack Living HQ: local read-only visual Command Center over Step 31 timelines; two-floor isometric house (trading upstairs, content downstairs, shared operations lobby/lounge/kitchen) with distinct bots; status-first replay (play/pause/scrub/speed), recorded vs reconstructed vs live vs demo labelling, honest partial/interrupted display, supported-only handoffs, decorative idle behaviour; inspector, Timeline/Text views, presentation mode, reduced motion and keyboard access; loopback-only GET API with Host/Origin checks and strict CSP; deterministic demo | #32 |
 | 33 | Shared | Accurate agent activity: rooms show only their actual roles (Step 5 Researcher/Analyst/Reviewer, production Creator); automated stages and controllers as labelled operations stations; optional event recording for the Step 5 workflow, production pipeline and quality report with explicit resume handling (`stage_reused`, attempt numbers, shared correlation), fail-closed recording that keeps committed results and never repeats paid calls; read-only reconstruction of saved workflow runs; department timeline filters, attempt grouping, honest movement labels and idle-spot occupancy | #33 |
-| 34 | Shared | Read-only trading results desk in the Living HQ: saved Step 29 runs and Step 30 reports correlated with timelines by validated IDs and hashes (mismatches rejected, missing data explicit); portfolio at a replay position built server-side from events up to that position only (no future fills, final P&L or end-of-run statistics), or `unavailable` when the timeline cannot support it; separate completed-run summary with `unavailable` metrics kept; equity/drawdown charts, accessible tables, limitations, simulator-station integration, presentation mode; labelled demo results | this PR |
+| 34 | Shared | Read-only trading results desk in the Living HQ: saved Step 29 runs and Step 30 reports correlated with timelines by validated IDs and hashes (mismatches rejected, missing data explicit); portfolio at a replay position built server-side from events up to that position only (no future fills, final P&L or end-of-run statistics), or `unavailable` when the timeline cannot support it; separate completed-run summary with `unavailable` metrics kept; equity/drawdown charts, accessible tables, limitations, simulator-station integration, presentation mode; labelled demo results | #34 |
+| 35 | Shared | Read-only content results desk in the Living HQ: saved productions with stages, attempts, failures and reuse; Story Brief, sources (text links, explicit open only), verification limits, script beats, scene plan with posters, local preview player with optional narration, Step 22 findings; artifacts re-verified by path, hash, contract and chain (tampered/mismatched/missing rejected); replay view shows only what the timeline proves existed, otherwise historical viewing unavailable; quality reports shown as unverified or stale, never current; opaque-ID media route with bounded byte ranges; Creator room and production stations open it; dedicated real-browser CI job for both desks | this PR |
 
 ## Deferred work
 
@@ -75,9 +76,11 @@ Other content work that is deferred and not scheduled:
 - More content profiles beyond GTA VI, using the same subject-neutral contracts.
 
 The content track has had no new steps since Step 22. Steps 23–30 built the trading
-foundation, and Steps 31–34 added shared execution events, the read-only Living HQ,
-optional event recording for the existing content commands (outputs unchanged) and a
-read-only trading results desk. Nothing in these steps changed content
+foundation, and Steps 31–35 added shared execution events, the read-only Living HQ,
+optional event recording for the existing content commands (outputs unchanged), and
+read-only trading and content results desks. The content desk only displays saved
+productions: it adds no review decision, export or publishing, so the human review and
+export package below is still deferred. Nothing in these steps changed content
 behaviour; all content tests still pass.
 
 ### Trading: not started, and out of scope until explicitly requested
@@ -122,7 +125,8 @@ Step 31 added its data layer: execution events, recorded and reconstructed timel
 display states and a terminal replay (see [Execution events](events.md)). Step 32 added
 the visual, read-only Living HQ on top of it (see [Living HQ](hq.md)). Step 33 added event
 recording for the Step 5 workflow, content productions and quality reports, with
-role-accurate rooms. Step 34 added a read-only trading results desk for saved simulations.
+role-accurate rooms. Step 34 added a read-only trading results desk for saved simulations, and Step 35 a
+read-only content results desk for saved productions.
 Still not built:
 - live event recording for the paper journal and the other commands;
 - liveness across machines, and streaming instead of polling;

@@ -1,4 +1,4 @@
-# ViceKrack Living HQ (Steps 32–34)
+# ViceKrack Living HQ (Steps 32–35)
 
 > **A read-only window, not a control panel.** The Living HQ draws the Step 31 execution
 > timelines as a two-floor headquarters with bots.
@@ -169,6 +169,7 @@ supports it:
   - **Trading**: upstairs;
   - **Content**: downstairs and terrace;
   - **Results** (Step 34): the [trading results desk](#trading-results-desk-step-34);
+  - **Content results** (Step 35): the [content results desk](#content-results-desk-step-35);
   - **Timeline**: the timeline picker and a full event table with "Go" buttons.
 - **Replay:**
   - play, pause, previous and next event, restart, scrub;
@@ -186,7 +187,7 @@ supports it:
   completeness chip stay visible. Keys 1–8 focus a room, 0 shows the whole house, L
   toggles labels, Esc exits.
 - **Keyboard:** Space plays or pauses, ←/→ step, Home restarts, End jumps to the last
-  event, R opens or closes the results desk. All controls are buttons, so they are
+  event, R opens or closes the trading results desk, C the content results desk. All controls are buttons, so they are
   reachable with Tab.
 - **Reduce motion (M):** bots stop wandering and go straight to their places. Pulses and
   camera moves are off. The system's reduced-motion setting is followed automatically.
@@ -205,6 +206,9 @@ supports it:
 | `/api/results?timeline=ID` | Step 34 results index for a simulation timeline (no results) |
 | `/api/results/at?timeline=ID&position=N` | the portfolio after the first N events (`N` is 0 to the event count) |
 | `/api/results/summary?timeline=ID` | the completed run summary |
+| `/api/content/at?timeline=ID&position=N` | Step 35: what a content timeline proves existed after N events |
+| `/api/content/latest?timeline=ID` | Step 35: the latest saved production, every artifact re-verified |
+| `/api/content/media?production=PROD&id=MED` | Step 35: one validated preview video or poster; single `bytes=` ranges of at most 4 MiB |
 
 **Request rules:**
 - Every other method returns 405.
@@ -330,6 +334,103 @@ figures, for recording an explanation; ←/→ still step the replay.
 
 ![Results desk on a phone, saved simulation](images/hq/hq-step34-saved-phone.png)
 
+## Content results desk (Step 35)
+
+> **Preview only and read-only.** `publishable: false` is shown on every view. The desk
+> displays saved Step 21 productions and Step 22 quality reports. Opening it never runs
+> agents, drafts scripts, renders media, runs quality checks, contacts providers, publishes
+> or changes production files. There is no approval, export or upload.
+
+![Content results desk opened from the Creator room, demo data](images/hq/hq-step35-creator-room.png)
+
+**Opening it:** select the **Creator** room ("Open content results desk"), any production
+station (pipeline, brief builder, script validator, scene planner, preview renderer,
+quality checker) in the station strip or on the operations board, the Content inspector's
+button, the **Content results** view, or press **C**. It works for:
+- a reconstructed production (`prod-…`);
+- a recorded `produce` / `production-resume` attempt or `quality-report` check (`tl-…`)
+  that names the production;
+- the demo, a synthetic production that matches the demo house's events, labelled
+  **DEMO DATA · SYNTHETIC · PREVIEW ONLY**. It has no media files, and says so.
+
+What it shows:
+- **stages:** status, attempt numbers, failures with reason codes, and stages reused from
+  an earlier attempt; in the latest view, also every recorded attempt of the production;
+- **Story Brief:** topic, angle, the only claims a script may state, sources with
+  publisher, kind and access time, and provenance;
+- **verification record:** claim statuses, rationale, flags and the limits of
+  verification;
+- **script beats:** timing, narration, on-screen text, claims, visual method and sound cue;
+- **scene plan:** methods and the four scene posters;
+- **local preview:** a video player with its watermark, format and optional narration (the
+  narration WAV is mixed into the MP4's audio track);
+- **Step 22 quality findings:** every check with pass, needs_review, fail or unavailable.
+
+**Text and links.** All script and source text is inserted as text, never as HTML. Source
+URLs are shown as text. A link is clickable only when both the server and the page find a
+plain `http(s)` URL with a host and no credentials; it opens in a new tab without opener or
+referrer, and only when you click it. Nothing is fetched or prefetched.
+
+### At replay position vs latest saved production
+
+**At replay position** shows only what the timeline **proves** existed after that event:
+- in a reconstructed production, an artifact appears at its stage's single
+  `stage_completed` in the production's own trace;
+- in a recorded attempt, at its `stage_completed` (only if the saved finish time falls
+  inside that attempt) or `stage_reused` (only if it finished before the attempt started);
+- in a quality timeline, artifacts finished before the check started are shown, and the
+  report only after the event that saved it.
+
+A failed attempt never shows the preview a later attempt made. If the timeline is
+truncated, has issues, predates the production, or its times disagree with the saved
+state, **historical viewing is unavailable** and the reasons are listed.
+
+**Latest saved production** re-verifies everything now:
+- every artifact must stay inside its production folder with no symbolic link on the
+  way;
+- it must match the SHA-256 saved in the state and pass its contract validator;
+- it must fit the chain brief → script → validation → plan → manifest → video.
+
+A failing artifact is shown as `missing`, `tampered` or `mismatched`, its content is not
+shown, and later artifacts are `unavailable`. Scene posters are listed in the hash-checked
+manifest, but the Step 13 manifest stores no poster hashes, so they are labelled **not
+hash-bound**.
+
+### Quality reports: never shown as current
+
+A Step 22 report records which production it checked and when, but no hashes of the files
+it saw. The desk therefore never claims a report is current:
+- **stale** when it provably predates the artifacts (checked before the last stage
+  finished, or it saw a different production status);
+- **unverified** otherwise.
+
+Reports are matched by their own `production_id`, and the file name must equal the report
+ID. Edited, renamed or invalid reports are listed as rejected. No check runs
+automatically: run `quality-report PRODUCTION_ID` to check the current artifacts.
+
+![Latest saved production with an unverified quality report](images/hq/hq-step35-saved-latest.png)
+
+### Media
+
+`/api/content/media` serves only files the desk has just validated for that production:
+the hash-checked video, and PNG posters listed in its manifest.
+- Files are addressed by opaque `med-` IDs derived from the production, path and hash.
+  There is no path parameter.
+- Correct content types are sent (`video/mp4`, `image/png`).
+- Single `bytes=` ranges are served (206), up to 4 MiB per response. Invalid or multiple
+  ranges get 416. Files over 8 MiB are served only in ranges.
+- The video's bytes are hashed again on every request, so a changed file is not served.
+- The usual loopback, Host, Origin, GET-only and CSP rules apply (`media-src 'self'`).
+
+The previews are H.264 MP4. They play in Chrome, Edge, Safari and Firefox with system
+codecs. Open-source Chromium builds (like the one in the automated tests) cannot decode
+them; the desk then shows the first scene poster and says so.
+
+**Presentation mode (P)** keeps the desk full-screen under the data badge. The
+**publishable: false** banner stays visible.
+
+![Content results desk on a phone, saved production](images/hq/hq-step35-saved-phone.png)
+
 ## Limitations
 
 - **Mapping:** the paper journal and other commands still emit no events, so they don't
@@ -351,5 +452,10 @@ figures, for recording an explanation; ←/→ still step the replay.
   the correlated analytics report, so without one they are unavailable. Tables show at
   most the last 200 rows (with a note). Charts are simple inline SVG lines, sampled at bar
   closes; intrabar moves are not shown.
+- **Content desk:** one production at a time. Quality reports can only be unverified or
+  stale until the Step 22 contract records artifact hashes. Posters are not hash-bound.
+  Historical viewing needs a timeline that proves each completion: a reconstructed
+  production, or a recorded attempt whose times match the saved state. The desk shows no
+  narration WAV separately, only the audio inside the preview.
 - **Still to come:** trading controls, publishing, AI calls and multi-user access are not
   part of the HQ.

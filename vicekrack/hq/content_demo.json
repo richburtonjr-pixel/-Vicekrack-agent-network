@@ -1,0 +1,504 @@
+{
+ "brief": {
+  "contract": "story_brief",
+  "version": "1.0",
+  "brief_id": "demo-brief-hq35",
+  "content_profile": "demo",
+  "format": "vertical_short_15s",
+  "language": "en",
+  "topic": "Demo: a studio schedules a trailer event",
+  "angle": "What the official announcement says, and what it does not.",
+  "sources": [
+   {
+    "source_id": "src-demo-official",
+    "title": "Demo: studio announces trailer event",
+    "publisher": "Example Studio (demo)",
+    "kind": "official",
+    "url": "https://official.example.com/news/demo-trailer-event",
+    "accessed_at": "2026-01-05T12:00:00Z"
+   },
+   {
+    "source_id": "src-demo-report",
+    "title": "Demo: outlet repeats the announcement",
+    "publisher": "Example News (demo)",
+    "kind": "press",
+    "url": "https://news.example.com/demo/trailer-event-report",
+    "accessed_at": "2026-01-05T12:05:00Z"
+   }
+  ],
+  "claims": [
+   {
+    "claim_id": "c1",
+    "text": "Demo text: the studio says a trailer event is scheduled for next week.",
+    "status": "verified",
+    "source_ids": [
+     "src-demo-official"
+    ]
+   }
+  ],
+  "constraints": {
+   "avoid": [
+    "real studio logos"
+   ],
+   "disclosures": [
+    "Demo data. Not real news."
+   ],
+   "tone": null
+  },
+  "provenance": {
+   "created_by": "verifier",
+   "provider": "local",
+   "model": null,
+   "created_at": "2026-01-05T14:30:00Z"
+  }
+ },
+ "script": {
+  "contract": "short_script",
+  "version": "1.0",
+  "script_id": "demo-brief-hq35-c97b2a0317b8",
+  "content_profile": "demo",
+  "format": "vertical_short_15s",
+  "aspect_ratio": "9:16",
+  "duration_seconds": 15,
+  "language": "en",
+  "title": "Demo: a studio schedules a trailer event",
+  "angle": "What the official announcement says, and what it does not.",
+  "sources": [
+   {
+    "source_id": "src-demo-official",
+    "title": "Demo: studio announces trailer event",
+    "publisher": "Example Studio (demo)",
+    "kind": "official",
+    "url": "https://official.example.com/news/demo-trailer-event",
+    "accessed_at": "2026-01-05T12:00:00Z"
+   },
+   {
+    "source_id": "src-demo-report",
+    "title": "Demo: outlet repeats the announcement",
+    "publisher": "Example News (demo)",
+    "kind": "press",
+    "url": "https://news.example.com/demo/trailer-event-report",
+    "accessed_at": "2026-01-05T12:05:00Z"
+   }
+  ],
+  "claims": [
+   {
+    "claim_id": "c1",
+    "text": "Demo text: the studio says a trailer event is scheduled for next week.",
+    "status": "verified",
+    "source_ids": [
+     "src-demo-official"
+    ]
+   }
+  ],
+  "beats": [
+   {
+    "beat": "hook",
+    "start_seconds": 0,
+    "end_seconds": 3,
+    "narration": "Demo: a studio schedules a trailer event",
+    "on_screen_text": null,
+    "claim_ids": [],
+    "visual": {
+     "description": "Local motion graphics for the hook beat.",
+     "preferred_method": "motion_graphics",
+     "fallback_methods": [
+      "text_card"
+     ],
+     "source_ids": [],
+     "generation_prompt": null,
+     "avoid": [
+      "real studio logos"
+     ]
+    },
+    "sound_cue": null
+   },
+   {
+    "beat": "context",
+    "start_seconds": 3,
+    "end_seconds": 7,
+    "narration": "What the official announcement says, and what it does not.",
+    "on_screen_text": null,
+    "claim_ids": [],
+    "visual": {
+     "description": "Local text card for the context beat.",
+     "preferred_method": "text_card",
+     "fallback_methods": [
+      "motion_graphics"
+     ],
+     "source_ids": [],
+     "generation_prompt": null,
+     "avoid": [
+      "real studio logos"
+     ]
+    },
+    "sound_cue": null
+   },
+   {
+    "beat": "key_info",
+    "start_seconds": 7,
+    "end_seconds": 12,
+    "narration": "Demo text: the studio says a trailer event is scheduled for next week.",
+    "on_screen_text": null,
+    "claim_ids": [
+     "c1"
+    ],
+    "visual": {
+     "description": "Local motion graphics for the key info beat.",
+     "preferred_method": "motion_graphics",
+     "fallback_methods": [
+      "text_card"
+     ],
+     "source_ids": [],
+     "generation_prompt": null,
+     "avoid": [
+      "real studio logos"
+     ]
+    },
+    "sound_cue": null
+   },
+   {
+    "beat": "payoff",
+    "start_seconds": 12,
+    "end_seconds": 15,
+    "narration": "Follow for more.",
+    "on_screen_text": null,
+    "claim_ids": [],
+    "visual": {
+     "description": "Local text card for the payoff beat.",
+     "preferred_method": "text_card",
+     "fallback_methods": [
+      "motion_graphics"
+     ],
+     "source_ids": [],
+     "generation_prompt": null,
+     "avoid": [
+      "real studio logos"
+     ]
+    },
+    "sound_cue": null
+   }
+  ],
+  "captions": {
+   "enabled": true,
+   "mode": "phrase"
+  },
+  "audio": {
+   "voiceover": true,
+   "music_mood": null
+  },
+  "disclosures": [
+   "Demo data. Not real news."
+  ],
+  "provenance": {
+   "created_by": "creator",
+   "provider": "mock",
+   "model": null,
+   "created_at": "2026-01-05T14:30:00Z"
+  }
+ },
+ "plan": {
+  "contract": "scene_plan",
+  "version": "1.0",
+  "script_id": "demo-brief-hq35-c97b2a0317b8",
+  "input_sha256": "e2f60d50c65dd93462bddbe44e1d7a0e239a228a4dfd36bfdcedb014760f1571",
+  "script": {
+   "contract": "short_script",
+   "version": "1.0",
+   "script_id": "demo-brief-hq35-c97b2a0317b8",
+   "content_profile": "demo",
+   "format": "vertical_short_15s",
+   "aspect_ratio": "9:16",
+   "duration_seconds": 15,
+   "language": "en",
+   "title": "Demo: a studio schedules a trailer event",
+   "angle": "What the official announcement says, and what it does not.",
+   "sources": [
+    {
+     "source_id": "src-demo-official",
+     "title": "Demo: studio announces trailer event",
+     "publisher": "Example Studio (demo)",
+     "kind": "official",
+     "url": "https://official.example.com/news/demo-trailer-event",
+     "accessed_at": "2026-01-05T12:00:00Z"
+    },
+    {
+     "source_id": "src-demo-report",
+     "title": "Demo: outlet repeats the announcement",
+     "publisher": "Example News (demo)",
+     "kind": "press",
+     "url": "https://news.example.com/demo/trailer-event-report",
+     "accessed_at": "2026-01-05T12:05:00Z"
+    }
+   ],
+   "claims": [
+    {
+     "claim_id": "c1",
+     "text": "Demo text: the studio says a trailer event is scheduled for next week.",
+     "status": "verified",
+     "source_ids": [
+      "src-demo-official"
+     ]
+    }
+   ],
+   "beats": [
+    {
+     "beat": "hook",
+     "start_seconds": 0,
+     "end_seconds": 3,
+     "narration": "Demo: a studio schedules a trailer event",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local motion graphics for the hook beat.",
+      "preferred_method": "motion_graphics",
+      "fallback_methods": [
+       "text_card"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    {
+     "beat": "context",
+     "start_seconds": 3,
+     "end_seconds": 7,
+     "narration": "What the official announcement says, and what it does not.",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local text card for the context beat.",
+      "preferred_method": "text_card",
+      "fallback_methods": [
+       "motion_graphics"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    {
+     "beat": "key_info",
+     "start_seconds": 7,
+     "end_seconds": 12,
+     "narration": "Demo text: the studio says a trailer event is scheduled for next week.",
+     "on_screen_text": null,
+     "claim_ids": [
+      "c1"
+     ],
+     "visual": {
+      "description": "Local motion graphics for the key info beat.",
+      "preferred_method": "motion_graphics",
+      "fallback_methods": [
+       "text_card"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    {
+     "beat": "payoff",
+     "start_seconds": 12,
+     "end_seconds": 15,
+     "narration": "Follow for more.",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local text card for the payoff beat.",
+      "preferred_method": "text_card",
+      "fallback_methods": [
+       "motion_graphics"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    }
+   ],
+   "captions": {
+    "enabled": true,
+    "mode": "phrase"
+   },
+   "audio": {
+    "voiceover": true,
+    "music_mood": null
+   },
+   "disclosures": [
+    "Demo data. Not real news."
+   ],
+   "provenance": {
+    "created_by": "creator",
+    "provider": "mock",
+    "model": null,
+    "created_at": "2026-01-05T14:30:00Z"
+   }
+  },
+  "capabilities": {
+   "available_methods": [
+    "motion_graphics",
+    "text_card"
+   ]
+  },
+  "frame": {
+   "width": 1080,
+   "height": 1920,
+   "aspect_ratio": "9:16"
+  },
+  "duration_seconds": 15,
+  "mode": "production",
+  "blocked_for_production": false,
+  "unverified_claim_ids": [],
+  "assets_produced": false,
+  "scenes": [
+   {
+    "index": 1,
+    "beat": {
+     "beat": "hook",
+     "start_seconds": 0,
+     "end_seconds": 3,
+     "narration": "Demo: a studio schedules a trailer event",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local motion graphics for the hook beat.",
+      "preferred_method": "motion_graphics",
+      "fallback_methods": [
+       "text_card"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    "selected_method": "motion_graphics",
+    "considered_methods": [
+     {
+      "method": "motion_graphics",
+      "status": "selected",
+      "reason": "configured_available"
+     }
+    ],
+    "assets_produced": false
+   },
+   {
+    "index": 2,
+    "beat": {
+     "beat": "context",
+     "start_seconds": 3,
+     "end_seconds": 7,
+     "narration": "What the official announcement says, and what it does not.",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local text card for the context beat.",
+      "preferred_method": "text_card",
+      "fallback_methods": [
+       "motion_graphics"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    "selected_method": "text_card",
+    "considered_methods": [
+     {
+      "method": "text_card",
+      "status": "selected",
+      "reason": "configured_available"
+     }
+    ],
+    "assets_produced": false
+   },
+   {
+    "index": 3,
+    "beat": {
+     "beat": "key_info",
+     "start_seconds": 7,
+     "end_seconds": 12,
+     "narration": "Demo text: the studio says a trailer event is scheduled for next week.",
+     "on_screen_text": null,
+     "claim_ids": [
+      "c1"
+     ],
+     "visual": {
+      "description": "Local motion graphics for the key info beat.",
+      "preferred_method": "motion_graphics",
+      "fallback_methods": [
+       "text_card"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    "selected_method": "motion_graphics",
+    "considered_methods": [
+     {
+      "method": "motion_graphics",
+      "status": "selected",
+      "reason": "configured_available"
+     }
+    ],
+    "assets_produced": false
+   },
+   {
+    "index": 4,
+    "beat": {
+     "beat": "payoff",
+     "start_seconds": 12,
+     "end_seconds": 15,
+     "narration": "Follow for more.",
+     "on_screen_text": null,
+     "claim_ids": [],
+     "visual": {
+      "description": "Local text card for the payoff beat.",
+      "preferred_method": "text_card",
+      "fallback_methods": [
+       "motion_graphics"
+      ],
+      "source_ids": [],
+      "generation_prompt": null,
+      "avoid": [
+       "real studio logos"
+      ]
+     },
+     "sound_cue": null
+    },
+    "selected_method": "text_card",
+    "considered_methods": [
+     {
+      "method": "text_card",
+      "status": "selected",
+      "reason": "configured_available"
+     }
+    ],
+    "assets_produced": false
+   }
+  ],
+  "plan_id": "e36082bd158587df539191b8b9f39877201ec4ced669acba444e1417680b3bad"
+ }
+}

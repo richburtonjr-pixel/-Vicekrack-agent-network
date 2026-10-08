@@ -8,7 +8,9 @@ workflow orders and every event passes the same Step 31 payload validation as re
 - simulated order decisions and a fill at the simulator station (Step 34: they match the demo results
   desk's synthetic run in `results_demo.py` exactly);
 - the production pipeline: brief builder -> Creator -> script validator -> scene planner ->
-  preview renderer -> pipeline done, then a quality check.
+  preview renderer -> pipeline done, then a quality check (Step 35: its report ID and
+  "needs_review" result match the demo content desk's synthetic production in
+  `content_demo.py`).
 Times and IDs are synthetic. It shows idle, working, waiting, blocked, completed and failed
 (unknown only appears in real recorded or reconstructed histories).
 """
@@ -31,6 +33,7 @@ DATASET = {"kind": "dataset", "id": _id("mds", "dataset")}
 ORDER_1, ORDER_2, FILL_1 = _id("sord", "order-1"), _id("sord", "order-2"), _id("sfil", "fill-1")
 SIGNAL_1, SIGNAL_2, RUN = _id("rsig", "signal-1"), _id("rsig", "signal-2"), _id("srun", "run")
 PRODUCTION = {"kind": "production", "id": _id("prod", "production")}
+QUALITY_REPORT = _id("qr", "quality-report")          # Step 35: matches the demo content desk's synthetic report
 ONE = {"attempt": 1}
 
 # (component, stage, event_type, status, reason_codes, refs, details, simulated minute or None)
@@ -78,7 +81,8 @@ SCRIPT = (
     (P + "preview", "preview", "stage_completed", "completed", [], [], ONE, None),
     (P + "pipeline", "pipeline", "stage_completed", "completed", [], [PRODUCTION], {}, None),
     (P + "quality", "quality", "stage_started", "started", [], [PRODUCTION], {}, None),
-    (P + "quality", "quality", "stage_completed", "completed", ["result_pass"], [PRODUCTION], {}, None),
+    (P + "quality", "quality", "stage_completed", "completed", ["result_needs_review"],
+     [PRODUCTION, {"kind": "quality_report", "id": QUALITY_REPORT}], {}, None),
 )
 
 
