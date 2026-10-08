@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vicekrack preview manifest (preview_render)",
+  "description": "Local preview package manifest. 1.0 (Steps 13-35, legacy): the video is hashed, scene posters are listed by name only. 1.1 (Step 36): every scene poster has a SHA-256 and byte size, and the video has its byte size; the renderer verifies every file before publication. Manifests never reference quality reports.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "plan_id",
+        "input_sha256",
+        "preview_only",
+        "publishable",
+        "source_blocked_for_production",
+        "width",
+        "height",
+        "fps",
+        "duration_seconds",
+        "audio_present",
+        "video",
+        "video_sha256",
+        "limitations",
+        "scenes"
+      ],
+      "properties": {
+        "contract": {
+          "const": "preview_render"
+        },
+        "version": {
+          "const": "1.0"
+        },
+        "plan_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "preview_only": {
+          "const": true
+        },
+        "publishable": {
+          "const": false
+        },
+        "source_blocked_for_production": {
+          "type": "boolean"
+        },
+        "width": {
+          "const": 1080
+        },
+        "height": {
+          "const": 1920
+        },
+        "fps": {
+          "const": 24
+        },
+        "duration_seconds": {
+          "const": 15
+        },
+        "audio_present": {
+          "type": "boolean"
+        },
+        "video": {
+          "const": "preview.mp4"
+        },
+        "video_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "method",
+              "start_seconds",
+              "end_seconds",
+              "poster"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "method": {
+                "type": "string",
+                "pattern": "^[a-z_]{1,40}$"
+              },
+              "start_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "end_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "poster": {
+                "type": "string",
+                "pattern": "^scene-[1-8]\\.png$"
+              }
+            }
+          }
+        },
+        "audio": {
+          "type": "object",
+          "maxProperties": 12
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "plan_id",
+        "input_sha256",
+        "preview_only",
+        "publishable",
+        "source_blocked_for_production",
+        "width",
+        "height",
+        "fps",
+        "duration_seconds",
+        "audio_present",
+        "video",
+        "video_sha256",
+        "limitations",
+        "scenes",
+        "video_bytes"
+      ],
+      "properties": {
+        "contract": {
+          "const": "preview_render"
+        },
+        "version": {
+          "const": "1.1"
+        },
+        "plan_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "preview_only": {
+          "const": true
+        },
+        "publishable": {
+          "const": false
+        },
+        "source_blocked_for_production": {
+          "type": "boolean"
+        },
+        "width": {
+          "const": 1080
+        },
+        "height": {
+          "const": 1920
+        },
+        "fps": {
+          "const": 24
+        },
+        "duration_seconds": {
+          "const": 15
+        },
+        "audio_present": {
+          "type": "boolean"
+        },
+        "video": {
+          "const": "preview.mp4"
+        },
+        "video_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "method",
+              "start_seconds",
+              "end_seconds",
+              "poster",
+              "poster_sha256",
+              "poster_bytes"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "method": {
+                "type": "string",
+                "pattern": "^[a-z_]{1,40}$"
+              },
+              "start_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "end_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "poster": {
+                "type": "string",
+                "pattern": "^scene-[1-8]\\.png$"
+              },
+              "poster_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "poster_bytes": {
+                "type": "integer",
+                "minimum": 8,
+                "maximum": 8388608
+              }
+            }
+          }
+        },
+        "audio": {
+          "type": "object",
+          "maxProperties": 12
+        },
+        "video_bytes": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 67108864
+        }
+      }
+    }
+  ]
+}

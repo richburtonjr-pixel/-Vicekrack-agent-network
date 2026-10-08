@@ -1,8 +1,13 @@
 """Bounded local previews, silent by default with optional local narration.
 
-No external assets, provider clients or shell commands."""
+No external assets, provider clients or shell commands.
+
+Step 36: the manifest is `preview_render` 1.1. Every scene poster carries `poster_sha256`
+and `poster_bytes`, and the video carries `video_bytes` beside `video_sha256`. Before the
+package is published (renamed into place), every named file is re-read and must exist
+inside the package, be a regular file within its size limit and match its recorded hash
+(`artifact_binding.check_package`); otherwise nothing is published."""
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -13,6 +18,7 @@ from uuid import uuid4
 from .errors import NetworkError
 from .narration import load_narration
 from .orchestrator import ROOT, read_json
+from .artifact_binding import check_package, sha256_bytes
 from .persistence import reject_secrets
 from .scene_plan import validate_scene_plan
 
@@ -165,11 +171,12 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
             video = work / "preview.mp4"
             if not video.is_file() or video.stat().st_size < 100:
                 raise NetworkError("invalid_render_output", "Encoder produced no usable video.")
-            manifest = {"contract":"preview_render","version":"1.0","plan_id":plan["plan_id"],
+            video_bytes = video.read_bytes()
+            manifest = {"contract":"preview_render","version":"1.1","plan_id":plan["plan_id"],
                         "input_sha256":plan["input_sha256"],"preview_only":True,"publishable":False,
                         "source_blocked_for_production":plan["blocked_for_production"],
                         "width":1080,"height":1920,"fps":FPS,"duration_seconds":15,"audio_present":audio is not None,
-                        "video":"preview.mp4","video_sha256":hashlib.sha256(video.read_bytes()).hexdigest(),
+                        "video":"preview.mp4","video_sha256":sha256_bytes(video_bytes),"video_bytes":len(video_bytes),
                         "limitations":(["silent storyboard"] if audio is None else
                                        ["user-supplied local narration padded with silence to 15 seconds",
                                         "no voice consent, rights or content verification of narration"])
@@ -177,7 +184,9 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
                                          "no sourced or generated media", "no fact or rights verification"],
                         "scenes":[{"index":s["index"],"method":s["selected_method"],
                                    "start_seconds":s["beat"]["start_seconds"],"end_seconds":s["beat"]["end_seconds"],
-                                   "poster":f"scene-{s['index']}.png"} for s in plan["scenes"]]}
+                                   "poster":f"scene-{s['index']}.png",
+                                   "poster_sha256":sha256_bytes((work/f"scene-{s['index']}.png").read_bytes()),
+                                   "poster_bytes":(work/f"scene-{s['index']}.png").stat().st_size} for s in plan["scenes"]]}
             if audio is not None:
                 manifest["audio"] = dict(audio)
             reject_secrets(manifest)
@@ -186,6 +195,9 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
                 with path.open("r+b") as stream: os.fsync(stream.fileno())
             for path in [work/"segments.txt", *work.glob("scene-*.mp4"), work/"silent.mp4", work/"narration.wav"]:
                 path.unlink(missing_ok=True)
+            # Every file the manifest names must be present, in bounds and match its hash before publication.
+            if check_package(work, json.loads((work / "manifest.json").read_text(encoding="utf-8"))) is not None:
+                raise NetworkError("invalid_render_output", "The preview package did not verify; nothing was published.")
             os.rename(work,target)
         return {"preview_file":str(target/"preview.mp4"),"manifest_file":str(target/"manifest.json"),
                 "preview_only":True,"publishable":False,"source_blocked_for_production":plan["blocked_for_production"],

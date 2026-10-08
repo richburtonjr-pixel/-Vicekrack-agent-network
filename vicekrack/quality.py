@@ -10,6 +10,16 @@ Checks reuse the existing validators (Story Brief, Short Script, scene plan, ver
 record replay, narration normalization). Media is measured with the local ffmpeg from
 requirements-render.txt in a restricted subprocess; raw tool output is parsed in memory
 and never stored. Nothing is repaired, retried, re-rendered or published.
+
+Step 36 (report version 1.1): the checks run against one consistent snapshot. Every file
+they rely on (production state, brief, script, plan, manifest, video, posters, verification
+record, narration input, configuration files) is read once; JSON is parsed from those bytes
+and media tools are re-checked by hash afterwards. The report's `binding` records each
+file's role, safe reference, SHA-256 and size (never credentials or the narration path). If
+any file changed while the checks ran, the binding is `changed_during_inspection`, a pass is
+downgraded to needs_review, and nothing is reported as bound. A 1.1 manifest's poster
+hashes are checked too. The binding is byte identity only; `evidence_freshness` and the
+technical checks stay separate, and none of them grants permission to publish.
 """
 
 import hashlib
@@ -19,15 +29,17 @@ import re
 import subprocess
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 
+from .artifact_binding import (BINDING_NOTE, BINDING_VERSION, MAX_JSON_BYTES, MAX_POSTER_BYTES, MAX_VIDEO_BYTES,
+                               Snapshot, norm, posters_bound, safe_file, validate_manifest)
 from .errors import NetworkError
 from .orchestrator import ROOT, read_json
 from .persistence import reject_secrets
-from .production import PROJECT, STAGES, ProductionStore, _sha256_file
+from .production import PROJECT, STAGES, ProductionStore, validate_state
 from .scene_plan import validate_scene_plan
 from .scout_cli import _publish
 from .short_script import FORMATS, validate_short_script
@@ -47,7 +59,19 @@ NOTES = [
     "Facts were not independently fact-checked by this report; claim status comes from the Verification stage.",
     "Image, footage, music and narration rights were not checked.",
     "This report never grants permission to publish; previews remain publishable: false.",
+    BINDING_NOTE,
 ]
+REF = re.compile(r"^(?!\.\.?(/|$))[A-Za-z0-9._-]+(/(?!\.\.?(/|$))[A-Za-z0-9._-]+){0,3}$")  # no "." or ".." parts
+ROLE_OF = {"brief_path": "brief", "script_path": "script", "plan_path": "scene_plan", "preview_file": "video",
+           "manifest_file": "preview_manifest"}
+CONFIGS = (("verification_policy", "policy"), ("editorial_profile", "editorial_profile"), ("creator", "creator"),
+           ("capabilities", "capabilities"))
+
+
+def _json_bytes(data):
+    def reject_constant(value):
+        raise ValueError("Non-finite numbers are not JSON values")
+    return json.loads(data.decode("utf-8-sig"), parse_constant=reject_constant)
 
 
 @lru_cache(maxsize=1)
@@ -187,12 +211,14 @@ class QualityChecker:
         with self.store.lock(production_id):
             events.check()                              # a recording failure stops before any checks run
             events.emit(QUALITY, "quality", "stage_started", "started", refs=refs)
+            self.snapshot = Snapshot()
             try:
                 checks = self._checks(production_id)
             except NetworkError as error:
                 events.emit(QUALITY, "quality", "stage_failed", "failed", reason_codes=[error.code], refs=refs)
                 raise
-        report = self._report(production_id, checks)
+            changed = self.snapshot.recheck()                # still under the production lock
+        report = self._report(production_id, checks, self._binding(changed))
         folder = Path(self.root if self.root is not None else ROOT) / "runtime/quality"
         if not _publish(report, folder, report["report_id"] + ".json"):
             events.emit(QUALITY, "quality", "stage_failed", "failed", reason_codes=["quality_report_exists"], refs=refs)
@@ -203,24 +229,38 @@ class QualityChecker:
 
     # -- helpers
 
-    def _path(self, relative):
-        if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
-            return None
-        path = (self.folder / relative).resolve()
-        if not path.is_relative_to(self.folder) or path.is_symlink():
-            return None
+    def _path(self, relative, limit=MAX_POSTER_BYTES):
+        """A regular file inside the production folder, reached without symbolic links (or None)."""
+        path, problem = safe_file(self.folder, relative, limit)
+        if path is None and problem == "missing":
+            relative = norm(relative)
+            return self.folder / relative if isinstance(relative, str) else None    # reported as missing by callers
         return path
+
+    def _poster_ref(self, poster):
+        base = PurePosixPath(norm(self.stages["preview"]["artifacts"]["preview_file"])).parent
+        return str(base / poster) if isinstance(poster, str) and "/" not in poster and "\\" not in poster else None
+
+    def _snap(self, role, relative, path, *, index=None, limit=MAX_JSON_BYTES, keep=False):
+        ref = norm(relative)
+        if not isinstance(ref, str) or not REF.match(ref):
+            return None
+        return self.snapshot.read(("file", ref), path, role=role, ref=ref, index=index, max_bytes=limit, keep=keep)
 
     def _artifact(self, check, stage, key, digest_key):
         artifacts = self.stages[stage]["artifacts"]
-        path = self._path(artifacts.get(key))
+        limit = MAX_VIDEO_BYTES if key == "preview_file" else MAX_JSON_BYTES
+        path, problem = safe_file(self.folder, artifacts.get(key), limit)
         if path is None:
-            check.fail(f"{stage}_artifact_outside_production")
+            check.fail(f"{stage}_artifact_missing" if problem == "missing" else
+                       f"{stage}_artifact_too_large" if problem == "file_too_large" else f"{stage}_artifact_outside_production")
             return None
-        if not path.is_file():
+        self._snap(ROLE_OF[key], artifacts.get(key), path, limit=limit, keep=key != "preview_file")   # JSON kept: read once
+        digest = self.snapshot.entries.get(("file", norm(artifacts.get(key))), {}).get("sha256")
+        if digest is None:
             check.fail(f"{stage}_artifact_missing")
             return None
-        if _sha256_file(path) != artifacts.get(digest_key):
+        if digest != artifacts.get(digest_key):
             check.fail(f"{stage}_artifact_hash_mismatch")
             return None
         return path
@@ -230,7 +270,7 @@ class QualityChecker:
         if path is None:
             return None
         try:
-            document = read_json(path)
+            document = _json_bytes(self._snap(ROLE_OF[key], self.stages[stage]["artifacts"][key], path, keep=True))
             validate(document)
         except (NetworkError, OSError, ValueError, UnicodeError, TypeError, KeyError):
             check.fail(code)
@@ -242,15 +282,26 @@ class QualityChecker:
     def _checks(self, production_id):
         results = {}
         state_check = Check("state")
+        path = self.store.state_path(production_id)
+        self.folder = self.store.folder(production_id).resolve()
+        data = self.snapshot.read(("file", "state.json"), path, role="production_state", ref="state.json", keep=True)
+        entry = self.snapshot.entries[("file", "state.json")]
+        if entry["status"] == "missing":
+            raise NetworkError("production_not_found", "Production does not exist.")
         try:
-            self.state = self.store.read(production_id)
-        except NetworkError as error:
-            if error.code in ("production_not_found", "invalid_production_id"):
-                raise
+            self.state = _json_bytes(data)
+            validate_state(self.state)
+            if self.state["production_id"] != production_id:
+                raise ValueError
+        except (NetworkError, ValueError, UnicodeError, TypeError, AttributeError):
             state_check.fail("production_state_invalid")
             self.state = None
         if self.state is not None:
-            self.folder = self.store.folder(production_id).resolve()
+            for name, key in CONFIGS:
+                config_path = self.state["config"][key]["path"]
+                found, _ = safe_file(PROJECT, config_path, MAX_JSON_BYTES)
+                if found is not None:
+                    self.snapshot.read(("config", name), found, role=name, ref=config_path)
             self.stages = {s["name"]: s for s in self.state["stages"]}
             incomplete = [s["name"] for s in self.state["stages"] if s["status"] != "completed"]
             state_check.details.update(status=self.state["status"], completed_stages=len(STAGES) - len(incomplete),
@@ -283,10 +334,12 @@ class QualityChecker:
         self.manifest = None
         if manifest_path is not None:
             try:
-                self.manifest = read_json(manifest_path)
-                if self.manifest.get("contract") != "preview_render":
+                self.manifest = _json_bytes(self._snap("preview_manifest", preview["manifest_file"], manifest_path, keep=True))
+                if not isinstance(self.manifest, dict) or self.manifest.get("contract") != "preview_render":
                     raise ValueError
-            except (OSError, ValueError, UnicodeError):
+                if self.manifest.get("version") == "1.1":
+                    validate_manifest(self.manifest)       # malformed poster hashes are rejected here
+            except (OSError, ValueError, UnicodeError, NetworkError, AttributeError, TypeError):
                 check.fail("manifest_invalid")
                 self.manifest = None
         if self.plan is not None and self.script is not None and self.plan["script"] != self.script:
@@ -307,10 +360,16 @@ class QualityChecker:
         config = self.state["config"]
         result = (None, None, None)
         try:
-            if _sha256_file(PROJECT / config["policy"]["path"]) != config["policy"]["sha256"]:
+            if self.snapshot.entries.get(("config", "verification_policy"), {}).get("sha256") != config["policy"]["sha256"]:
                 result = (None, None, "verification_policy_changed")
             else:
                 policy, policy_sha = load_policy(config["policy"]["path"])
+                from .verification_cli import paths as verification_paths
+                records, _ = verification_paths(self.root)
+                found, _ = safe_file(records, config["record_id"] + ".json", MAX_JSON_BYTES)
+                if found is not None:
+                    self.snapshot.read(("record", config["record_id"]), found, role="verification_record",
+                                       ref=None, ident=config["record_id"])
                 record = load_record(config["record_id"], policy, policy_sha, self.root)
                 result = (policy, record, None)
         except NetworkError as error:
@@ -399,7 +458,7 @@ class QualityChecker:
         posters = [s.get("poster") for s in self.manifest.get("scenes", [])]
         colours_ok, available = True, True
         for poster in posters:
-            path = self._path(str(Path(self.stages["preview"]["artifacts"]["preview_file"]).parent / str(poster)))
+            path = self._path(self._poster_ref(poster))
             if path is None or not path.is_file():
                 continue  # Missing posters are reported by manifest_consistency.
             try:
@@ -498,7 +557,10 @@ class QualityChecker:
             audio = self.manifest.get("audio") or {}
             path = Path(narration["path"])
             try:
-                if _sha256_file(path) != narration["sha256"]:
+                digest = self.snapshot.read(("narration", 0), path, role="narration", max_bytes=16 * 1024 * 1024)
+                if digest is None:
+                    raise OSError("narration unavailable")
+                if digest != narration["sha256"]:
                     check.review("narration_source_changed")
                 else:
                     metadata, _ = load_narration(path)
@@ -518,7 +580,8 @@ class QualityChecker:
             check.skip("artifacts_unavailable")
             return check
         m = self.manifest
-        if m.get("video_sha256") != _sha256_file(self.video_path) or m.get("video_sha256") != self.stages["preview"]["artifacts"].get("video_sha256"):
+        video_digest = self.snapshot.entries.get(("file", norm(self.stages["preview"]["artifacts"]["preview_file"])), {}).get("sha256")
+        if m.get("video_sha256") != video_digest or m.get("video_sha256") != self.stages["preview"]["artifacts"].get("video_sha256"):
             check.fail("manifest_video_hash_mismatch")
         if m.get("plan_id") != self.plan["plan_id"] or m.get("input_sha256") != self.plan["input_sha256"]:
             check.fail("manifest_plan_mismatch")
@@ -534,13 +597,20 @@ class QualityChecker:
                 check.fail("manifest_audio_not_matching_media")
         else:
             check.skip("media_measurements_unavailable")
-        posters_ok, sized = 0, True
-        base = Path(self.stages["preview"]["artifacts"]["preview_file"]).parent
-        for scene in m.get("scenes", []):
-            path = self._path(str(base / str(scene.get("poster"))))
+        posters_ok, sized, bound = 0, True, posters_bound(m)
+        for number, scene in enumerate(m.get("scenes", []), start=1):
+            ref = self._poster_ref(scene.get("poster"))
+            path = self._path(ref)
             if path is None or not path.is_file():
                 check.fail("poster_missing")
                 continue
+            digest = self._snap("poster", ref, path, index=number, limit=MAX_POSTER_BYTES)
+            entry = self.snapshot.entries.get(("file", norm(ref)))
+            if digest is None:
+                check.fail("poster_missing")
+                continue
+            if bound and (digest != scene.get("poster_sha256") or entry["bytes"] != scene.get("poster_bytes")):
+                check.fail("poster_hash_mismatch")             # Step 36: manifest 1.1 binds every poster
             posters_ok += 1
             try:
                 size, _ = self.poster_reader(path)
@@ -550,7 +620,7 @@ class QualityChecker:
                 sized = False
             except ProbeFailed:
                 check.fail("poster_unreadable")
-        check.details.update(posters_found=posters_ok, posters_sized=sized,
+        check.details.update(posters_found=posters_ok, posters_sized=sized, posters_hash_bound=bound,
                              media_measured=media is not None)
         if not sized:
             check.skip("poster_check_unavailable")
@@ -579,7 +649,30 @@ class QualityChecker:
 
     # -- report
 
-    def _report(self, production_id, checks):
+    def _binding(self, changed):
+        """What these checks read, and whether it stayed the same while they ran (Step 36)."""
+        artifacts, configuration = self.snapshot.artifacts(), self.snapshot.configuration()
+        reasons = []
+        if changed:
+            status = "changed_during_inspection"
+            reasons = ["artifact_changed_during_inspection"]
+            roles = {self.snapshot.entries[key]["role"] for key in changed}
+            reasons += sorted("changed_" + role for role in roles)[:20]
+        elif self.state is None or self.state["status"] != "completed" or any(
+                row["status"] != "read" for row in artifacts + configuration):
+            status = "incomplete"
+            reasons = ["not_every_artifact_could_be_read"]
+        else:
+            expected = {"production_state", "brief", "script", "scene_plan", "preview_manifest", "video", "poster",
+                        "verification_record"} | ({"narration"} if self.state["config"]["narration"] else set())
+            missing = expected - {row["role"] for row in artifacts}
+            status = "incomplete" if missing else "bound"
+            reasons = sorted("not_read_" + role for role in missing)
+        return {"binding_version": BINDING_VERSION, "status": status, "reasons": reasons[:30], "integrity_only": True,
+                "artifacts": artifacts[:40], "configuration": configuration,
+                "note": BINDING_NOTE}
+
+    def _report(self, production_id, checks, binding):
         reasons = list(dict.fromkeys(code for check in checks for code in check["reasons"]))
         statuses = {check["status"] for check in checks}
         if "fail" in statuses:
@@ -588,15 +681,18 @@ class QualityChecker:
             result = "needs_review"
         else:
             result = "pass"
+        if binding["status"] == "changed_during_inspection":
+            reasons.append("artifacts_changed_during_inspection")   # a pass on moving files is not a pass
+            result = "needs_review" if result == "pass" else result
         checked_at = self.clock()
         # A random component keeps every run's report separate (reports are never overwritten).
         digest = hashlib.sha256(json.dumps([production_id, checked_at, checks, uuid4().hex], sort_keys=True).encode()).hexdigest()
-        report = {"contract": "production_quality_report", "version": "1.0", "report_id": "qr-" + digest[:24],
+        report = {"contract": "production_quality_report", "version": "1.1", "report_id": "qr-" + digest[:24],
                   "production_id": production_id, "checked_at": checked_at, "result": result, "reasons": reasons,
                   "checks": checks,
                   "scope": {"technical_checks_only": True, "factual_accuracy_verified": False, "rights_cleared": False,
                             "publishable": False, "permission_to_publish": False},
-                  "notes": list(NOTES)}
+                  "notes": list(NOTES), "binding": binding}
         validate_report(report)
         return report
 
@@ -606,6 +702,40 @@ def validate_report(report):
     error = next(_validator().iter_errors(report), None)
     if error is not None:
         raise NetworkError("invalid_quality_report", f"Quality report rejected: schema rule '{error.validator}'.")
+
+
+def load_report(report_id, root=None):
+    """One saved report, validated, whose file name equals its report ID."""
+    if not isinstance(report_id, str) or not re.fullmatch(r"qr-[0-9a-f]{24}", report_id):
+        raise NetworkError("invalid_report_id", "Report IDs look like qr- followed by 24 hex characters.")
+    folder = Path(root if root is not None else ROOT) / "runtime/quality"
+    path, problem = safe_file(folder, report_id + ".json", MAX_JSON_BYTES)
+    if path is None:
+        raise NetworkError("quality_report_not_found" if problem == "missing" else "invalid_quality_report",
+                           "No saved quality report with this ID.")
+    try:
+        report = read_json(path)
+    except (OSError, ValueError, UnicodeError):
+        raise NetworkError("invalid_quality_report", "The quality report is unreadable.") from None
+    validate_report(report)
+    if report["report_id"] != report_id:
+        raise NetworkError("invalid_quality_report", "The report file name does not match its ID.")
+    return report
+
+
+def binding_of(report_id, root=None):
+    """Step 36, read-only: a saved report's artifact binding re-checked against the current files."""
+    from .artifact_binding import verify_binding
+    report = load_report(report_id, root)
+    store = ProductionStore(root)
+    state = store.read(report["production_id"])
+    binding = verify_binding(report, state, store.folder(report["production_id"]), root, PROJECT)
+    freshness = next((c for c in report["checks"] if c["check_id"] == "evidence_freshness"), None)
+    return {"report_id": report_id, "production_id": report["production_id"], "checked_at": report["checked_at"],
+            "binding": binding, "technical_result": report["result"],
+            "evidence_freshness_at_check": freshness["status"] if freshness else "unavailable",
+            "scope": report["scope"],
+            "note": "Binding compares file hashes only; it re-runs no checks and proves nothing about facts or rights."}
 
 
 def list_reports(root=None):

@@ -396,17 +396,31 @@ shown, and later artifacts are `unavailable`. Scene posters are listed in the ha
 manifest, but the Step 13 manifest stores no poster hashes, so they are labelled **not
 hash-bound**.
 
-### Quality reports: never shown as current
+### Quality reports: binding, result and freshness (Step 36)
 
-A Step 22 report records which production it checked and when, but no hashes of the files
-it saw. The desk therefore never claims a report is current:
-- **stale** when it provably predates the artifacts (checked before the last stage
-  finished, or it saw a different production status);
-- **unverified** otherwise.
+Each report shows three separate labels:
+- **Artifact binding**, re-checked by hash every time the desk loads:
+  - **matching**: every file and configuration file the report inspected still has the
+    same SHA-256;
+  - **changed**: at least one differs or is gone (the roles are listed);
+  - **legacy/unverified**: a report saved before Step 36 records no hashes, so it is never
+    shown as current (the Step 35 `stale` reasons are still listed);
+  - **unavailable**: the report was not bound (the production was incomplete, or files
+    changed while it was being checked), or this is demo data.
+- **Technical result:** pass, needs_review, fail or unavailable, as saved.
+- **Evidence freshness:** the `evidence_freshness` status at check time, and in the
+  verification section the record's age now against its policy limit.
+
+Matching hashes prove byte identity only, not facts, fresh evidence, rights or permission
+to publish. Posters from a 1.1 manifest are shown as hash-verified and re-checked when
+served; posters from a 1.0 manifest stay `not hash-bound`.
 
 Reports are matched by their own `production_id`, and the file name must equal the report
 ID. Edited, renamed or invalid reports are listed as rejected. No check runs
-automatically: run `quality-report PRODUCTION_ID` to check the current artifacts.
+automatically: run `quality-report PRODUCTION_ID` to check the current artifacts, and
+`quality-binding REPORT_ID` to re-check one report from the command line.
+
+![Quality report with three separate labels](images/hq/hq-step36-binding-desktop.png)
 
 ![Latest saved production with an unverified quality report](images/hq/hq-step35-saved-latest.png)
 

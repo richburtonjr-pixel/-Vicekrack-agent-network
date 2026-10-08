@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "hq_content",
-  "description": "Living HQ content results desk documents (Step 35): at_position (only what the timeline proves existed at that event) and latest (every artifact re-verified now). Read-only display data; publishable is always false.",
+  "description": "Living HQ content results desk documents (Step 35): at_position (only what the timeline proves existed at that event) and latest (every artifact re-verified now). Read-only display data; publishable is always false. Step 36: reports carry separate artifact binding (matching/changed/legacy_unverified/unavailable), technical result and evidence freshness; posters from a 1.1 manifest are verified by hash.",
   "oneOf": [
     {
       "type": "object",
@@ -1313,6 +1313,7 @@
                                   },
                                   "status": {
                                     "enum": [
+                                      "verified",
                                       "not_hash_bound",
                                       "missing",
                                       "tampered",
@@ -1396,7 +1397,9 @@
                         "publishable",
                         "preview_only",
                         "watermark",
-                        "limitations"
+                        "limitations",
+                        "manifest_version",
+                        "posters_hash_bound"
                       ],
                       "properties": {
                         "video": {
@@ -1505,6 +1508,15 @@
                             "type": "string",
                             "maxLength": 200
                           }
+                        },
+                        "manifest_version": {
+                          "enum": [
+                            "1.0",
+                            "1.1"
+                          ]
+                        },
+                        "posters_hash_bound": {
+                          "type": "boolean"
                         }
                       }
                     },
@@ -1526,7 +1538,8 @@
                 "claims",
                 "summary",
                 "flags",
-                "limitations"
+                "limitations",
+                "freshness_now"
               ],
               "properties": {
                 "record_id": {
@@ -1637,6 +1650,36 @@
                     "type": "string",
                     "maxLength": 300
                   }
+                },
+                "freshness_now": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "age_hours",
+                    "max_age_days"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "fresh",
+                        "stale",
+                        "unavailable"
+                      ]
+                    },
+                    "age_hours": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "max_age_days": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -1669,7 +1712,11 @@
                   "counts",
                   "checks",
                   "scope",
-                  "notes"
+                  "notes",
+                  "report_version",
+                  "binding_changed",
+                  "bound_files",
+                  "evidence_freshness_at_check"
                 ],
                 "properties": {
                   "report_id": {
@@ -1687,8 +1734,10 @@
                   },
                   "binding": {
                     "enum": [
-                      "stale",
-                      "unverified"
+                      "matching",
+                      "changed",
+                      "legacy_unverified",
+                      "unavailable"
                     ]
                   },
                   "binding_reasons": {
@@ -1784,6 +1833,32 @@
                       "type": "string",
                       "maxLength": 300
                     }
+                  },
+                  "report_version": {
+                    "enum": [
+                      "1.0",
+                      "1.1"
+                    ]
+                  },
+                  "binding_changed": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_]{1,60}$"
+                    }
+                  },
+                  "bound_files": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evidence_freshness_at_check": {
+                    "enum": [
+                      "pass",
+                      "needs_review",
+                      "fail",
+                      "unavailable"
+                    ]
                   }
                 }
               }
@@ -3128,6 +3203,7 @@
                                       },
                                       "status": {
                                         "enum": [
+                                          "verified",
                                           "not_hash_bound",
                                           "missing",
                                           "tampered",
@@ -3211,7 +3287,9 @@
                             "publishable",
                             "preview_only",
                             "watermark",
-                            "limitations"
+                            "limitations",
+                            "manifest_version",
+                            "posters_hash_bound"
                           ],
                           "properties": {
                             "video": {
@@ -3320,6 +3398,15 @@
                                 "type": "string",
                                 "maxLength": 200
                               }
+                            },
+                            "manifest_version": {
+                              "enum": [
+                                "1.0",
+                                "1.1"
+                              ]
+                            },
+                            "posters_hash_bound": {
+                              "type": "boolean"
                             }
                           }
                         },
@@ -3341,7 +3428,8 @@
                     "claims",
                     "summary",
                     "flags",
-                    "limitations"
+                    "limitations",
+                    "freshness_now"
                   ],
                   "properties": {
                     "record_id": {
@@ -3452,6 +3540,36 @@
                         "type": "string",
                         "maxLength": 300
                       }
+                    },
+                    "freshness_now": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "age_hours",
+                        "max_age_days"
+                      ],
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "fresh",
+                            "stale",
+                            "unavailable"
+                          ]
+                        },
+                        "age_hours": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "max_age_days": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -3497,7 +3615,11 @@
                       "counts",
                       "checks",
                       "scope",
-                      "notes"
+                      "notes",
+                      "report_version",
+                      "binding_changed",
+                      "bound_files",
+                      "evidence_freshness_at_check"
                     ],
                     "properties": {
                       "report_id": {
@@ -3515,8 +3637,10 @@
                       },
                       "binding": {
                         "enum": [
-                          "stale",
-                          "unverified"
+                          "matching",
+                          "changed",
+                          "legacy_unverified",
+                          "unavailable"
                         ]
                       },
                       "binding_reasons": {
@@ -3612,6 +3736,32 @@
                           "type": "string",
                           "maxLength": 300
                         }
+                      },
+                      "report_version": {
+                        "enum": [
+                          "1.0",
+                          "1.1"
+                        ]
+                      },
+                      "binding_changed": {
+                        "type": "array",
+                        "maxItems": 40,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9_]{1,60}$"
+                        }
+                      },
+                      "bound_files": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "evidence_freshness_at_check": {
+                        "enum": [
+                          "pass",
+                          "needs_review",
+                          "fail",
+                          "unavailable"
+                        ]
                       }
                     }
                   }

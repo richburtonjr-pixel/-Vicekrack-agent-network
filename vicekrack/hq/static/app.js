@@ -1741,7 +1741,8 @@
   function statusChip(status) {
     var tone = { verified: "ok", pass: "ok", completed: "ok", needs_review: "warn", unverified: "warn", stale: "bad",
       fail: "bad", failed: "bad", tampered: "bad", mismatched: "bad", missing: "bad", unavailable: "na",
-      not_produced: "na", not_established_at_position: "na", not_hash_bound: "warn", reused: "info" }[status] || "na";
+      not_produced: "na", not_established_at_position: "na", not_hash_bound: "warn", reused: "info", matching: "ok", changed: "bad", legacy_unverified: "warn",
+      fresh: "ok" }[status] || "na";
     return chip(C.words(status).toUpperCase(), tone);
   }
   function linkCell(source) {
@@ -1820,6 +1821,9 @@
         "Unavailable: " + C.words(v.reason || "unknown"));
     } else {
       row(facts, "Verified at", C.formatTime(v.verified_at));
+      var now = v.freshness_now;
+      row(facts, "Evidence freshness now", now.status === "unavailable" ? "unavailable" : C.words(now.status).toUpperCase() +
+        " · " + now.age_hours + " h old · limit " + now.max_age_days + " days");
       if (v.summary) {
         row(facts, "Summary", Object.keys(v.summary).map(function (k) { return C.words(k) + " " + v.summary[k]; }).join(" · "));
       }
@@ -1846,7 +1850,9 @@
         var img = h("img", { src: mediaUrl(productionId, poster.media_id), loading: "lazy", width: "108", height: "192",
           alt: "Scene " + scene.index + " poster: " + C.plain(scene.on_screen_text || scene.narration) }, li);
         img.className = "poster";
-        h("span", { class: "poster-note" }, li, "Poster not hash-bound (the Step 13 manifest has no poster hashes)");
+        h("span", { class: "poster-note" }, li, poster.status === "verified" ?
+          "Poster hash-verified against the 1.1 manifest (re-checked when served)" :
+          "Poster not hash-bound (this older 1.0 manifest has no poster hashes; it is never upgraded)");
       } else {
         var none = h("div", { class: "poster none", role: "img",
           "aria-label": "No poster for scene " + scene.index }, li);
@@ -1891,6 +1897,8 @@
     row(side, "Narration", preview.narration.note + (preview.narration.sha256 ? " (WAV " + preview.narration.sha256.slice(0, 12) + "…)" : ""));
     row(side, "Audio track", preview.audio_present ? "present" : "none (silent)");
     row(side, "Publishable", "false · preview only");
+    row(side, "Manifest", "version " + preview.manifest_version + (preview.posters_hash_bound ?
+      " · every poster hash-bound" : " · posters not hash-bound (older preview; a new production is needed to bind them)"));
     row(side, "Video hash", preview.video.sha256 ? preview.video.sha256.slice(0, 16) + "… (re-checked when served)" : "-");
     if (preview.limitations.length) { row(side, "Renderer limits", preview.limitations.join("; ")); }
   }
@@ -1908,10 +1916,18 @@
       var card = h("div", { class: "report" }, box);
       var head = h("div", { class: "block-head" }, card);
       h("strong", {}, head, r.report_id + " · checked " + C.formatTime(r.checked_at));
-      head.appendChild(statusChip(r.result));
-      head.appendChild(statusChip(r.binding));
-      h("p", { class: "small" }, card, (r.binding === "stale" ? "STALE: " : "UNVERIFIED: ") +
-        r.binding_reasons.map(C.words).join("; "));
+      var labels = h("div", { class: "facts" }, card);
+      var binding = h("span", {});
+      binding.appendChild(statusChip(r.binding));
+      var why = r.binding_changed.length ? " changed: " + r.binding_changed.map(C.words).join(", ") :
+        r.binding_reasons.length ? " " + r.binding_reasons.map(C.words).join("; ") :
+        " the " + r.bound_files + " files it inspected are unchanged (re-checked now)";
+      h("span", { class: "small" }, binding, " (report " + r.report_version + ")" + why);
+      row(labels, "Artifact binding", binding);
+      row(labels, "Technical result", statusChip(r.result));
+      row(labels, "Evidence freshness at check", statusChip(r.evidence_freshness_at_check));
+      h("p", { class: "muted small" }, card, "Three separate things: matching hashes prove byte identity only. They do " +
+        "not prove facts, fresh evidence, rights clearance or permission to publish.");
       table(card, "Checks in " + r.report_id, ["Check", "Status", "Reasons"], r.checks.map(function (c) {
         return [C.words(c.check_id), statusChip(c.status), c.reasons.length ? codeList(c.reasons) : "-"];
       }));

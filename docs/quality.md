@@ -28,12 +28,18 @@ Linux/macOS):
 python -m vicekrack production-list                         # find a PRODUCTION_ID
 python -m vicekrack quality-report PRODUCTION_ID
 python -m vicekrack quality-list
+python -m vicekrack quality-binding REPORT_ID               # Step 36, read-only
 ```
 
 - **`quality-report`:** prints the report file, result, all reason codes, each check's
   status and the scope block. Exit code 0 only for `pass`, 1 for `needs_review`, `fail`
   or an error.
 - **`quality-list`:** lists saved reports, newest first.
+- **`quality-binding`:** re-checks a saved report's artifact binding against the files as
+  they are now, without running any check or writing anything. Prints the binding status
+  (`matching`, `changed`, `legacy_unverified` or `unavailable`) with the roles that
+  differ, the technical result and the evidence freshness recorded at check time. Exit
+  code 0 only for `matching`.
 - **Media measurement:** needs `requirements-render.txt` (bundled ffmpeg and Pillow).
   Without them, the media checks are reported as `unavailable` and the result is at
   best `needs_review`.
@@ -88,6 +94,44 @@ Reports contain IDs, statuses, fixed reason codes and numeric/boolean measuremen
 They never contain claim or script text, prompts, credentials, environment values or raw
 exceptions, and they pass the existing credential check before saving. The command
 never repairs, retries, re-renders, re-verifies or publishes.
+
+## Step 36: artifact binding
+
+New reports are version **1.1** and carry a `binding` object (see
+`schemas/quality-report.schema.json`):
+
+| Field | Meaning |
+|---|---|
+| `status` | `bound`, `changed_during_inspection` or `incomplete` (something could not be read, or the production was not complete) |
+| `artifacts` | role, safe reference inside the production folder, record ID (verification record only), poster index, SHA-256, size and read status for: production state, brief, script, scene plan, preview manifest, video, every poster, the verification record and the narration input |
+| `configuration` | name, project-relative path (`config/*.json`) and SHA-256 of the verification policy, editorial profile, Creator and capabilities files the checks used |
+| `integrity_only` | always `true` |
+| `note` | binding is byte identity only |
+
+- **One snapshot.** Every file is read once; JSON is parsed from those exact bytes, and the
+  media tools are given the same file, which is re-hashed afterwards. After the checks,
+  still under the production lock, every snapshotted file is hashed again. Any change,
+  disappearance or new file makes the binding `changed_during_inspection`; a `pass`
+  becomes `needs_review` with `artifacts_changed_during_inspection`. Such a report is
+  never shown as bound.
+- **Safe references only.** References are relative, have at most four parts and no `.` or
+  `..` part. The narration input is recorded by hash only (its path is the user's). No
+  credentials, environment values or absolute paths are stored.
+- **No circularity.** The report hashes the manifest; the manifest never names a report.
+  `runtime/quality` is never part of a snapshot, so a report never hashes itself or another
+  report.
+- **Not bound:** the selection history file read by the `history` check (it is shared,
+  append-only state, and its entry is checked by ID).
+- **Separate things.** `binding` (integrity of the inspected bytes), `result` (technical
+  checks) and the `evidence_freshness` check are reported separately. Matching hashes do
+  not prove facts, fresh evidence, rights clearance or permission to publish.
+
+**Older reports (1.0)** have no binding. They stay readable, are shown as
+`legacy_unverified`, and are never rewritten or given hashes afterwards. To get a bound
+report for any production, run `quality-report PRODUCTION_ID` again: it writes a new 1.1
+report and leaves the old one unchanged. For a production whose preview manifest is 1.0,
+the new report still records each poster's hash as it saw it, but the manifest itself
+stays unbound (see [Preview](preview.md#step-36-preview-manifest-11)).
 
 ## Limitations
 

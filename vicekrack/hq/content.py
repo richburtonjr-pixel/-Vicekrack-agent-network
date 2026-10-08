@@ -21,20 +21,25 @@ Integrity (IDs and hashes only; never filenames or timestamps alone):
   manifest -> video (IDs, embedded copies and hashes). A failing artifact is reported
   (`missing`, `tampered`, `mismatched`) and its content is never shown; artifacts after it
   are `unavailable_upstream_invalid`.
-- Scene posters are listed in the hash-checked manifest but the Step 13 manifest stores no
-  poster hashes: they are served as `not_hash_bound` (inside the preview folder, PNG
-  signature, size limit) and labelled so.
+- Scene posters: a Step 36 manifest (1.1) records each poster's SHA-256 and size, so posters
+  are `verified` only while they match (and are re-hashed whenever served). A legacy 1.0
+  manifest stores no poster hashes: its posters stay `not_hash_bound` (inside the preview
+  folder, PNG signature, size limit) and are never upgraded.
 - Timelines: a recorded timeline must name this production (run ID and correlation ID). For
   the historical view each completed stage's single saved completion must be proven by the
   timeline: in a reconstructed timeline by the production's own trace (unique completion,
   no truncation or disagreement); in a recorded attempt by a `stage_completed` whose saved
   finish time lies inside that attempt, or a `stage_reused` for a stage finished before
   the attempt started. Otherwise historical viewing is `unavailable` with reasons.
-- Quality reports are matched by their own `production_id` (and file name = report ID).
-  The Step 22 report contract stores no artifact hashes, so a report can never be proven
-  to describe the current artifacts: it is `stale` when it provably predates them (checked
-  before the last stage finished, or it saw a different production status) and
-  `unverified` otherwise. It is never shown as current. Quality checks are never run.
+- Quality reports are matched by their own `production_id` (and file name = report ID), and
+  shown with three separate labels (Step 36):
+    artifact binding   matching | changed | legacy_unverified | unavailable, re-checked
+                       against the files now (`artifact_binding.verify_binding`). Legacy 1.0
+                       reports record no hashes and stay `legacy_unverified` (with `stale`
+                       hints when they provably predate the artifacts);
+    technical result   the report's own pass | needs_review | fail;
+    evidence freshness the report's freshness check at check time, and the record's age now.
+  Quality checks are never run.
 
 Nothing here runs agents, generates scripts, renders media, contacts providers, publishes,
 locks or writes production files.
@@ -79,9 +84,10 @@ VERIFICATION_LIMITS = [
     "Image, footage, music and narration rights were never checked.",
     "Evidence is whatever the approved sources said when they were scouted; later corrections are not known.",
 ]
-QUALITY_BINDING = ("The Step 22 report records which production it checked and when, but no hashes of the "
-                   "artifacts it saw. It cannot prove it describes the current files, so it is never shown as current. "
-                   "Run quality-report PRODUCTION_ID to check the current artifacts.")
+QUALITY_BINDING = ("Three separate things: artifact binding (do the files the report inspected still match, by hash), "
+                   "the technical result, and evidence freshness. Matching hashes prove byte identity only: not facts, "
+                   "rights or permission to publish. Reports from before Step 36 record no hashes and stay "
+                   "legacy/unverified. Run quality-report PRODUCTION_ID for a new bound report; nothing runs from here.")
 
 
 def _sha(path_or_bytes):
@@ -113,41 +119,8 @@ def check(document):
     return document
 
 
-# ---------------------------------------------------------------- safe files
-def norm(relative):
-    """Saved relative paths use the separator of the computer that saved them (Windows writes
-    backslashes); both are treated as separators, and every part is then checked."""
-    return relative.replace("\\", "/") if isinstance(relative, str) else relative
-
-
-def safe_file(folder, relative, max_bytes):
-    """(path, None) for a regular file inside `folder` reached without any symbolic link, else (None, code)."""
-    relative = norm(relative)
-    if not isinstance(relative, str) or not relative or len(relative) > 300 or "\x00" in relative or ":" in relative:
-        return None, "path_invalid"
-    parts = PurePosixPath(relative).parts
-    if PurePosixPath(relative).is_absolute() or any(p in ("..", ".", "") for p in parts):
-        return None, "path_invalid"
-    current = Path(folder)
-    try:
-        if stat.S_ISLNK(os.lstat(current).st_mode):
-            return None, "path_invalid"
-        for part in parts:
-            current = current / part
-            mode = os.lstat(current).st_mode
-            if stat.S_ISLNK(mode):
-                return None, "path_invalid"
-        if not stat.S_ISREG(mode):
-            return None, "path_invalid"
-        if not current.resolve().is_relative_to(Path(folder).resolve()):
-            return None, "path_invalid"
-        if os.lstat(current).st_size > max_bytes:
-            return None, "file_too_large"
-    except FileNotFoundError:
-        return None, "missing"
-    except OSError:
-        return None, "missing"
-    return current, None
+# ---------------------------------------------------------------- safe files (shared with the renderer and quality report)
+from ..artifact_binding import norm, posters_bound, safe_file, validate_manifest, verify_binding  # noqa: E402
 
 
 def _read_json(path):
@@ -288,7 +261,9 @@ class Artifacts:
             manifest = _read_json(path)
             ok = (isinstance(manifest, dict) and manifest.get("contract") == "preview_render"
                   and isinstance(manifest.get("scenes"), list) and isinstance(manifest.get("limitations"), list))
-        except (OSError, ValueError, UnicodeError):
+            if ok and manifest.get("version") == "1.1":
+                validate_manifest(manifest)              # malformed poster hashes make the manifest invalid
+        except (OSError, ValueError, UnicodeError, NetworkError):
             ok = False
         if not ok:
             self._set("manifest", "tampered", "artifact_invalid")
@@ -303,7 +278,8 @@ class Artifacts:
             self._set("manifest", "mismatched", "manifest_not_matching_plan")
             return
         self.manifest, self.manifest_dir = manifest, str(PurePosixPath(norm(artifacts["manifest_file"])).parent)
-        self._set("manifest", "verified", sha256=artifacts["manifest_sha256"])
+        self._set("manifest", "verified", sha256=artifacts["manifest_sha256"], posters_bound=posters_bound(manifest),
+                  manifest_version=manifest.get("version"))
 
     def _check_video(self, *_):
         artifacts = self.stages["preview"]["artifacts"]
@@ -327,14 +303,19 @@ class Artifacts:
                 relative = f"{self.manifest_dir}/{poster}"
                 found, problem = safe_file(self.folder, relative, MAX_POSTER_BYTES)
                 if found is not None:
-                    with open(found, "rb") as stream:
-                        png = stream.read(8) == PNG
-                    if png:
-                        identifier = media_id(self.state["production_id"], relative, self.items["manifest"]["sha256"])
-                        self.media[identifier] = {"path": relative, "kind": "poster", "sha256": None}
-                        row.update(status="not_hash_bound", reason="manifest_has_no_poster_hashes", media_id=identifier)
-                    else:
+                    data = found.read_bytes()
+                    bound = posters_bound(self.manifest)
+                    if not data.startswith(PNG):
                         row.update(status="tampered", reason="poster_not_png")
+                    elif bound and (_sha(data) != scene.get("poster_sha256") or len(data) != scene.get("poster_bytes")):
+                        row.update(status="tampered", reason="poster_hash_mismatch")
+                    else:
+                        binding = scene["poster_sha256"] if bound else self.items["manifest"]["sha256"]
+                        identifier = media_id(self.state["production_id"], relative, binding)
+                        self.media[identifier] = {"path": relative, "kind": "poster",
+                                                  "sha256": scene["poster_sha256"] if bound else None}
+                        row.update(status="verified" if bound else "not_hash_bound",
+                                   reason=None if bound else "manifest_has_no_poster_hashes", media_id=identifier)
                 elif problem != "missing":
                     row.update(status="tampered", reason="poster_path_invalid")
             else:
@@ -398,7 +379,7 @@ def plan_section(plan, posters):
 
 def preview_section(manifest, video, narration):
     audio = manifest.get("audio") if isinstance(manifest.get("audio"), dict) else {}
-    return {"video": video,
+    return {"video": video, "manifest_version": manifest.get("version"), "posters_hash_bound": posters_bound(manifest),
             "format": {k: manifest.get(k) for k in ("width", "height", "fps", "duration_seconds")},
             "audio_present": bool(manifest.get("audio_present")),
             "narration": {"configured": narration is not None, "sha256": narration["sha256"] if narration else None,
@@ -414,8 +395,9 @@ def preview_section(manifest, video, narration):
 def verification_section(state, root, demo_record=None):
     """The saved Step 17 record behind the brief, re-validated with the production's own policy."""
     out = {"record_id": state["config"]["record_id"], "status": "unavailable", "reason": None, "verified_at": None,
-           "claims": [], "summary": None, "flags": [], "limitations": list(VERIFICATION_LIMITS)}
-    record = demo_record
+           "claims": [], "summary": None, "flags": [], "limitations": list(VERIFICATION_LIMITS),
+           "freshness_now": {"status": "unavailable", "age_hours": None, "max_age_days": None}}
+    record, max_age = demo_record, 14
     if record is None:
         from ..production import PROJECT
         from ..verification import load_policy
@@ -427,12 +409,16 @@ def verification_section(state, root, demo_record=None):
                 return out
             loaded, sha = load_policy(policy["path"])
             record = load_record(state["config"]["record_id"], loaded, sha, root)
+            max_age = loaded["rules"]["max_record_age_days"]
         except NetworkError as error:
             out["reason"] = {"record_not_found": "evidence_record_unavailable"}.get(error.code, "evidence_record_invalid")
             return out
         except OSError:
             out["reason"] = "verification_policy_unavailable"
             return out
+    age = datetime.now(timezone.utc).timestamp() - _seconds(record["verified_at"])
+    out["freshness_now"] = {"status": "stale" if age > max_age * 86400 else "fresh", "age_hours": round(age / 3600, 1),
+                            "max_age_days": max_age}
     out.update(status="verified", verified_at=record["verified_at"], summary=record["summary"],
                flags=list(record.get("flags", [])),
                claims=[{"claim_id": c["claim_id"], "text": c["text"], "status": c["status"],
@@ -466,17 +452,17 @@ def production_section(state):
 
 
 # ---------------------------------------------------------------- quality reports
-def quality_reports(state, root=None, demo_reports=None):
+def quality_reports(state, root=None, demo_reports=None, folder=None):
     """(rows, rejected, skipped) for every saved Step 22 report about this production (newest first)."""
     if demo_reports is not None:
         reports, rejected, skipped = demo_reports, [], 0
     else:
         from ..quality import validate_report
-        folder = Path(root if root is not None else ROOT) / "runtime/quality"
+        reports_dir = Path(root if root is not None else ROOT) / "runtime/quality"
         reports, rejected, skipped = [], [], 0
-        paths = sorted(folder.glob("qr-*.json")) if folder.is_dir() else []
+        paths = sorted(reports_dir.glob("qr-*.json")) if reports_dir.is_dir() else []
         for path in paths[:MAX_REPORT_SCAN]:
-            found, problem = safe_file(folder, path.name, MAX_JSON_BYTES)
+            found, problem = safe_file(reports_dir, path.name, MAX_JSON_BYTES)
             try:
                 report = _read_json(found) if found is not None else None
                 claimed = report["production_id"] if isinstance(report, dict) else None
@@ -500,24 +486,35 @@ def quality_reports(state, root=None, demo_reports=None):
     last_finish = max((s["finished_at"] for s in state["stages"] if s["finished_at"]), default=None)
     rows = []
     for report in sorted(reports, key=lambda r: (r["checked_at"], r["report_id"]), reverse=True)[:MAX_REPORTS]:
-        rows.append(report_row(report, state, last_finish))
+        rows.append(report_row(report, state, last_finish, folder, root, demo=demo_reports is not None))
     return rows, rejected[:20], skipped
 
 
-def report_row(report, state, last_finish):
+def report_row(report, state, last_finish, folder=None, root=None, demo=False):
     seen = next((c["details"].get("status") for c in report["checks"] if c["check_id"] == "state"), None)
     reasons = []
     if last_finish is not None and report["checked_at"] < last_finish:
         reasons.append("checked_before_artifacts_finished")
     if seen is not None and seen != state["status"]:
         reasons.append("production_status_changed_since_check")
-    binding = "stale" if reasons else "unverified"
-    reasons.append("report_records_no_artifact_hashes")
+    if demo:
+        result = {"status": "unavailable", "reasons": ["demo_has_no_files"], "changed": []}
+    elif folder is None:
+        result = {"status": "unavailable", "reasons": ["production_folder_unavailable"], "changed": []}
+    else:
+        result = verify_binding(report, state, folder, root)          # re-checked against the files now
+    binding = result["status"]
+    reasons = list(dict.fromkeys(reasons + result["reasons"]))
+    freshness = next((c for c in report["checks"] if c["check_id"] == "evidence_freshness"), None)
     counts = {}
     for item in report["checks"]:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
-    return {"report_id": report["report_id"], "checked_at": report["checked_at"], "result": report["result"],
-            "binding": binding, "binding_reasons": reasons, "reasons": report["reasons"][:40], "counts": counts,
+    return {"report_id": report["report_id"], "report_version": report.get("version", "1.0"),
+            "checked_at": report["checked_at"], "result": report["result"],
+            "binding": binding, "binding_reasons": reasons, "binding_changed": result["changed"][:40],
+            "bound_files": len(report.get("binding", {}).get("artifacts", [])),
+            "evidence_freshness_at_check": freshness["status"] if freshness else "unavailable",
+            "reasons": report["reasons"][:40], "counts": counts,
             "checks": [{"check_id": c["check_id"], "status": c["status"], "reasons": c["reasons"][:20],
                         "details": {k: v for k, v in list(c["details"].items())[:12]}} for c in report["checks"]],
             "scope": report["scope"], "notes": report["notes"][:8]}
@@ -688,7 +685,8 @@ def sections(artifacts, state, root, visible=None, demo=None):
     out["verification"] = verification_section(state, root, demo["record"] if demo else None) if show("brief") else \
         {"record_id": state["config"]["record_id"], "status": "not_established_at_position",
          "reason": "brief_not_established_at_position", "verified_at": None, "claims": [], "summary": None, "flags": [],
-         "limitations": list(VERIFICATION_LIMITS)}
+         "limitations": list(VERIFICATION_LIMITS),
+         "freshness_now": {"status": "unavailable", "age_hours": None, "max_age_days": None}}
     return out
 
 
@@ -718,7 +716,7 @@ def _load(timeline_id, root):
 
 def content_latest(timeline_id, root=None):
     view, state, artifacts, demo = _load(timeline_id, root)
-    rows, rejected, skipped = quality_reports(state, root, demo["reports"] if demo else None)
+    rows, rejected, skipped = quality_reports(state, root, demo["reports"] if demo else None, getattr(artifacts, "folder", None))
     doc = {"contract": "hq_content", "version": "1.0", "view": "latest", "demo": demo is not None, "read_only": True,
            "label": "Latest saved production: every artifact re-verified now. Not tied to the replay position.",
            "timeline": _timeline(view, demo is not None), "production": production_section(state),
@@ -762,7 +760,7 @@ def content_at(timeline_id, position, root=None):
     elif not shown:
         doc["quality"] = {"status": "not_yet", "reports": [], "binding_note": QUALITY_BINDING}
     else:
-        rows, _, _ = quality_reports(state, root, demo["reports"] if demo else None)
+        rows, _, _ = quality_reports(state, root, demo["reports"] if demo else None, getattr(artifacts, "folder", None))
         by_id = {r["report_id"]: r for r in rows}
         doc["quality"] = {"status": "available" if all(r in by_id for r in shown) else "referenced_report_unavailable",
                           "reports": [by_id[r] for r in shown if r in by_id], "binding_note": QUALITY_BINDING}
@@ -789,6 +787,6 @@ def media_file(production_id, identifier, root=None):
     data = path.read_bytes()                       # one read: what is checked is exactly what is served
     if entry["kind"] == "video" and _sha(data) != entry["sha256"]:
         raise NetworkError("media_changed", "The preview file changed; reload the desk.")
-    if entry["kind"] == "poster" and not data.startswith(PNG):
+    if entry["kind"] == "poster" and (not data.startswith(PNG) or (entry["sha256"] and _sha(data) != entry["sha256"])):
         raise NetworkError("media_changed", "The poster changed; reload the desk.")
     return data, "video/mp4" if entry["kind"] == "video" else "image/png"

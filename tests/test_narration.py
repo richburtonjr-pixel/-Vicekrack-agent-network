@@ -157,7 +157,7 @@ class NarratedRenderTests(unittest.TestCase):
 
     def fake_card(self, plan, scene, path, modules, **options):
         self.calls.append(("card", options))
-        path.write_bytes(b"fixture png")
+        path.write_bytes(b"\x89PNG\r\n\x1a\nfixture png")
 
     def fake_invoke(self, exe, args, cwd, fail_mux=False):
         self.calls.append(("ffmpeg", list(args)))

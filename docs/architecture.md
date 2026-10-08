@@ -924,6 +924,7 @@ flowchart LR
   Any doubt makes historical viewing unavailable.
 - **Quality binding:** the Step 22 contract has no artifact hashes, so a report is `stale`
   (it predates the artifacts or saw another status) or `unverified`, never current.
+  Step 36 replaced this for new 1.1 reports with a hash binding (see below).
 - **Demo:** `hq/content_demo.py` loads a committed fixture (`content_demo.json`: a brief,
   mock script and plan made once offline) and re-validates it on load. The demo house's
   quality event now names its synthetic report.
@@ -938,3 +939,28 @@ flowchart LR
 - **CI:** a `browser` job installs `requirements-browser.txt` (render requirements +
   pinned Playwright) and Chromium, then runs the whole network-blocked suite with
   `RUN_LOCAL_RENDER_TESTS=1` and `RUN_LOCAL_BROWSER_TESTS=1`.
+
+## Step 36: verifiable content artifacts
+
+- **One implementation** in `vicekrack/artifact_binding.py`, used by the renderer, the
+  production pipeline, the quality report and the Living HQ:
+  - `safe_file` (relative paths only, Windows separators normalised, no `.`/`..`, no
+    symbolic link in any component, regular files, size limits);
+  - `validate_manifest` / `check_package` for preview manifests 1.0 and 1.1;
+  - `Snapshot` (read once, keep bytes for JSON, re-hash afterwards);
+  - `verify_binding` (read-only re-check of a saved report).
+- **Renderer → manifest 1.1:** poster and video hashes and sizes; the package is checked
+  before the atomic rename, so a bad package is never published.
+- **Quality report 1.1:** all inputs come from one snapshot taken under the production lock;
+  the re-hash after the checks decides `bound` vs `changed_during_inspection`. The
+  binding lists artifacts and configuration by role, safe reference and hash.
+- **Direction of hashing:** state → artifacts → manifest → video/posters; report →
+  everything it read. Nothing points back at a report, so there is no cycle.
+- **Compatibility:** schemas accept 1.0 and 1.1 (`oneOf` / `if-then`); a 1.0 report must
+  not carry a binding and a 1.1 report must. Legacy data is labelled, never upgraded.
+- **Living HQ:** `report_row` calls `verify_binding` on every load (`matching`, `changed`,
+  `legacy_unverified`, `unavailable`); posters from a 1.1 manifest are verified on load
+  and again when served. The desk never runs a check. The CLI `quality-binding` uses the
+  same function.
+- **Integrity is not truth:** binding, technical result and evidence freshness are separate
+  fields everywhere; none grants permission to publish.

@@ -1,13 +1,16 @@
 """Quality report commands (Step 22). Read-only checks; never repair, retry or publish.
 
-quality-report PRODUCTION_ID   check one production run and save a report
+quality-report PRODUCTION_ID   check one production run and save a new bound report (version 1.1)
 quality-list                   list saved reports
+quality-binding REPORT_ID      Step 36, read-only: is a saved report still bound to the files as they are
+                               now? matching | changed | legacy_unverified | unavailable. Nothing is
+                               checked again and nothing is written.
 """
 import argparse
 import json
 
 from .errors import NetworkError
-from .quality import QualityChecker, list_reports
+from .quality import QualityChecker, binding_of, list_reports
 
 
 def main():
@@ -18,6 +21,8 @@ def main():
     run.add_argument("--record-events", action="store_true",
                      help="Record execution events under runtime/events/content/ (Step 33)")
     commands.add_parser("quality-list")
+    binding = commands.add_parser("quality-binding")
+    binding.add_argument("report_id", metavar="REPORT_ID")
     args = parser.parse_args()
     from .content_events import ContentEvents, EventFailure
     events = ContentEvents.persistent("quality") if getattr(args, "record_events", False) else None
@@ -27,12 +32,18 @@ def main():
             result = {"report_file": str(path), "report_id": report["report_id"], "result": report["result"],
                       "reasons": report["reasons"],
                       "checks": {c["check_id"]: c["status"] for c in report["checks"]},
-                      "scope": report["scope"]}
+                      "scope": report["scope"],
+                      "binding": {"status": report["binding"]["status"], "reasons": report["binding"]["reasons"],
+                                  "artifacts": len(report["binding"]["artifacts"]), "note": report["binding"]["note"]}}
             if events is not None:
                 events.close("completed")
                 result["events"] = events.summary()
             print(json.dumps(result, indent=2))
             return 0 if report["result"] == "pass" and not (events is not None and events.failure) else 1
+        if args.command == "quality-binding":
+            result = binding_of(args.report_id)
+            print(json.dumps(result, indent=2))
+            return 0 if result["binding"]["status"] == "matching" else 1
         print(json.dumps({"reports": list_reports()}, indent=2))
         return 0
     except EventFailure as failure:

@@ -251,13 +251,19 @@ class TamperTests(ContentBase):
 
 
 class QualityBindingTests(ContentBase):
-    def test_reports_are_never_current(self):
+    def test_bound_report_matches_and_legacy_report_stays_unverified(self):
+        # Step 36 replaced the Step 35 rule "never current": a bound (1.1) report can be re-checked by hash.
         self.make()
         report, _ = self.quality(at=TIMES[1])
         row = self.latest()["quality"]["reports"][0]
-        self.assertEqual((row["report_id"], row["result"], row["binding"]), (report["report_id"], report["result"], "unverified"))
-        self.assertEqual(row["binding_reasons"], ["report_records_no_artifact_hashes"])
-        self.assertNotIn("current", {r["binding"] for r in self.latest()["quality"]["reports"]})
+        self.assertEqual((row["report_id"], row["result"], row["binding"], row["report_version"]),
+                         (report["report_id"], report["result"], "matching", "1.1"))
+        legacy = {k: v for k, v in report.items() if k != "binding"}
+        legacy.update(version="1.0", report_id="qr-" + "9" * 24)
+        (self.root / "runtime/quality" / f"{legacy['report_id']}.json").write_text(json.dumps(legacy))
+        rows = {r["report_id"]: r for r in self.latest()["quality"]["reports"]}
+        self.assertEqual(rows[legacy["report_id"]]["binding"], "legacy_unverified")
+        self.assertIn("report_records_no_artifact_hashes", rows[legacy["report_id"]]["binding_reasons"])
 
     def test_report_that_predates_the_artifacts_is_stale(self):
         # First attempt fails at the preview; a quality check runs on the incomplete production; then resume.
@@ -271,10 +277,11 @@ class QualityBindingTests(ContentBase):
         self.assertEqual(self.pipeline(PngRenderer()).resume(self.pid)["status"], "completed")
         late, _ = self.quality(at=TIMES[3])
         rows = {r["report_id"]: r for r in self.latest()["quality"]["reports"]}
-        self.assertEqual(rows[early["report_id"]]["binding"], "stale")
+        self.assertEqual(rows[early["report_id"]]["binding"], "unavailable")    # it bound an unfinished production
         self.assertIn("checked_before_artifacts_finished", rows[early["report_id"]]["binding_reasons"])
         self.assertIn("production_status_changed_since_check", rows[early["report_id"]]["binding_reasons"])
-        self.assertEqual(rows[late["report_id"]]["binding"], "unverified")
+        self.assertIn("not_bound_incomplete", rows[early["report_id"]]["binding_reasons"])
+        self.assertEqual(rows[late["report_id"]]["binding"], "matching")
         self.assertEqual(list(rows), [late["report_id"], early["report_id"]])      # newest first
 
     def test_tampered_renamed_and_foreign_reports(self):
@@ -519,7 +526,7 @@ class DemoTests(unittest.TestCase):
         self.assertTrue(first["demo"])
         self.assertIn("DEMO DATA", first["notice"])
         self.assertEqual(first["artifacts"]["preview"]["status"], "not_produced")    # no media files in the demo
-        self.assertEqual(first["quality"]["reports"][0]["binding"], "unverified")
+        self.assertEqual(first["quality"]["reports"][0]["binding"], "unavailable")     # the demo has no files to bind
         view, state, _, _ = demo_inputs()
         self.assertEqual(len(view["events"]), len(demo_events()))
         established, reports, reasons = content.establish(view, state, demo=True)
@@ -585,7 +592,16 @@ class ContentBrowserTests(ContentBase):
                     self.assertEqual(page.locator("#content-body a[href]").count(), 0)          # URLs are text
                     page.click("#ct-tab-latest")
                     page.wait_for_selector(".report")
-                    self.assertIn("UNVERIFIED", page.inner_text(".report"))
+                    report = page.inner_text(".report")
+                    for label in ("Artifact binding\nMATCHING", "Technical result\nPASS", "Evidence freshness at check"):
+                        self.assertIn(label, report)                            # three separate labels (Step 36)
+                    self.assertIn("Poster hash-verified", page.inner_text("#content-body"))
+                    self.assertIn("every poster hash-bound", page.inner_text("#content-body"))
+                    self.assertIn("Evidence freshness now", page.inner_text("#content-body"))
+                    shots = os.environ.get("HQ_SCREENSHOT_DIR")
+                    if shots:
+                        page.locator(".report").first.scroll_into_view_if_needed()
+                        page.screenshot(path=str(Path(shots) / f"hq-step36-binding-{'phone' if width < 600 else 'desktop'}.png"))
                     self.assertTrue(any(s == 206 and t == "video/mp4" and r for s, t, r in media), media)
                     self.assertTrue(any(s == 200 and t == "image/png" for s, t, _ in media), media)
                     page.keyboard.press("p")
