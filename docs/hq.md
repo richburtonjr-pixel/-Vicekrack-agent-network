@@ -339,7 +339,8 @@ figures, for recording an explanation; ←/→ still step the replay.
 > **Preview only and read-only.** `publishable: false` is shown on every view. The desk
 > displays saved Step 21 productions and Step 22 quality reports. Opening it never runs
 > agents, drafts scripts, renders media, runs quality checks, contacts providers, publishes
-> or changes production files. There is no approval, export or upload.
+> or changes production files. There is no export or upload, and review decisions (Step 37) are
+> recorded only from the command line.
 
 ![Content results desk opened from the Creator room, demo data](images/hq/hq-step35-creator-room.png)
 
@@ -444,6 +445,23 @@ them; the desk then shows the first scene poster and says so.
 **publishable: false** banner stays visible.
 
 ![Content results desk on a phone, saved production](images/hq/hq-step35-saved-phone.png)
+
+### Human review decisions (Step 37)
+
+The Content Results Desk shows the saved review history read-only:
+- whether there is a current preview approval, and evidence freshness now;
+- each decision with:
+  - its self-declared reviewer label;
+  - whether it applies now (`current`, `superseded`, `invalidated`, `unavailable`) and the
+    artifact binding now;
+  - the quality report and binding digest it names;
+  - acknowledgments, supersession and notes, shown as text.
+
+In replay, only decisions that a recorded timeline proves were saved by that position are
+shown, without re-evaluating them. Otherwise historical review status is unavailable.
+Decisions are recorded only with `review-record` (see [Human review](review.md)).
+
+![Human review decisions](images/hq/hq-step37-reviews-desktop.png)
 
 ## Limitations
 

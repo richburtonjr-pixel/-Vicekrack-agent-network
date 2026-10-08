@@ -550,7 +550,16 @@ class ContentBrowserTests(ContentBase):
         from playwright.sync_api import sync_playwright
         from vicekrack.preview import render_preview
         self.make(renderer=render_preview, drafter=MarkupDrafter())           # one real local render (offline)
-        self.quality(at=TIMES[1])
+        report, _ = self.quality(at=TIMES[1])
+        from vicekrack.review import ReviewRecorder, reviewable
+        found = reviewable(self.pid, self.root)[0]                            # real clock: acknowledge what applies
+        first, _ = ReviewRecorder(self.root, clock=lambda: TIMES[2]).record(
+            self.pid, report["report_id"], decision="changes_requested", reviewer="Rich (editor)",
+            binding=found["binding_digest"], notes=MARKUP + "\nTighten scene 2.")
+        ReviewRecorder(self.root, clock=lambda: TIMES[3]).record(
+            self.pid, report["report_id"], decision="approved_for_preview", reviewer="Rich (editor)",
+            binding=found["binding_digest"], acknowledgments=found["applicable_acknowledgments"],
+            supersedes=first["review_id"], notes="Scene 2 fixed in review; preview accepted.")
         server = HQServer(0, self.root)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         url = f"http://127.0.0.1:{server.server_address[1]}/"
@@ -602,6 +611,16 @@ class ContentBrowserTests(ContentBase):
                     if shots:
                         page.locator(".report").first.scroll_into_view_if_needed()
                         page.screenshot(path=str(Path(shots) / f"hq-step36-binding-{'phone' if width < 600 else 'desktop'}.png"))
+                    reviews = page.inner_text(".review >> nth=1")                # Step 37: history, oldest last
+                    self.assertIn(MARKUP, reviews)                                # the note is shown as text...
+                    self.assertIn("self-declared, not authenticated", reviews)
+                    self.assertIn("SUPERSEDED", reviews)
+                    self.assertEqual(page.locator(".review-notes *").count(), 0)  # ...and never becomes markup
+                    self.assertIn("Preview approval now", page.inner_text("#content-body"))
+                    self.assertEqual(page.locator("#content-body form, #content-body input, #content-body textarea").count(), 0)
+                    if shots:
+                        page.locator(".review").first.scroll_into_view_if_needed()
+                        page.screenshot(path=str(Path(shots) / f"hq-step37-reviews-{'phone' if width < 600 else 'desktop'}.png"))
                     self.assertTrue(any(s == 206 and t == "video/mp4" and r for s, t, r in media), media)
                     self.assertTrue(any(s == 200 and t == "image/png" for s, t, _ in media), media)
                     page.keyboard.press("p")

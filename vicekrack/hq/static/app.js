@@ -1742,7 +1742,8 @@
     var tone = { verified: "ok", pass: "ok", completed: "ok", needs_review: "warn", unverified: "warn", stale: "bad",
       fail: "bad", failed: "bad", tampered: "bad", mismatched: "bad", missing: "bad", unavailable: "na",
       not_produced: "na", not_established_at_position: "na", not_hash_bound: "warn", reused: "info", matching: "ok", changed: "bad", legacy_unverified: "warn",
-      fresh: "ok" }[status] || "na";
+      fresh: "ok", current: "ok", approved_for_preview: "ok", changes_requested: "warn", rejected: "bad",
+      superseded: "na", invalidated: "bad", not_evaluated_at_position: "na", not_evaluated: "na" }[status] || "na";
     return chip(C.words(status).toUpperCase(), tone);
   }
   function linkCell(source) {
@@ -1940,6 +1941,69 @@
       }));
     }
   }
+  function renderReviews(parent, reviews, latest) {
+    var box = h("section", { class: "content-block" }, parent);
+    var head = h("div", { class: "block-head" }, box);
+    h("h3", {}, head, "Human review decisions (Step 37)");
+    head.appendChild(statusChip(reviews.status));
+    var notes = { none_saved: "No review decision is saved for this production.",
+      not_yet: "No review decision had been saved by this replay position.",
+      not_in_demo: "The demo has no review decisions.",
+      history_corrupted: "The review history has unreadable or inconsistent records, so no decision is shown as current.",
+      unavailable: "Review history is unavailable here: " + reviews.reasons.map(C.words).join("; ") + "." };
+    if (notes[reviews.status]) { h("p", { class: "muted" }, box, notes[reviews.status]); }
+    para("p", { class: "notice warn" }, box, reviews.note);
+    if (latest && reviews.summary) {
+      var s = reviews.summary, facts = h("div", { class: "facts" }, box);
+      var approval = h("span", {});
+      approval.appendChild(chip(s.current_preview_approval ? "CURRENT PREVIEW APPROVAL" : "NO CURRENT PREVIEW APPROVAL",
+        s.current_preview_approval ? "ok" : "warn"));
+      if (s.reasons.length) { h("span", { class: "small" }, approval, " " + s.reasons.map(C.words).join("; ")); }
+      row(facts, "Preview approval now", approval);
+      row(facts, "Latest decision", s.latest_decision ? C.words(s.latest_decision) + " · " + C.words(s.latest_applicability) +
+        " · " + s.latest_review_id : "none");
+      if (reviews.evidence_now) {
+        var e = reviews.evidence_now;
+        row(facts, "Evidence freshness now", e.status === "unavailable" ? "unavailable (approval cannot be current)" :
+          C.words(e.status).toUpperCase() + " · " + e.age_hours + " h old · limit " + e.max_age_days + " days");
+      }
+      row(facts, "Publishable", "false · approval accepts this preview only");
+    }
+    reviews.reviews.forEach(function (r) {
+      var card = h("div", { class: "report review" }, box);
+      var top = h("div", { class: "block-head" }, card);
+      h("strong", {}, top, "#" + r.sequence + " · " + r.review_id + " · " + C.formatTime(r.recorded_at));
+      top.appendChild(statusChip(r.decision));
+      var facts = h("div", { class: "facts" }, card);
+      row(facts, "Reviewer", r.reviewer_label + " (self-declared, not authenticated)");
+      var applies = h("span", {});
+      applies.appendChild(statusChip(r.applicability));
+      if (r.superseded_by) { h("span", { class: "small" }, applies, " by " + r.superseded_by); }
+      if (r.reasons.length) { h("span", { class: "small" }, applies, " " + r.reasons.map(C.words).join("; ")); }
+      row(facts, latest ? "Applies now" : "Applicability", applies);
+      var files = h("span", {});
+      files.appendChild(statusChip(r.artifact_binding_now));
+      row(facts, "Artifact binding now", files);
+      row(facts, "Quality report", r.report_id + " · " + C.words(r.conditions.technical_result) + " · report " +
+        r.report_sha256.slice(0, 12) + "… · binding " + r.binding_digest.slice(0, 12) + "…");
+      row(facts, "Evidence", "at check " + C.words(r.conditions.evidence_freshness_at_check) + " · at review " +
+        C.words(r.conditions.evidence_at_review));
+      row(facts, "Acknowledged", r.acknowledgments.length ? codeList(r.acknowledgments) : "nothing needed acknowledging");
+      if (r.supersedes) { row(facts, "Supersedes", r.supersedes); }
+      if (r.notes) {
+        h("span", { class: "muted small" }, card, "Notes (user text):");
+        var text = h("p", { class: "review-notes" }, card);
+        text.textContent = C.noteText(r.notes);
+      }
+    });
+    if (latest && reviews.corrupted.length) {
+      table(box, "Unreadable or inconsistent review records", ["Entry", "Why"], reviews.corrupted.map(function (c) {
+        return [c.name, C.words(c.code)];
+      }));
+    }
+    h("p", { class: "muted small" }, box, "Read-only: decisions are recorded with review-record on the command line. " +
+      "Nothing here approves, exports, uploads or publishes.");
+  }
   function renderStagesAt(body, doc) {
     table(body, "Production stages as recorded up to this position", ["Stage", "State", "Attempt", "Reused", "Failures",
       "Last event", "Reason codes", "Recorded at"], doc.stages.map(function (s) {
@@ -2036,6 +2100,7 @@
       renderStagesLatest(body, doc);
       renderArtifacts(body, doc.artifacts, p.production_id);
       renderQuality(body, doc.quality, true);
+      renderReviews(body, doc.reviews, true);
       return;
     }
     if (doc.historical.status !== "available") {
@@ -2049,6 +2114,7 @@
     renderStagesAt(body, doc);
     renderArtifacts(body, doc.artifacts, p.production_id);
     renderQuality(body, doc.quality, false);
+    renderReviews(body, doc.reviews, false);
   }
 
   /* ------------------------------------------------------------------ data (GET only) */

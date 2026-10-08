@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "content_review",
+  "description": "Step 37 human review decision for one content preview, tied to one Step 36 bound quality report. Append-only; a later record supersedes the previous latest. Approval accepts this preview only: technical findings are unchanged and publishable stays false. Reviewer labels are self-declared, not authenticated. Notes are user text and may contain sensitive content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "review_id",
+    "production_id",
+    "sequence",
+    "supersedes",
+    "decision",
+    "reviewer",
+    "recorded_at",
+    "quality_report",
+    "binding_digest",
+    "conditions",
+    "acknowledgments",
+    "notes",
+    "scope"
+  ],
+  "properties": {
+    "contract": {
+      "const": "content_review"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "review_id": {
+      "type": "string",
+      "pattern": "^rev-[0-9a-f]{24}$"
+    },
+    "production_id": {
+      "type": "string",
+      "pattern": "^prod-[0-9a-f]{24}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "supersedes": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^rev-[0-9a-f]{24}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision": {
+      "enum": [
+        "approved_for_preview",
+        "changes_requested",
+        "rejected"
+      ]
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "authenticated"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._@'()-]{0,63}$"
+        },
+        "authenticated": {
+          "const": false
+        }
+      }
+    },
+    "recorded_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "quality_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report_id",
+        "sha256",
+        "result",
+        "checked_at"
+      ],
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "pattern": "^qr-[0-9a-f]{24}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "needs_review",
+            "fail"
+          ]
+        },
+        "checked_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "technical_result",
+        "needs_review",
+        "unavailable_checks",
+        "draft",
+        "evidence_freshness_at_check",
+        "evidence_now"
+      ],
+      "properties": {
+        "technical_result": {
+          "enum": [
+            "pass",
+            "needs_review",
+            "fail"
+          ]
+        },
+        "needs_review": {
+          "type": "boolean"
+        },
+        "unavailable_checks": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,64}$"
+          }
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "evidence_freshness_at_check": {
+          "enum": [
+            "pass",
+            "needs_review",
+            "fail",
+            "unavailable"
+          ]
+        },
+        "evidence_now": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "age_hours",
+            "max_age_days"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unavailable"
+              ]
+            },
+            "age_hours": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "max_age_days": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "acknowledgments": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "needs_review_result",
+          "unavailable_checks",
+          "draft_restrictions",
+          "stale_evidence"
+        ]
+      }
+    },
+    "notes": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preview_only",
+        "publishable",
+        "technical_findings_unchanged",
+        "reviewer_authenticated",
+        "meaning"
+      ],
+      "properties": {
+        "preview_only": {
+          "const": true
+        },
+        "publishable": {
+          "const": false
+        },
+        "technical_findings_unchanged": {
+          "const": true
+        },
+        "reviewer_authenticated": {
+          "const": false
+        },
+        "meaning": {
+          "type": "string",
+          "maxLength": 400
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sequence": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "supersedes": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "supersedes": {
+            "type": "string",
+            "pattern": "^rev-[0-9a-f]{24}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "approved_for_preview"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "quality_report": {
+            "properties": {
+              "result": {
+                "enum": [
+                  "pass",
+                  "needs_review"
+                ]
+              }
+            }
+          },
+          "conditions": {
+            "properties": {
+              "evidence_now": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "fresh",
+                      "stale"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

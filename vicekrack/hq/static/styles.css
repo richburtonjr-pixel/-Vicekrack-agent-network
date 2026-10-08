@@ -358,6 +358,7 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
 .player-media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .player video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 10px; border: 1px solid #2a3440; object-fit: contain; }
 .report { margin-top: 10px; padding: 10px 12px; border: 1px solid #1c2530; border-radius: 9px; background: #0b1016; }
+.review-notes { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; padding: 8px 10px; border-left: 3px solid #2b3a4a; background: #0e151d; }
 .presenting.results-open .content-view .content-block { font-size: 15px; }
 @media (max-width: 760px) {
   .player { grid-template-columns: 1fr; }

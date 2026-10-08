@@ -1415,3 +1415,56 @@ rights clearance or permission to publish. Human review and export are still def
 
 See [Quality report](docs/quality.md#step-36-artifact-binding), [Preview](docs/preview.md)
 and the [Roadmap](docs/roadmap.md).
+
+## Step 37: human review decisions for content previews
+
+A person can now record an explicit decision about a preview:
+- **`approved_for_preview`** accepts this exact preview **as a preview only**: not
+  permission to publish, not rights clearance, not fact verification.
+- **`changes_requested`** and **`rejected`**.
+
+`publishable` stays `false`.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack review-list PRODUCTION_ID                # history + binding digest + required acknowledgments
+.\.venv\Scripts\python.exe -m vicekrack review-record PRODUCTION_ID --report REPORT_ID --binding DIGEST `
+    --decision approved_for_preview --reviewer "Rich" --ack needs_review_result --notes "Looks right."
+.\.venv\Scripts\python.exe -m vicekrack review-inspect PRODUCTION_ID REVIEW_ID
+```
+
+- **Tied to exact artifacts.** Each record stores:
+  - the production ID;
+  - the quality report's ID and SHA-256;
+  - the exact Step 36 binding digest, which you confirm with `--binding`;
+  - a reviewer label (self-declared, **not authenticated**) and the time;
+  - the decision, acknowledgments and optional notes (up to 2,000 characters).
+- **Gates.**
+  - The report must still match the current files.
+  - A `fail` report cannot be approved.
+  - Approval is refused when evidence freshness cannot be established.
+  - Approval needs explicit `--ack` for `needs_review`, unavailable checks, draft
+    restrictions and stale evidence, whichever apply.
+- **Changes during review are refused.** Everything is checked again under the production
+  lock just before saving. If any file, the report, the evidence or the history changed,
+  nothing is saved.
+- **Append-only history.** Records are never edited or deleted.
+  - A new decision must name the latest one with `--supersedes`, so a concurrent decision
+    is refused instead of lost.
+  - Writes are atomic and exclusive.
+  - Corrupted records make the history visibly `history_corrupted`, and nothing is shown
+    as current.
+- **Applies now?** This is computed on every read:
+  - changed or missing artifacts or reports make a decision `invalidated`;
+  - evidence that became stale is shown separately and turns off the current approval.
+- **Living HQ (read-only)** shows the review history with applicability, reviewer labels,
+  acknowledgments and notes, displayed as text. In replay, only decisions a recorded
+  timeline proves were saved by that position are shown; otherwise review status is
+  unavailable.
+
+Review notes are user text and may contain sensitive content. They are stored unencrypted
+under `runtime/reviews/` (ignored by Git). There is still no publishing, export, upload or
+automatic revision; the portable export package remains deferred.
+
+![Human review decisions in the Content Results Desk](docs/images/hq/hq-step37-reviews-desktop.png)
+
+See [Human review](docs/review.md) and the [Roadmap](docs/roadmap.md).

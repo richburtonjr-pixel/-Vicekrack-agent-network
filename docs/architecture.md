@@ -964,3 +964,37 @@ flowchart LR
   same function.
 - **Integrity is not truth:** binding, technical result and evidence freshness are separate
   fields everywhere; none grants permission to publish.
+
+## Step 37: human review decisions
+
+- **Module:** `vicekrack/review.py` (records, gates, history), `vicekrack/review_cli.py`
+  (`review-record`, `review-list`, `review-inspect`), schema
+  `schemas/content-review.schema.json` (`content_review` 1.0).
+- **Inputs to a decision:**
+  - one saved Step 36 report (1.1), loaded by ID and hashed as file bytes;
+  - `verify_binding` must be `matching`;
+  - the binding digest is SHA-256 over the report's canonical `binding` JSON, which the
+    reviewer confirms.
+  `assess()` derives the conditions (technical result, unavailable checks, draft flag from
+  the saved validate stage, evidence freshness at check and now) and the acknowledgments
+  that apply.
+- **Write path (`ReviewRecorder.record`):**
+  1. take the production lock (the same lock as resume and quality checks);
+  2. read the history (refused if corrupted) and check `supersedes` equals the latest;
+  3. evaluate the gates and build the record, with secrets rejected and the schema
+     validated;
+  4. re-evaluate everything (report hash, binding, digest, condition statuses, history);
+  5. publish `<sequence>-<review_id>.json` with temp file + fsync + exclusive hard link.
+
+  Any difference at step 4 refuses the decision.
+- **Read path (`history`):** validates every record and the sequence/supersedes chain, then
+  computes per record: `superseded_by`, `applicability`, `artifact_binding_now` and
+  `current_preview_approval`. It re-hashes the report and calls `verify_binding`, and
+  evidence freshness is evaluated separately. Nothing is cached or written.
+- **Living HQ:** `reviews_latest` uses `history`; `reviews_at` shows only records whose
+  `recorded_at` is not after the event at the position in a recorded timeline, with
+  applicability `not_evaluated_at_position`. The client renders notes with `textContent`
+  (`C.noteText` keeps line breaks, removes other control characters and is bounded). No
+  route or control writes reviews.
+- **Trust model:** local and self-declared. Labels are not identities, and records are not
+  signed.

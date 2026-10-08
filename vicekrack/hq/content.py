@@ -76,7 +76,7 @@ NOTICE = ("Read-only display of one saved content production. Preview only: publ
 DEMO_NOTICE = "DEMO DATA: a synthetic production with no media files; not a saved run. " + NOTICE
 RESTRICTIONS = [
     "publishable: false. Every preview is preview-only and watermarked; this desk cannot change that.",
-    "No approval, export, upload or publishing exists in the HQ (human review and export is deferred work).",
+    "The HQ records nothing: review decisions are made only with review-record (Step 37) and approve a preview only. No export, upload or publishing exists (portable export is deferred work).",
     "Claim status comes from the Verification stage; nothing here re-checks facts or rights.",
 ]
 VERIFICATION_LIMITS = [
@@ -520,6 +520,57 @@ def report_row(report, state, last_finish, folder=None, root=None, demo=False):
             "scope": report["scope"], "notes": report["notes"][:8]}
 
 
+# ---------------------------------------------------------------- human reviews (Step 37, read-only)
+REVIEW_NOTE = ("Human review decisions (Step 37) are recorded only from the command line (review-record). Reviewer "
+               "labels are self-declared, not authenticated. A decision applies only while its quality report is "
+               "unchanged and still matches the files; evidence freshness is shown separately. Approval accepts this "
+               "preview only: publishable stays false. Notes are user text, shown as text.")
+
+
+def _reviews_doc(status, reasons=(), rows=(), summary=None, evidence=None, corrupted=()):
+    return {"status": status, "reasons": list(reasons)[:20], "summary": summary, "evidence_now": evidence,
+            "reviews": list(rows)[:50], "corrupted": list(corrupted)[:40], "note": REVIEW_NOTE}
+
+
+def reviews_latest(state, root, demo, folder):
+    """Every saved decision, re-checked now (read-only; nothing is recorded from the desk)."""
+    if demo:
+        return _reviews_doc("not_in_demo", ["demo_has_no_reviews"])
+    from ..review import history
+    try:
+        doc = history(state["production_id"], root, state=state, folder=folder)
+    except NetworkError as error:
+        return _reviews_doc("unavailable", [error.code])
+    return _reviews_doc(doc["status"], doc["summary"]["reasons"], doc["reviews"], doc["summary"], doc["evidence_now"],
+                        doc["corrupted"])
+
+
+def reviews_at(view, state, event, root, demo):
+    """Only decisions provably saved by this replay position; applicability is not evaluated historically."""
+    if demo:
+        return _reviews_doc("not_in_demo", ["demo_has_no_reviews"])
+    if view["origin"] != "recorded":
+        return _reviews_doc("unavailable", ["review_times_need_a_recorded_timeline"])
+    reference = event["recorded_at"] if event else view.get("started_at")
+    if reference is None:
+        return _reviews_doc("unavailable", ["no_reference_time_at_position"])
+    from ..review import _read_history, _row, utc
+    try:
+        records, corrupted = _read_history(state["production_id"], root)
+    except NetworkError as error:
+        return _reviews_doc("unavailable", [error.code])
+    if corrupted:
+        return _reviews_doc("unavailable", ["review_history_corrupted"])
+    shown = [r for r in records if utc(r["recorded_at"]) <= utc(reference)]
+    if shown != records[:len(shown)]:
+        return _reviews_doc("unavailable", ["review_times_inconsistent"])
+    later = {r["supersedes"]: r["review_id"] for r in shown if r["supersedes"]}
+    live = {"applicability": "not_evaluated_at_position", "artifact_binding_now": "not_evaluated",
+            "current_preview_approval": False, "reasons": ["historical_view_not_rechecked"]}
+    rows = [_row(r, later, live) for r in reversed(shown)]
+    return _reviews_doc("available" if rows else "not_yet", [] if rows else ["no_review_saved_by_this_position"], rows)
+
+
 # ---------------------------------------------------------------- timelines and history
 def _seconds(stamp):
     return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
@@ -727,6 +778,7 @@ def content_latest(timeline_id, root=None):
            "quality": {"reports": rows, "rejected_reports": rejected, "unreadable_reports_skipped": skipped,
                        "binding_note": QUALITY_BINDING,
                        "status": "available" if rows else ("rejected" if rejected else "none_saved")},
+           "reviews": reviews_latest(state, root, demo, getattr(artifacts, "folder", None)),
            "notice": DEMO_NOTICE if demo else NOTICE}
     return check(doc)
 
@@ -744,6 +796,7 @@ def content_at(timeline_id, position, root=None):
            "event": {k: event[k] for k in ("sequence", "component", "event_type", "status", "recorded_at")} if event else None,
            "historical": {"status": "unavailable" if reasons else "available", "reasons": reasons},
            "stages": stages_at(view, position), "artifacts": None, "quality": None,
+           "reviews": _reviews_doc("unavailable", ["historical_view_unavailable"]),
            "restrictions": {"publishable": False, "preview_only": True, "draft": None, "claims_unverified": None,
                             "allow_draft_preview": state["config"]["allow_draft_preview"],
                             "statements": list(RESTRICTIONS)},
@@ -752,6 +805,7 @@ def content_at(timeline_id, position, root=None):
         return check(doc)
     visible = {name for name, index in established.items() if index <= position}
     doc["artifacts"] = sections(artifacts, state, root, visible=visible, demo=demo)
+    doc["reviews"] = reviews_at(view, state, event, root, demo is not None)
     if "validate" in visible:
         doc["restrictions"] = restrictions(state, artifacts)
     shown = [rid for rid, index in report_at.items() if index <= position]

@@ -196,6 +196,13 @@ test("Step 34: unavailable metrics stay unavailable (never zero) and positions n
   assert.strictEqual(C.nearestIndex([0, 10, 20], 14), 1);
 });
 
+test("Step 37: review notes keep line breaks, drop other control characters and stay bounded", () => {
+  assert.strictEqual(C.noteText("line one\n\tline two\u0000\u001b[31m"), "line one\n\tline two[31m");
+  assert.strictEqual(C.noteText("<b>x</b>"), "<b>x</b>");             // returned as text; the page uses textContent
+  assert.strictEqual(C.noteText("x".repeat(5000)).length, 2000);
+  assert.strictEqual(C.noteText(null), "");
+});
+
 test("Step 35: only plain http(s) links with a host and no credentials are clickable", () => {
   assert.strictEqual(C.safeLink("https://official.example.com/news/a?b=1"), "https://official.example.com/news/a?b=1");
   assert.strictEqual(C.safeLink("http://example.org"), "http://example.org/");

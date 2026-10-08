@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "hq_content",
-  "description": "Living HQ content results desk documents (Step 35): at_position (only what the timeline proves existed at that event) and latest (every artifact re-verified now). Read-only display data; publishable is always false. Step 36: reports carry separate artifact binding (matching/changed/legacy_unverified/unavailable), technical result and evidence freshness; posters from a 1.1 manifest are verified by hash.",
+  "description": "Living HQ content results desk documents (Step 35): at_position (only what the timeline proves existed at that event) and latest (every artifact re-verified now). Read-only display data; publishable is always false. Step 36: reports carry separate artifact binding (matching/changed/legacy_unverified/unavailable), technical result and evidence freshness; posters from a 1.1 manifest are verified by hash. Step 37: read-only human review history with per-decision applicability (re-checked now in latest; only decisions provably saved by the position in replay).",
   "oneOf": [
     {
       "type": "object",
@@ -21,7 +21,8 @@
         "trace_entries",
         "attempts",
         "artifacts",
-        "quality"
+        "quality",
+        "reviews"
       ],
       "properties": {
         "contract": {
@@ -1900,6 +1901,9 @@
               ]
             }
           }
+        },
+        "reviews": {
+          "$ref": "#/$defs/reviews"
         }
       }
     },
@@ -1922,7 +1926,8 @@
         "historical",
         "stages",
         "artifacts",
-        "quality"
+        "quality",
+        "reviews"
       ],
       "properties": {
         "contract": {
@@ -3776,6 +3781,9 @@
               "type": "null"
             }
           ]
+        },
+        "reviews": {
+          "$ref": "#/$defs/reviews"
         }
       }
     }
@@ -3800,6 +3808,337 @@
     "report_id": {
       "type": "string",
       "pattern": "^qr-[0-9a-f]{12,64}$"
+    },
+    "reviews": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reasons",
+        "summary",
+        "evidence_now",
+        "reviews",
+        "corrupted",
+        "note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "none_saved",
+            "available",
+            "history_corrupted",
+            "unavailable",
+            "not_in_demo",
+            "not_yet"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/code"
+          }
+        },
+        "summary": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "latest_review_id",
+                "latest_decision",
+                "latest_applicability",
+                "current_preview_approval",
+                "reasons"
+              ],
+              "properties": {
+                "latest_review_id": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^rev-[0-9a-f]{24}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "latest_decision": {
+                  "enum": [
+                    "approved_for_preview",
+                    "changes_requested",
+                    "rejected",
+                    null
+                  ]
+                },
+                "latest_applicability": {
+                  "enum": [
+                    "current",
+                    "superseded",
+                    "invalidated",
+                    "unavailable",
+                    null
+                  ]
+                },
+                "current_preview_approval": {
+                  "type": "boolean"
+                },
+                "reasons": {
+                  "type": "array",
+                  "maxItems": 40,
+                  "items": {
+                    "$ref": "#/$defs/code"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "evidence_now": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "age_hours",
+                "max_age_days"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "unavailable"
+                  ]
+                },
+                "age_hours": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "max_age_days": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "reviews": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "review_id",
+              "sequence",
+              "decision",
+              "reviewer_label",
+              "reviewer_authenticated",
+              "recorded_at",
+              "report_id",
+              "report_sha256",
+              "binding_digest",
+              "acknowledgments",
+              "notes",
+              "conditions",
+              "supersedes",
+              "superseded_by",
+              "applicability",
+              "artifact_binding_now",
+              "current_preview_approval",
+              "reasons"
+            ],
+            "properties": {
+              "review_id": {
+                "type": "string",
+                "pattern": "^rev-[0-9a-f]{24}$"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "decision": {
+                "enum": [
+                  "approved_for_preview",
+                  "changes_requested",
+                  "rejected"
+                ]
+              },
+              "reviewer_label": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "reviewer_authenticated": {
+                "const": false
+              },
+              "recorded_at": {
+                "$ref": "#/$defs/utc"
+              },
+              "report_id": {
+                "$ref": "#/$defs/report_id"
+              },
+              "report_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "binding_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "acknowledgments": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "enum": [
+                    "needs_review_result",
+                    "unavailable_checks",
+                    "draft_restrictions",
+                    "stale_evidence"
+                  ]
+                }
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 2000
+              },
+              "conditions": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "technical_result",
+                  "unavailable_checks",
+                  "draft",
+                  "evidence_freshness_at_check",
+                  "evidence_at_review"
+                ],
+                "properties": {
+                  "technical_result": {
+                    "enum": [
+                      "pass",
+                      "needs_review",
+                      "fail"
+                    ]
+                  },
+                  "unavailable_checks": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "$ref": "#/$defs/code"
+                    }
+                  },
+                  "draft": {
+                    "type": "boolean"
+                  },
+                  "evidence_freshness_at_check": {
+                    "enum": [
+                      "pass",
+                      "needs_review",
+                      "fail",
+                      "unavailable"
+                    ]
+                  },
+                  "evidence_at_review": {
+                    "enum": [
+                      "fresh",
+                      "stale",
+                      "unavailable"
+                    ]
+                  }
+                }
+              },
+              "supersedes": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^rev-[0-9a-f]{24}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "superseded_by": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^rev-[0-9a-f]{24}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "applicability": {
+                "enum": [
+                  "current",
+                  "superseded",
+                  "invalidated",
+                  "unavailable",
+                  "not_evaluated_at_position"
+                ]
+              },
+              "artifact_binding_now": {
+                "enum": [
+                  "matching",
+                  "changed",
+                  "unavailable",
+                  "not_evaluated"
+                ]
+              },
+              "current_preview_approval": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "type": "array",
+                "maxItems": 30,
+                "items": {
+                  "$ref": "#/$defs/code"
+                }
+              }
+            }
+          }
+        },
+        "corrupted": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "code"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^(unexpected_entry|[0-9]{6}-rev-[0-9a-f]{24}\\.json)$"
+              },
+              "code": {
+                "$ref": "#/$defs/code"
+              }
+            }
+          }
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 600
+        }
+      }
     }
   }
 }
