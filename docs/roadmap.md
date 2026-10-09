@@ -164,3 +164,12 @@ Still not built:
 - **Tests:** they block the network and use mock or synthetic data, so they spend no API
   credits.
 - **Local storage:** runtime data stays in ignored `runtime/` and is written atomically.
+# Step 43 implementation checkpoint
+
+Implemented: explicit persisted xAI video jobs, uncertainty/duplicate protection,
+bounded downloads, four-scene media manifest assembly, and repaired local media rendering.
+Offline synthetic demo and mocked provider tests require no API credits.
+Implemented production attachment: preserve old previews, atomically revise the current
+preview, invalidate old approvals, and require fresh quality/review/export bindings.
+Live xAI behavior has not been paid-tested.
+Trading and the deferred farmhouse visualization are unchanged.

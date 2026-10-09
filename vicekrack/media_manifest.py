@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 from .artifact_binding import sha256_bytes
 from .errors import NetworkError
 from .orchestrator import ROOT
+from .persistence import reject_secrets
 
 MAX_ASSET_BYTES = 80 * 1024 * 1024
 _VALIDATOR = None
@@ -25,6 +26,7 @@ def validator():
 
 
 def validate_media_manifest(document):
+    reject_secrets(document)
     if not isinstance(document, dict) or next(validator().iter_errors(document), None) is not None:
         raise NetworkError("invalid_media_manifest", "The media manifest does not match its contract.")
     ids = [asset["asset_id"] for asset in document["assets"]]
@@ -64,7 +66,8 @@ def load_asset(root, asset):
     if not path.is_file():
         raise NetworkError("media_missing", "A declared media file is missing.")
     try:
-        data = path.read_bytes()
+        with path.open("rb") as stream:
+            data = stream.read(MAX_ASSET_BYTES + 1)
     except OSError:
         raise NetworkError("media_unreadable", "A declared media file could not be read.") from None
     if not data or len(data) > MAX_ASSET_BYTES or len(data) != asset["bytes"]:

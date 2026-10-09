@@ -1,5 +1,10 @@
 # Vicekrack Agent Network
 
+Step 43 adds explicit Grok video jobs and repairs local image/video assembly.
+See [setup, generation, recovery, and offline demo commands](docs/grok-video.md).
+Paid generation requires deliberate per-job consent. Generated previews can be attached
+to completed productions, with fresh quality checks and review required afterward.
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

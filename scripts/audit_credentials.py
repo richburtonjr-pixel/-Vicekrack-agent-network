@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PATTERNS = [rb"sk-(?:ant-)?[A-Za-z0-9_-]{20,}", rb"gh[pousr]_[A-Za-z0-9]{30,}",
+PATTERNS = [rb"xai-[A-Za-z0-9_-]{24,}", rb"sk-(?:ant-)?[A-Za-z0-9_-]{20,}", rb"gh[pousr]_[A-Za-z0-9]{30,}",
             rb"github_pat_[A-Za-z0-9_]{30,}", rb"AKIA[0-9A-Z]{16}",
             rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"]
 

@@ -63,7 +63,7 @@ NOTES = [
 ]
 REF = re.compile(r"^(?!\.\.?(/|$))[A-Za-z0-9._-]+(/(?!\.\.?(/|$))[A-Za-z0-9._-]+){0,3}$")  # no "." or ".." parts
 ROLE_OF = {"brief_path": "brief", "script_path": "script", "plan_path": "scene_plan", "preview_file": "video",
-           "manifest_file": "preview_manifest"}
+           "manifest_file": "preview_manifest", "media_path": "media_manifest"}
 CONFIGS = (("verification_policy", "policy"), ("editorial_profile", "editorial_profile"), ("creator", "creator"),
            ("capabilities", "capabilities"))
 
@@ -329,6 +329,8 @@ class QualityChecker:
         self.script = self._load(check, "creator", "script_path", "script_sha256", validate_short_script, "script_invalid")
         self.plan = self._load(check, "plan", "plan_path", "plan_sha256", validate_scene_plan, "scene_plan_invalid")
         preview = self.stages["preview"]["artifacts"]
+        if "media_path" in preview:
+            self._artifact(check, "preview", "media_path", "media_sha256")
         self.video_path = self._artifact(check, "preview", "preview_file", "video_sha256")
         manifest_path = self._artifact(check, "preview", "manifest_file", "manifest_sha256")
         self.manifest = None

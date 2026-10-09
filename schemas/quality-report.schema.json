@@ -209,6 +209,7 @@
                   "script",
                   "scene_plan",
                   "preview_manifest",
+                  "media_manifest",
                   "video",
                   "poster",
                   "verification_record",

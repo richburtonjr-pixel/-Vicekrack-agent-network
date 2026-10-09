@@ -44,7 +44,7 @@ MAX_POSTER_BYTES = 8 * 1024 * 1024
 MIN_VIDEO_BYTES = 100
 PNG = b"\x89PNG\r\n\x1a\n"
 BINDING_VERSION = "1.0"
-ROLES = ("production_state", "brief", "script", "scene_plan", "preview_manifest", "video", "poster",
+ROLES = ("production_state", "brief", "script", "scene_plan", "preview_manifest", "media_manifest", "video", "poster",
          "verification_record", "narration")
 CONFIG_NAMES = ("verification_policy", "editorial_profile", "creator", "capabilities")
 STATE_CONFIG = {"verification_policy": "policy", "editorial_profile": "editorial_profile", "creator": "creator",
@@ -254,7 +254,7 @@ def verify_binding(report, state, folder, root=None, project=ROOT):
     stages = {s["name"]: s["artifacts"] for s in state["stages"]}
     expected_refs = {"brief": ("brief", "brief_path"), "script": ("creator", "script_path"),
                      "scene_plan": ("plan", "plan_path"), "preview_manifest": ("preview", "manifest_file"),
-                     "video": ("preview", "preview_file")}
+                     "video": ("preview", "preview_file"), "media_manifest": ("preview", "media_path")}
     for row in binding["artifacts"]:
         label = row["role"] if row["index"] is None else f"{row['role']}_{row['index']}"
         if row["role"] in expected_refs:
