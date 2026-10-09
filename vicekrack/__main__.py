@@ -52,6 +52,9 @@ def saved_command():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1].startswith("video-"):
+        from .video_cli import main as video_main
+        return video_main()
     if len(sys.argv) > 1 and sys.argv[1] == "render-preview":
         from .preview import main as preview_main
         return preview_main()

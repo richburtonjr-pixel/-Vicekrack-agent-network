@@ -592,6 +592,8 @@ class Pipeline:
                     raise NetworkError("artifact_tampered", "The saved scene plan does not match the script.")
             if "preview" in done:
                 artifacts = state["stages"][4]["artifacts"]
+                if "media_path" in artifacts:
+                    self._hashed(state, artifacts["media_path"], artifacts["media_sha256"])
                 self._hashed(state, artifacts["preview_file"], artifacts["video_sha256"])
                 manifest_path = self._hashed(state, artifacts["manifest_file"], artifacts["manifest_sha256"])
                 manifest = read_json(manifest_path)

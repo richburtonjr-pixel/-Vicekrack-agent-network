@@ -5,11 +5,14 @@ rewrite sha256/bytes in the manifest to use your own footage. No downloads.
 """
 import json
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vicekrack.artifact_binding import sha256_bytes
 from vicekrack.orchestrator import ROOT, read_json
-from vicekrack.preview import render_preview
+from vicekrack.preview import render_preview, dependencies, invoke
 from vicekrack.scene_plan import build_scene_plan
 
 ROOT_OUT = ROOT / "runtime" / "step42-demo"
@@ -17,7 +20,7 @@ MEDIA = ROOT_OUT / "media"
 
 
 def ffmpeg(*args):
-    subprocess.run(["ffmpeg", "-y", *args], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    invoke(dependencies()[3], ["-y", *args], MEDIA)
 
 
 def main():

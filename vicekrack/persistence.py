@@ -40,9 +40,9 @@ def reject_secrets(value):
                 check(val)
     check(value)
     encoded = json.dumps(value, allow_nan=False)
-    if re.search(r"sk-(?:ant-)?[A-Za-z0-9_-]{16,}", encoded):
+    if re.search(r"(?:sk-(?:ant-)?|xai-)[A-Za-z0-9_-]{16,}", encoded):
         raise NetworkError("sensitive_state", "Saved data contains a credential-shaped value.")
-    for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+    for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY"):
         secret = os.environ.get(name, "").strip()
         if secret and secret in encoded:
             raise NetworkError("sensitive_state", "Saved data contains an active credential.")

@@ -121,8 +121,10 @@ def invoke(exe, arguments, cwd):
         raise NetworkError("render_failed", "Local encoding failed; no output was published.") from None
 
 
-def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
+def render_preview(plan, *, allow_draft=False, directory=None, narration=None, media=None, media_root=None):
     preflight(plan,allow_draft)
+    from .media_render import prepare_media, render_scene
+    media_assets = prepare_media(plan, media, media_root) if media is not None else None
     # Validate optional audio before any encoder launch, folder creation or staging.
     audio, wav = load_narration(narration) if narration is not None else (None, None)
     modules = dependencies()
@@ -146,6 +148,10 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
                 raise NetworkError("render_failed", "Invalid local staging location.")
             for scene in plan["scenes"]:
                 number = scene["index"]
+                if media_assets is not None:
+                    row = media["assignments"][number - 1]
+                    render_scene(plan, scene, row, media_assets[row["asset_id"]], work, modules)
+                    continue
                 if audio is None:
                     make_card(plan,scene,work / f"scene-{number}.png",modules)
                 else:
@@ -189,6 +195,11 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None):
                                    "poster_bytes":(work/f"scene-{s['index']}.png").stat().st_size} for s in plan["scenes"]]}
             if audio is not None:
                 manifest["audio"] = dict(audio)
+            if media is not None:
+                manifest["limitations"] = [item for item in manifest["limitations"] if item not in
+                                            {"no sourced or generated media", "silent storyboard", "narration displayed as text"}]
+                manifest["limitations"] += ["illustrative media; source audio muted; rights declared, not verified",
+                    "media_manifest_sha256:" + sha256_bytes(json.dumps(media, sort_keys=True, allow_nan=False).encode())]
             reject_secrets(manifest)
             (work / "manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
             for path in [video,work/"manifest.json"]:
@@ -216,9 +227,12 @@ def main():
     parser.add_argument("--allow-draft-preview",action="store_true")
     parser.add_argument("--narration",type=Path,default=None,
                         help="Optional local 16-bit PCM WAV (mono/stereo, 8-48 kHz, max 15 s and 12 MB)")
+    parser.add_argument("--media", type=Path)
+    parser.add_argument("--media-root", type=Path)
     args=parser.parse_args()
     try:
-        result=render_preview(read_json(args.plan),allow_draft=args.allow_draft_preview,narration=args.narration)
+        result=render_preview(read_json(args.plan),allow_draft=args.allow_draft_preview,narration=args.narration,
+                              media=read_json(args.media) if args.media else None, media_root=args.media_root)
         print(json.dumps(result,indent=2))
         return 0
     except NetworkError as error:

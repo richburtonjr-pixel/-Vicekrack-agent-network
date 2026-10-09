@@ -1164,3 +1164,18 @@ flowchart LR
   - no other trading package imports it (tests check both);
   - the Step 40 network-isolation test now forbids `urllib.request` and `urllib.error`
     outside `providers/alpaca.py`.
+# Step 43 video boundary
+
+`video_cli` controls explicit operator actions; `video_jobs` owns atomic local state
+and an OS operation lock; `video_transport` owns bounded, nonredirecting HTTPS requests.
+No provider SDK is added to the orchestrator. Preparation is offline; submission is
+explicit and paid; polling and downloading are separate resumable commands.
+Unknown submissions require explicit duplicate-charge acceptance before another attempt.
+
+Validated scene plan -> reviewed request -> explicit xAI submission -> saved request ID
+-> explicit status/download -> four-scene media manifest -> local `media_render`
+-> existing hashed preview package. Source audio is muted, with optional local narration.
+`media_production` explicitly revises a completed production under its existing lock,
+validating configuration, evidence and prior artifacts first. The atomic state update
+invalidates earlier report/review bindings. New quality reports also bind the source
+media manifest, and existing review/export gates still apply.
