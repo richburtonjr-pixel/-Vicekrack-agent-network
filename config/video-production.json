@@ -1,0 +1,17 @@
+{
+  "config_version": "1.0",
+  "description": "Step 44 controlled video-production workflow: four explicitly consented Grok scene jobs, controlled downloads, local preview revision, quality report, explicit human review and gated export. No automatic paid requests, no background polling.",
+  "generation": {
+    "models": ["grok-imagine-video-1.5", "grok-imagine-video-1.5-lite"],
+    "resolutions": ["480p", "720p", "1080p"],
+    "audio_modes": ["none", "generated"]
+  },
+  "limits": {
+    "max_steps": 80,
+    "max_stage_attempts": 3,
+    "max_status_checks_per_resume": 4,
+    "max_downloads_per_resume": 4,
+    "max_scene_replacements": 2,
+    "max_trace": 200
+  }
+}

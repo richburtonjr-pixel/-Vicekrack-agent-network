@@ -173,3 +173,27 @@ Implemented production attachment: preserve old previews, atomically revise the 
 preview, invalidate old approvals, and require fresh quality/review/export bindings.
 Live xAI behavior has not been paid-tested.
 Trading and the deferred farmhouse visualization are unchanged.
+
+# Step 44 implementation checkpoint
+
+Implemented: a controlled, resumable video-production workflow (`video-production-*` commands)
+that connects these existing parts:
+
+- approved story;
+- scene plan;
+- four consented Grok jobs;
+- bounded status and download;
+- media manifest;
+- revised preview;
+- quality;
+- explicit human review;
+- gated export.
+
+Uncertain submissions pause, and a retry needs an explicit duplicate-billing acknowledgment.
+Configuration, plan, media and preview changes are refused. Stale approvals cannot export.
+
+An offline demo renders a real MP4 using a mock provider and synthetic clips. Live xAI behaviour
+remains untested with paid requests.
+
+Deferred: automatic fallback media selection, voice/music mixing, publishing, farmhouse
+visualization. Trading is unchanged.

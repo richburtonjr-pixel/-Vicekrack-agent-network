@@ -1,0 +1,558 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/video-production-workflow.schema.json",
+  "title": "Step 44 controlled video-production workflow state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "workflow_id",
+    "status",
+    "created_at",
+    "updated_at",
+    "origin",
+    "generation",
+    "config_sha256",
+    "notice",
+    "publishable",
+    "steps",
+    "inputs",
+    "scenes",
+    "outputs",
+    "stages",
+    "trace",
+    "state_sha256"
+  ],
+  "properties": {
+    "contract": {
+      "const": "video_production_workflow"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "workflow_id": {
+      "type": "string",
+      "pattern": "^vpw-[0-9a-f]{24}$"
+    },
+    "status": {
+      "enum": [
+        "running",
+        "waiting_for_consent",
+        "uncertain_submission",
+        "waiting_for_provider",
+        "waiting_for_review",
+        "review_rejected",
+        "ready_to_export",
+        "exported",
+        "failed",
+        "quality_failed",
+        "blocked"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "production_id",
+        "selection_run_id",
+        "record_id",
+        "allow_draft_preview"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "production",
+            "selection"
+          ]
+        },
+        "production_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^prod-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "selection_run_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^sel-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "record_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^ver-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "allow_draft_preview": {
+          "type": "boolean"
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "resolution",
+        "audio_mode"
+      ],
+      "properties": {
+        "model": {
+          "enum": [
+            "grok-imagine-video-1.5",
+            "grok-imagine-video-1.5-lite"
+          ]
+        },
+        "resolution": {
+          "enum": [
+            "480p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "audio_mode": {
+          "enum": [
+            "none",
+            "generated"
+          ]
+        }
+      }
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "notice": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "publishable": {
+      "const": false
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_id",
+        "plan_id",
+        "plan_sha256"
+      ],
+      "properties": {
+        "production_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^prod-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "plan_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "plan_sha256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scene_index",
+          "job_id",
+          "replaced_job_ids",
+          "job_status",
+          "request_id",
+          "media_sha256",
+          "media_bytes"
+        ],
+        "properties": {
+          "scene_index": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^vid-[0-9a-f]{24}$"
+              }
+            ]
+          },
+          "replaced_job_ids": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "pattern": "^vid-[0-9a-f]{24}$"
+            }
+          },
+          "job_status": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "prepared",
+                  "submitting",
+                  "uncertain",
+                  "submitted",
+                  "pending",
+                  "done",
+                  "failed",
+                  "expired",
+                  "downloaded"
+                ]
+              }
+            ]
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]{1,100}$"
+              }
+            ]
+          },
+          "media_sha256": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "media_bytes": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer",
+                "minimum": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "media_manifest_sha256",
+        "media_digest",
+        "preview_video_sha256",
+        "preview_manifest_sha256",
+        "quality_report_id",
+        "quality_result",
+        "review_id",
+        "export_package_id",
+        "export_purpose"
+      ],
+      "properties": {
+        "media_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "media_digest": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "preview_video_sha256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "preview_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "quality_report_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^qr-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "quality_result": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "pass",
+                "needs_review",
+                "fail"
+              ]
+            }
+          ]
+        },
+        "review_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^rev-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "export_package_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^pkg-[0-9a-f]{24}$"
+            }
+          ]
+        },
+        "export_purpose": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "review_copy",
+                "approved_preview"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "status",
+          "attempts",
+          "started_at",
+          "finished_at",
+          "error_code"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "production",
+              "scene_plan",
+              "jobs",
+              "generation",
+              "downloads",
+              "media_manifest",
+              "preview_revision",
+              "quality",
+              "review",
+              "export"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "waiting",
+              "completed",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+              }
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,79}$"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at",
+          "stage",
+          "event",
+          "code"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+          },
+          "stage": {
+            "enum": [
+              "production",
+              "scene_plan",
+              "jobs",
+              "generation",
+              "downloads",
+              "media_manifest",
+              "preview_revision",
+              "quality",
+              "review",
+              "export"
+            ]
+          },
+          "event": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,79}$"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,79}$"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
