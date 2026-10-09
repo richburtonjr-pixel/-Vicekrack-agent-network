@@ -651,7 +651,7 @@ class OfflineDemoTests(unittest.TestCase):
             reviews = history(summary["production_id"], Path(temp) / "demo")["reviews"]
             self.assertEqual([r["reviewer_label"] for r in reviews], [DEMO_REVIEWER])
             video = Path(summary["video"])
-            self.assertTrue(video.is_file() and video.is_relative_to(Path(temp) / "demo"))
+            self.assertTrue(video.is_file() and video.is_relative_to((Path(temp) / "demo").resolve()))   # resolved: aliased temp folders
             info = inspect_video(video)
             self.assertEqual((info["width"], info["height"]), (1080, 1920))
             self.assertAlmostEqual(info["duration"], 15, delta=0.2)
