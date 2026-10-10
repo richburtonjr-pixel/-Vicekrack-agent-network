@@ -398,6 +398,10 @@ def _e(value):
     return html.escape("" if value is None else str(value), quote=True)
 
 
+GENERATED_FOOTAGE = ("ILLUSTRATIVE MEDIA: this preview uses generated or supplied footage (for example AI-generated "
+                     "video). It is not factual evidence and its usage rights are not verified.")
+
+
 def render_page(snap, purpose, package_id, exported_at, provenance, review, script, paths):
     """A static HTML page: escaped text, relative links to files in this package, no script or remote resource."""
     report, manifest = snap["report"], snap["preview_manifest"]
@@ -424,6 +428,9 @@ def render_page(snap, purpose, package_id, exported_at, provenance, review, scri
            f'<p class="banner {"review" if purpose == "review_copy" else "approved"}">{_e(banner)}</p>']
     if draft:
         out.append('<p class="banner draft">DRAFT - NOT FOR PRODUCTION: the script has unverified claims.</p>')
+    preview = next(s for s in snap["state"]["stages"] if s["name"] == "preview")["artifacts"]
+    if preview.get("media_path"):                 # Step 44: generated or supplied footage is disclosed on the page
+        out.append(f'<p class="banner draft">{_e(GENERATED_FOOTAGE)}</p>')
     out += [f"<h1>{_e(script['title'])}</h1>",
             f'<p class="muted">Package {_e(package_id)} · production {_e(snap["state"]["production_id"])} · exported '
             f"{_e(exported_at)} (UTC). publishable: false.</p>",

@@ -5,6 +5,22 @@ See [setup, generation, recovery, and offline demo commands](docs/grok-video.md)
 Paid generation requires deliberate per-job consent. Generated previews can be attached
 to completed productions, with fresh quality checks and review required afterward.
 
+Step 44 joins these parts into one resumable **video-production workflow**:
+
+- approved story;
+- scene plan;
+- four Grok jobs, each submitted only with its own consent phrase;
+- bounded status checks and downloads;
+- media manifest;
+- revised preview;
+- fresh quality report;
+- explicit human review;
+- gated export (`publishable: false`).
+
+Try it offline, with no network and no credits:
+`python -m vicekrack video-production-demo`. The commands, statuses and recovery steps are in
+[docs/step44.md](docs/step44.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

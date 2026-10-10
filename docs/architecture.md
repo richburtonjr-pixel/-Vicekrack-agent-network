@@ -1179,3 +1179,41 @@ Validated scene plan -> reviewed request -> explicit xAI submission -> saved req
 validating configuration, evidence and prior artifacts first. The atomic state update
 invalidates earlier report/review bindings. New quality reports also bind the source
 media manifest, and existing review/export gates still apply.
+
+# Step 44 video-production workflow
+
+`video_production.VideoProduction` is the single orchestrator for one production and one set of
+generation settings. It owns no media, provider or review logic. Each stage calls an existing
+component:
+
+| Stage | Existing component |
+|---|---|
+| production | `production.Pipeline` (`produce`, or `resume` with `allow_paid=False`) |
+| scene_plan | the production's verified plan |
+| jobs, generation, downloads, media_manifest | `video_jobs` (`prepare`, `status`, `download`, `media_manifest`), through `video_jobs.use_root` |
+| preview_revision | `media_production.render_production` |
+| quality | `quality.QualityChecker` |
+| review | read-only `review.history` |
+| export | `export.PreviewExporter` |
+
+How it runs:
+
+- **Fixed sequence.** Stages run in a fixed order with `max_steps` and `max_stage_attempts`. Each
+  handler completes, raises `Wait`, which sets an explicit waiting status, or raises a coded
+  `NetworkError`.
+- **Explicit paid work.** Start and resume never submit; only `submit()` does. Each submission
+  passes the job-specific consent phrase straight to `video_jobs.submit`. An uncertain result
+  pauses the workflow, and a retry needs both `retry_uncertain` and
+  `acknowledge_duplicate_billing`.
+- **Bounded network use.** Status checks and downloads have a fixed budget per resume and run only
+  with `allow_network`. There are no threads or schedulers.
+- **Integrity first.** Before any work, `_verify` re-hashes the config, the plan, the saved plan,
+  the media, the media manifest and the production preview. Any mismatch is refused.
+- **Review is never self-approved.** A completed review stage is re-read on every resume and
+  export, so superseded or stale approvals cannot be exported.
+- **Storage.** State is `runtime/video-production/<id>/workflow.json`
+  (`schemas/video-production-workflow.schema.json`). It is self-hashed, replaced atomically and
+  guarded by a per-workflow OS lock. Scene plan and manifest files are written once.
+
+`video_production_demo` runs the same class against a mock transport and synthetic FFmpeg clips,
+inside a fresh root folder with sockets blocked.

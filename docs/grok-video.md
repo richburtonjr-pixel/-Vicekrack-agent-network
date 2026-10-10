@@ -103,3 +103,9 @@ leave an unused preview package, never an automatically approved replacement.
 Official API reference checked for this implementation:
 [xAI video generation](https://docs.x.ai/developers/model-capabilities/video/generation).
 The live paid API was not exercised during development.
+
+## Step 44 workflow
+
+The commands above stay available. To run all four scenes, the production revision, quality,
+review and export as one resumable workflow, use the `video-production-*` commands in
+[step44.md](step44.md). The workflow uses these same job records and duplicate protections.

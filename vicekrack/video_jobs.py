@@ -9,6 +9,7 @@ import json
 import os
 import re
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
@@ -26,6 +27,7 @@ GENERATE_URL = "https://api.x.ai/v1/videos/generations"
 STATUS_URL = "https://api.x.ai/v1/videos/"
 DOWNLOAD_HOSTS = {"vidgen.x.ai"}
 DEFAULT_MODEL = "grok-imagine-video-1.5"
+ALLOWED_MODELS = (DEFAULT_MODEL, "grok-imagine-video-1.5-lite")
 MAX_DOWNLOAD = 80 * 1024 * 1024
 
 
@@ -46,6 +48,22 @@ def jobs_dir():
     path = ROOT / "runtime" / "video-jobs"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+@contextmanager
+def use_root(root):
+    """Step 44: keep a workflow's (or the offline demo's) job records under its own root.
+    `None` keeps the shared repository runtime, so manual Step 43 commands and workflows see
+    the same records and the same duplicate protection."""
+    global ROOT
+    if root is None:
+        yield
+        return
+    previous, ROOT = ROOT, Path(root)
+    try:
+        yield
+    finally:
+        ROOT = previous
 
 
 @locked
