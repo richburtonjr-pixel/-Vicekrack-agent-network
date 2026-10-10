@@ -269,3 +269,22 @@ untested.
 
 Deferred: word-by-word highlighting, captions for local recordings, translations and other fonts,
 music/SFX, publishing, farmhouse visualization, Step 48. Trading is unchanged.
+
+# Step 48 implementation checkpoint
+
+Numbering note: PR #48 delivered Step 47, and Step 48 arrives in a later PR.
+
+Implemented: the Video Studio in the Living HQ ([docs/step48.md](step48.md)):
+
+- `hq-serve --studio` and `--studio-demo`;
+- production eligibility, explained in plain words;
+- narration and caption choices with their limits;
+- the exact paid requests, each approved explicitly;
+- saved progress with the allowed recovery actions;
+- playback, quality findings, explicit review and verified-export download.
+
+The action routes are narrow and validated: loopback only, Host and Origin checks, session and
+CSRF, size limits, de-duplication and one action at a time. The read-only HQ is unchanged without
+the flag. The offline demo uses mocks and a separate folder.
+
+Deferred: farmhouse redesign, trading changes, music, social publishing, Step 49.

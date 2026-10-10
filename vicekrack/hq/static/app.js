@@ -2,6 +2,7 @@
  *
  * Safety rules for this file:
  * - Only GET requests to the read-only /api/ routes (timelines, scene, results, content, sessions, broker-paper).
+ *   The Step 48 Video Studio (the only screen that can act) is a separate file, studio.js.
  *   No other
  *   network use.
  * - All text from the server is inserted with textContent / setAttribute, never as HTML.
@@ -1045,16 +1046,19 @@
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
-    var sessions = view === "sessions", broker = view === "broker";
+    var sessions = view === "sessions", broker = view === "broker", studio = view === "studio";
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
     $("sessions-view").hidden = !sessions;
     $("broker-view").hidden = !broker;
-    $("stage-wrap").hidden = timeline || results || content || sessions || broker || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker);
-    document.body.classList.toggle("results-open", results || content || sessions || broker);
-    document.body.classList.toggle("sessions-open", sessions || broker);   // replay controls belong to the house timeline
+    $("studio-view").hidden = !studio;                  // Step 48: the Video Studio lives in studio.js
+    $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio);
+    document.body.classList.toggle("results-open", results || content || sessions || broker || studio);
+    document.body.classList.toggle("sessions-open", sessions || broker || studio);   // replay controls belong to the house timeline
+    document.body.classList.toggle("studio-open", studio);
+    document.dispatchEvent(new CustomEvent("hq:view", { detail: view }));
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
     if (sessions) { loadSessions(); }
