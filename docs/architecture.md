@@ -1312,3 +1312,51 @@ the sidecars, manifest, script, narration and duration. Estimated timing makes t
 **Export.** The export adds `captions/captions.{json,srt,vtt}` (bound roles) and a manifest
 `captions` section that separates the burned-in video from the optional sidecars.
 `verify_package` re-derives the sidecars from the track.
+
+# Step 48 Video Studio
+
+The Living HQ is read-only by default. `hq-serve --studio` (or `--studio-demo`) adds the only
+routes that act, `/api/studio/...`. They are handled by `hq/studio_api.py` before the HQ's
+GET-only dispatcher, so every other route stays GET-only and unchanged.
+
+**Request checks (`studio_api.StudioGate`).** Each action passes, in order:
+
+- the loopback Host;
+- an exact Origin and same-origin fetch metadata;
+- the session cookie and CSRF token;
+- JSON of at most 16 KB with strictly allow-listed fields and patterns;
+- request-ID de-duplication;
+- a single-action lock.
+
+`server.py` reads a body only for studio POSTs on a studio server, after a size check.
+
+**Service (`hq/studio.py`).** The service delegates every step to the existing services:
+
+| Studio step | Existing service |
+|---|---|
+| Eligibility | `VideoProduction._plan` and the speech/caption text checks |
+| Narration | `speech_jobs` |
+| Captions | `captions` |
+| The workflow | `VideoProduction` |
+| Review | `ReviewRecorder` |
+| Video playback | Read-only `/api/content/media`, using `hq.content.Artifacts`' own verified media IDs |
+| Export download | `export.verify_package`, before and after zipping |
+
+The allowed next actions are derived from the workflow's saved status. Nothing runs in the
+background.
+
+**Demo (`hq/studio_demo.py`).** For the whole server lifetime the demo:
+
+- uses a fresh root;
+- blocks outbound sockets;
+- uses a placeholder key;
+- uses mock xAI video and speech transports;
+- runs on the fixed demo clock;
+- seeds one mock production.
+
+**Front end (`static/studio.js`).** It is a separate file and does nothing until the Studio view
+opens. Clicks disable all actions until the answer arrives; paid buttons need an approval checkbox.
+`app.js` only shows or hides the view.
+
+**Fix found along the way.** The Content results desk now accepts narrated media revisions from
+Step 45. It previously rejected their manifests, so their videos could not be served.
