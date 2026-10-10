@@ -104,6 +104,9 @@ def _workflow_commands(commands):
                                  help="optional local 16-bit PCM WAV (mono/stereo, 8-48 kHz, at most 15 s and 12 MB); "
                                       "shorter is padded with silence, longer is refused, never cut off. "
                                       "Omit for silent output")
+            command.add_argument("--speech", default=None, metavar="SPEECH_JOB_ID",
+                                 help="Step 46: use a COMPLETED Grok speech job (speech-prepare/-submit) as the "
+                                      "narration; it must come from this production's saved script")
         if name == "video-production-resume":
             command.add_argument("--allow-network", action="store_true",
                                  help="allow bounded status checks and downloads (never a new paid submission)")
@@ -123,20 +126,28 @@ def _workflow_commands(commands):
             command.add_argument("--purpose", required=True, choices=["review_copy", "approved_preview"])
         if name == "video-production-demo":
             command.add_argument("--output", type=Path, help="demo folder (default: runtime/video-production-demo/RUN)")
-            command.add_argument("--narrated", action="store_true",
-                                 help="Step 45: add synthetic local narration (synthetic tones, not a voice)")
+            mode = command.add_mutually_exclusive_group()
+            mode.add_argument("--narrated", action="store_true",
+                              help="Step 45: add synthetic local narration (synthetic tones, not a voice)")
+            mode.add_argument("--speech", action="store_true",
+                              help="Step 46: mocked Grok speech job -> managed WAV -> narrated video (synthetic test "
+                                   "audio, NOT a Grok voice sample)")
 
 
 def _run_workflow(args):
     from .video_production import VideoProduction
     if args.command == "video-production-demo":
         from .video_production_demo import run_demo
+        if args.speech:
+            from .speech_demo import run_speech_demo
+            return run_speech_demo(args.output)
         return run_demo(args.output, narrated=True) if args.narrated else run_demo(args.output)
     flow = VideoProduction()
     if args.command == "video-production-start":
         return flow.start(production_id=args.production, selection_run_id=args.selection, record_id=args.record,
                           model=args.model, resolution=args.resolution, audio_mode=args.audio_mode,
-                          allow_draft_preview=args.allow_draft_preview, narration=args.narration)
+                          allow_draft_preview=args.allow_draft_preview, narration=args.narration,
+                          speech_job=args.speech)
     if args.command == "video-production-list":
         return {"workflows": flow.list()}
     if args.command == "video-production-inspect":
