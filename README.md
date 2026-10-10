@@ -74,6 +74,40 @@ Timing behaviour:
 Offline demo with mock providers and synthetic audio and timings (not a Grok voice):
 `python -m vicekrack video-production-demo --captions`. See [docs/step47.md](docs/step47.md).
 
+### Step 48: Video Studio (make videos from the Living HQ)
+
+**Try it offline.** This uses mock providers and synthetic media, with no network and no credits:
+
+```powershell
+python -m pip install -r requirements-render.txt
+python -m vicekrack hq-serve --studio-demo
+```
+
+Open the address it prints (for example `http://127.0.0.1:8765/`) and click **Video Studio**. Then:
+
+1. Choose the production and read its script and scene plan.
+2. Pick narration and captions.
+3. Approve each paid request: the narration and four clips (mock in the demo).
+4. Click **Check the provider** until the video is ready.
+5. Watch the video, read the quality findings and approve it.
+6. Export, then **Download the verified package**.
+
+The demo uses its own folder, `runtime/studio-demo/`, and never touches real productions.
+
+**Real use.** Set `XAI_API_KEY` in that terminal only, then run:
+
+```powershell
+python -m vicekrack hq-serve --studio
+```
+
+Plain `hq-serve` stays read-only. With `--studio`:
+
+- paid xAI requests are sent only when you tick and approve that exact request;
+- nothing is retried automatically;
+- everything stays `publishable: false`.
+
+See [docs/step48.md](docs/step48.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

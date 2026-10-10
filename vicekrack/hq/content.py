@@ -275,7 +275,8 @@ class Artifacts:
                 or manifest.get("source_blocked_for_production") != draft
                 or manifest.get("video_sha256") != artifacts.get("video_sha256")
                 or bool(manifest.get("audio_present")) != bool(artifacts.get("audio_present"))
-                or bool(manifest.get("audio_present")) != (self.state["config"]["narration"] is not None)):
+                or bool(manifest.get("audio_present")) != (self.state["config"]["narration"] is not None
+                                                           or "narration_path" in artifacts)):   # Step 45 revisions
             self._set("manifest", "mismatched", "manifest_not_matching_plan")
             return
         self.manifest, self.manifest_dir = manifest, str(PurePosixPath(norm(artifacts["manifest_file"])).parent)

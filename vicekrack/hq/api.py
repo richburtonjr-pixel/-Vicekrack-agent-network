@@ -16,6 +16,8 @@ Routes (GET only; everything else is 405):
   /api/session?id=ID                          Step 39: one read-only session summary (ID is demo or tss-...)
   /api/broker-paper                           Step 41: saved Alpaca PAPER broker intents and states (read-only)
   /api/broker-paper/intent?id=bpi-...         Step 41: one paper intent with its sanitized events (read-only)
+  /api/studio/...                             Step 48: Video Studio (studio_api.py). Off unless the server was
+                                              started with --studio or --studio-demo; the only routes that act.
 
 Boundaries:
 - The Host header must be this loopback server (127.0.0.1 or localhost on its port);
@@ -47,7 +49,8 @@ STATIC = Path(__file__).resolve().parent / "static"
 FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/styles.css": ("styles.css", "text/css; charset=utf-8"),
          "/static/hq-core.js": ("hq-core.js", "text/javascript; charset=utf-8"),
-         "/static/app.js": ("app.js", "text/javascript; charset=utf-8")}
+         "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
+         "/static/studio.js": ("studio.js", "text/javascript; charset=utf-8")}
 TIMELINE = re.compile(r"^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24}|wfr-[0-9a-f]{32})$")
 MAX_TIMELINES = 200
 RESULTS_ROUTES = {"/api/results": {"timeline"}, "/api/results/at": {"timeline", "position"},
@@ -225,8 +228,14 @@ def _media(query_text, headers, root):
     return 206, {**base, "Content-Range": f"bytes {start}-{end}/{size}"}, data[start:end + 1]
 
 
-def respond(method, target, headers, *, port, root=None):
-    """(status, headers, body) for one request. `headers` keys must be lower-case."""
+def respond(method, target, headers, *, port, root=None, studio=None, body=b""):
+    """(status, headers, body) for one request. `headers` keys must be lower-case. `studio` is the Step 48
+    StudioGate when the server runs with --studio/--studio-demo, else None (studio routes refuse to act)."""
+    if target.startswith("/api/studio/") and len(target) <= 300 and not any(ch in target for ch in ("\\", "\x00")):
+        if not _allowed_origin(headers, port):
+            return _error(403, "forbidden_origin", "Requests must come from the local HQ page itself.")
+        from .studio_api import handle
+        return handle(studio, method, target, headers, body, port)
     if method != "GET":
         return _error(405, "method_not_allowed", "The HQ is read-only; only GET is allowed.")
     if not _allowed_origin(headers, port):
@@ -246,7 +255,8 @@ def respond(method, target, headers, *, port, root=None):
         return 200, {**HEADERS, "Content-Type": content_type}, body
     try:
         if path == "/api/status":
-            return _json(200, {"read_only": True, "service": "vicekrack_living_hq", "version": "1.0"})
+            return _json(200, {"read_only": studio is None, "service": "vicekrack_living_hq", "version": "1.0",
+                               "studio_actions": studio is not None})
         if path == "/api/timelines":
             return _json(200, timelines(root))
         if path == "/api/scene":
