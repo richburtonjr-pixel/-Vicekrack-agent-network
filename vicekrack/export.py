@@ -10,6 +10,10 @@ self-contained directory under runtime/exports/ (ignored by Git):
                                 no JavaScript, fonts, trackers or remote resources.
   media/preview.mp4             the preview exactly as rendered (narration already mixed in).
   media/scene-N.png             scene posters.
+  captions/captions.srt|.vtt    Step 47, only when the reviewed video has burned-in captions: OPTIONAL sidecar
+  captions/captions.json        copies of the same cues (SRT, WebVTT) and the caption track they come from,
+                                original bytes, each bound by the quality report. The captions that the
+                                reviewer saw are the ones burned into media/preview.mp4.
   content/script.json           the script, original bytes.
   content/provenance.json       DERIVED readable summary of the brief, sources and verification
                                 record (source IDs and hashes kept).
@@ -65,6 +69,13 @@ PACKAGE_ID = re.compile(r"^pkg-[0-9a-f]{24}$")
 MANIFEST = "package.json"
 MAX_PACKAGE_FILES = 40
 ROLE_LIMITS = {"video": MAX_VIDEO_BYTES, "poster": MAX_POSTER_BYTES}
+# Step 47: package path -> (package role, production artifact key, quality-report binding role)
+CAPTION_FILES = {"captions/captions.json": ("captions_track", "captions_path", "captions"),
+                 "captions/captions.srt": ("captions_srt", "captions_srt_path", "captions_srt"),
+                 "captions/captions.vtt": ("captions_vtt", "captions_vtt_path", "captions_vtt")}
+CAPTIONS_STATEMENT = ("The captions are BURNED INTO media/preview.mp4: they are part of the reviewed video and cannot be "
+                      "turned off. captions/captions.srt and captions/captions.vtt are OPTIONAL sidecar copies of the same "
+                      "cues for players; they were not what the reviewer watched.")
 INTEGRITY_NOTE = ("SHA-256 hashes let anyone check that these files are consistent with this manifest. They are not "
                   "signatures: whoever can edit the package can rewrite the manifest too, and nothing here proves who "
                   "made it.")
@@ -192,6 +203,9 @@ class PreviewExporter:
                                            "manifest": ("preview", "manifest_file", MAX_JSON_BYTES),
                                            "video": ("preview", "preview_file", MAX_VIDEO_BYTES)}.items():
             sources[key] = _read(folder, norm(stages[stage][field]), limit, "required_artifact_missing")
+        for path, (_, key, _) in CAPTION_FILES.items():
+            if stages["preview"].get(key):
+                sources[path] = _read(folder, norm(stages["preview"][key]), MAX_JSON_BYTES, "required_artifact_missing")
         preview_manifest = _json(sources["manifest"], "invalid_preview_manifest")
         validate_manifest(preview_manifest)
         package_dir = PurePosixPath(norm(stages["preview"]["manifest_file"])).parent
@@ -232,6 +246,7 @@ class PreviewExporter:
         expected = {"state": ("production_state", None), "brief": ("brief", None), "script": ("script", None),
                     "plan": ("scene_plan", None), "manifest": ("preview_manifest", None), "video": ("video", None)}
         expected.update({f"poster_{i}": ("poster", i) for i, _, _ in snap["posters"]})
+        expected.update({path: (role, None) for path, (_, _, role) in CAPTION_FILES.items() if path in snap["sources"]})
         for key, row in expected.items():
             if rows.get(row) != snap["sources"][key].sha:
                 raise NetworkError("required_artifact_changed", "A required artifact differs from the bound report.")
@@ -253,6 +268,9 @@ class PreviewExporter:
                                        {"sha256": snap["sources"]["video"].sha})}
         for index, _, source in snap["posters"]:
             files[f"media/scene-{index}.png"] = ("poster", source.data, False, {"sha256": source.sha, "index": index})
+        for path, (role, _, _) in CAPTION_FILES.items():
+            if path in snap["sources"]:
+                files[path] = (role, snap["sources"][path].data, False, {"sha256": snap["sources"][path].sha})
         files["content/script.json"] = ("script", snap["sources"]["script"].data, False,
                                         {"sha256": snap["sources"]["script"].sha, "id": snap["script"]["script_id"]})
         files["quality/quality-report.json"] = ("quality_report", snap["sources"]["report"].data, False,
@@ -347,7 +365,8 @@ class PreviewExporter:
                             "narration_source_included": False, "production_state_included": False,
                             "configuration_included": False},
                 "integrity": {"hash": "sha256", "manifest_lists_itself": False, "note": INTEGRITY_NOTE},
-                "files": rows}
+                "files": rows, **({"captions": _captions_summary(snap)} if "captions/captions.json" in snap["sources"]
+                                  else {})}
 
     # -- publication
     def _publish(self, base, package_id, files, manifest, snap):
@@ -391,6 +410,16 @@ class PreviewExporter:
             shutil.rmtree(staging, ignore_errors=True)
             raise NetworkError("export_write_failed", "Could not write the package completely; nothing was exported.") from None
         return target
+
+
+def _captions_summary(snap):
+    track = json.loads(snap["sources"]["captions/captions.json"].data)
+    return {"burned_in_video": True, "burned_in_file": "media/preview.mp4",
+            "sidecars": ["captions/captions.srt", "captions/captions.vtt"], "sidecars_optional": True,
+            "track": "captions/captions.json", "caption_id": track["caption_id"],
+            "timing_method": track["timing"]["method"],
+            "requires_manual_timing_review": track["timing"]["requires_manual_timing_review"],
+            "statement": CAPTIONS_STATEMENT}
 
 
 # ---------------------------------------------------------------- static review page
@@ -447,6 +476,16 @@ def render_page(snap, purpose, package_id, exported_at, provenance, review, scri
     for index, _, _ in snap["posters"]:
         out.append(f'<a href="media/scene-{index}.png"><img src="media/scene-{index}.png" alt="Scene {index} poster"></a>')
     out.append("</div></section>")
+    if "captions/captions.json" in snap["sources"]:
+        summary = _captions_summary(snap)
+        timing = ("ESTIMATED phrase timing (not synchronized to the voice); a person had to check it before approval"
+                  if summary["requires_manual_timing_review"] else
+                  "phrase timing from the provider's character timestamps")
+        out += ["<section><h2>Captions</h2>", f"<p><strong>{_e(CAPTIONS_STATEMENT)}</strong></p>",
+                f"<p>Caption track {_e(summary['caption_id'])} · {_e(timing)}.</p>",
+                '<p>Sidecars: <a href="captions/captions.srt">captions.srt</a> · <a href="captions/captions.vtt">'
+                'captions.vtt</a> · track <a href="captions/captions.json">captions.json</a> (original bytes)</p>'
+                "</section>"]
     out += ["<section><h2>Script</h2>", '<div class="wrap"><table><tr><th>Beat</th><th>Time</th><th>Narration</th>'
             "<th>On screen</th><th>Visual</th><th>Claims</th></tr>"]
     for beat in script["beats"]:
@@ -596,6 +635,7 @@ def _references(manifest, data, validate_report):
                         ("review_summary", 1), ("review_page", 1)):
         if len(roles.get(role, [])) != count:
             problems.append("package_role_count_wrong_" + role)
+    problems.extend(_caption_problems(manifest, data, roles))
     report = load("quality/quality-report.json")
     if report is not None:
         from .review import binding_digest
@@ -616,7 +656,8 @@ def _references(manifest, data, validate_report):
             problems.append("technical_result_mismatch")
         bound = {(r["role"], r["index"]): r["sha256"] for r in report.get("binding", {}).get("artifacts", [])}
         for row in manifest["files"]:
-            key = {"video": ("video", None), "script": ("script", None), "poster": ("poster", row["index"])}.get(row["role"])
+            key = {"video": ("video", None), "script": ("script", None), "poster": ("poster", row["index"]),
+                   **{role: (bound_role, None) for role, _, bound_role in CAPTION_FILES.values()}}.get(row["role"])
             if key is not None and bound.get(key) != row["sha256"]:
                 problems.append("payload_not_bound_by_report")
         if bound.get(("preview_manifest", None)) != source["preview_manifest_sha256"]:
@@ -649,6 +690,31 @@ def _references(manifest, data, validate_report):
     page = data.get("index.html")
     if page is not None:
         problems.extend(_page_problems(page.decode("utf-8", "replace"), manifest))
+    return problems
+
+
+def _caption_problems(manifest, data, roles):
+    """Step 47: either no caption files at all, or all three, consistent with each other and the manifest."""
+    present = [role for role, _, _ in CAPTION_FILES.values() if roles.get(role)]
+    if not present:
+        return ["captions_summary_without_files"] if "captions" in manifest else []
+    if len(present) != 3 or any(len(roles[role]) != 1 for role in present) or "captions" not in manifest:
+        return ["captions_incomplete"]
+    if any(path not in data for path in CAPTION_FILES):
+        return []                                       # already reported as a hash/size problem
+    from .captions import files_for, track_from_bytes
+    try:
+        track = track_from_bytes(data["captions/captions.json"])
+    except NetworkError:
+        return ["captions_track_invalid"]
+    problems = []
+    expected = files_for(track)
+    if data["captions/captions.srt"] != expected["captions.srt"] or data["captions/captions.vtt"] != expected["captions.vtt"]:
+        problems.append("captions_sidecar_mismatch")
+    summary = manifest["captions"]
+    if (summary["caption_id"] != track["caption_id"] or summary["timing_method"] != track["timing"]["method"]
+            or summary["requires_manual_timing_review"] != track["timing"]["requires_manual_timing_review"]):
+        problems.append("captions_summary_mismatch")
     return problems
 
 

@@ -30,6 +30,9 @@ def parser():
             command.add_argument("--codec", choices=["wav", "mp3"])
             command.add_argument("--sample-rate", type=int)
             command.add_argument("--bit-rate", type=int, help="mp3 only")
+            command.add_argument("--with-timestamps", action="store_true",
+                                 help="Step 47: also request xAI's documented per-character timings (for captions); "
+                                      "a different request and job")
         elif name != "speech-list":
             command.add_argument("job_id")
         if name == "speech-submit":
@@ -50,7 +53,7 @@ def run(args):
             script, source, production_id = speech.read_script_file(args.script), "script_file", None
         return speech.view(speech.prepare(script, source=source, production_id=production_id, voice=args.voice,
                                           language=args.language, codec=args.codec, sample_rate=args.sample_rate,
-                                          bit_rate=args.bit_rate))
+                                          bit_rate=args.bit_rate, with_timestamps=args.with_timestamps))
     if args.command == "speech-list":
         return {"speech_jobs": speech.list_jobs()}
     if args.command == "speech-inspect":

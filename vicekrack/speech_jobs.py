@@ -252,8 +252,10 @@ def settings_for(config, voice=None, language=None, codec=None, sample_rate=None
 
 
 def prepare(script, *, source="script_file", production_id=None, voice=None, language=None, codec=None,
-            sample_rate=None, bit_rate=None, root=None, clock=None, config_root=None):
-    """Offline. Returns the (new or existing) job record. Nothing is sent and nothing is paid."""
+            sample_rate=None, bit_rate=None, with_timestamps=False, root=None, clock=None, config_root=None):
+    """Offline. Returns the (new or existing) job record. Nothing is sent and nothing is paid.
+    Step 47: `with_timestamps` asks xAI for documented per-character timings (used for captions); it is a
+    different request, so a different job with its own review and consent."""
     clock = clock or utc_now
     config = load_config(config_root or ROOT)
     settings = settings_for(config, voice, language, codec, sample_rate, bit_rate)
@@ -265,6 +267,8 @@ def prepare(script, *, source="script_file", production_id=None, voice=None, lan
         output_format["bit_rate"] = settings["bit_rate"]
     request = {"text": text, "voice_id": settings["voice"], "language": settings["language"],
                "output_format": output_format}
+    if with_timestamps is True:
+        request["with_timestamps"] = True
     digest = script_digest(script)
     job_id = "sp-" + sha256_bytes(canonical({"script_sha256": digest, "request": request}))[:24]
     with _Locked(root):
@@ -361,7 +365,14 @@ def submit(job_id, *, consent, allow_network, retry_uncertain=False, acknowledge
         except Exception:
             return _uncertain(record, root, clock)
         record["attempts"][-1].update(outcome="received")
-        _store_raw(record, audio, content_type, root, clock)
+        timestamps = None
+        if record["request"].get("with_timestamps"):
+            try:
+                audio, content_type, timestamps = _envelope(audio, limits["max_response_bytes"])
+            except NetworkError:                       # received (maybe billed) but unusable: never resent
+                record["status"], record["error_code"] = "invalid_audio", "speech_response_malformed"
+                return _save(record, root, clock)
+        _store_raw(record, audio, content_type, root, clock, timestamps)
         return _process(record, root, clock)
 
 
@@ -372,9 +383,53 @@ def _uncertain(record, root, clock):
                        "It was not retried.")
 
 
-def _store_raw(record, audio, content_type, root, clock):
+def _envelope(body, max_bytes):
+    """Step 47: the documented `with_timestamps` JSON reply -> (audio bytes, content type, timings)."""
+    import base64
+    try:
+        document = json.loads(body.decode("utf-8"))
+        audio = base64.b64decode(document["audio"], validate=True)
+        timestamps = document["audio_timestamps"]
+        chars, times, duration = timestamps["graph_chars"], timestamps["graph_times"], document.get("duration")
+        if (not audio or len(audio) > max_bytes or not isinstance(chars, list) or not isinstance(times, list)
+                or len(chars) > 60000 or len(times) > 60000
+                or not (duration is None or (isinstance(duration, (int, float)) and not isinstance(duration, bool)))):
+            raise ValueError
+        content_type = document.get("content_type")
+        cleaned = {"graph_chars": chars, "graph_times": times, "duration": duration}
+        reject_secrets(cleaned)
+        canonical(cleaned)                              # finite numbers only
+    except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, NetworkError):
+        raise NetworkError("speech_response_malformed", "The timestamped speech reply is malformed.") from None
+    return audio, content_type if isinstance(content_type, str) else "", cleaned
+
+
+def timestamps(job_id, root=None):
+    """Step 47: the provider character timings saved with a job, hash-checked, or None if never requested."""
+    record = _load(job_id, root)
+    info = record.get("timestamps")
+    if not info:
+        return None
+    path = folder(job_id, root) / info["file"]
+    try:
+        data = path.read_bytes() if path.is_file() and not path.is_symlink() else None
+    except OSError:
+        data = None
+    if data is None or sha256_bytes(data) != info["sha256"]:
+        raise NetworkError("speech_timestamps_tampered", "The saved provider timestamps are missing or changed.")
+    return {"data": json.loads(data), "sha256": info["sha256"]}
+
+
+def _store_raw(record, audio, content_type, root, clock, timestamps=None):
     name = f"provider-audio-{len(record['attempts'])}.{record['settings']['codec']}"
     _write_atomic(folder(record["job_id"], root) / name, audio, create=True)
+    if timestamps is not None:
+        stamp_name = f"provider-timestamps-{len(record['attempts'])}.json"
+        data = canonical(timestamps) + b"\n"
+        _write_atomic(folder(record["job_id"], root) / stamp_name, data, create=True)
+        record["timestamps"] = {"file": stamp_name, "sha256": sha256_bytes(data),
+                                "characters": len(timestamps["graph_chars"]),
+                                "provider_duration_seconds": timestamps["duration"]}
     record["raw_audio"] = {"file": name, "sha256": sha256_bytes(audio), "bytes": len(audio),
                            "content_type": content_type if isinstance(content_type, str) and
                            re.fullmatch(r"[a-z0-9.+/-]{0,100}", content_type) else ""}

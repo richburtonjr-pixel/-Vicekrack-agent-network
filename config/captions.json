@@ -1,0 +1,27 @@
+{
+  "config_version": "1.0",
+  "description": "Step 47 narration-aligned captions: phrase cues built from the exact narration of a Grok speech job's script, timed by the provider's character timestamps or (explicitly) estimated, burned into the vertical preview and exported as SRT/WebVTT sidecars.",
+  "style": {
+    "burn_in": true,
+    "font_size": 56,
+    "max_chars_per_line": 26,
+    "max_lines": 2,
+    "max_line_pixels": 880,
+    "box_left": 60,
+    "box_right": 1020,
+    "box_bottom": 1400,
+    "box_padding": 24,
+    "box_rgba": [5, 12, 25, 235],
+    "text_color": "#ffffff",
+    "estimated_label": "CAPTION TIMING ESTIMATED - CHECK BEFORE APPROVAL",
+    "estimated_label_color": "#ffbe55",
+    "estimated_label_size": 26
+  },
+  "timing": {
+    "min_cue_ms": 400,
+    "hold_ms": 600,
+    "sentence_break_min_words": 3,
+    "provider_duration_tolerance_ms": 250,
+    "provider_end_tolerance_ms": 50
+  }
+}

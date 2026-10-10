@@ -53,6 +53,27 @@ How it behaves:
 Offline demo with mock providers and synthetic test audio (not a Grok voice):
 `python -m vicekrack video-production-demo --speech`. See [docs/step46.md](docs/step46.md).
 
+Step 47 adds **narration-aligned captions**. They are built only from the exact narration of a
+completed speech job's script, then burned into the narrated preview, bound into quality and review,
+and exported with optional SRT/WebVTT sidecars:
+
+```powershell
+python -m vicekrack speech-prepare --production PRODUCTION_ID --with-timestamps   # optional: provider timing (PAID when submitted)
+python -m vicekrack captions-prepare --speech SPEECH_JOB_ID --timing provider      # or --timing estimated (labelled for review)
+python -m vicekrack captions-inspect CAPTION_ID
+python -m vicekrack video-production-start --production PRODUCTION_ID --speech SPEECH_JOB_ID --captions CAPTION_ID
+```
+
+Timing behaviour:
+
+- Estimated timing is never called synchronized. It shows a visible label and makes the quality
+  result `needs_review`.
+- Changing captions creates a new video that needs a fresh review.
+- Paid clips and speech are reused.
+
+Offline demo with mock providers and synthetic audio and timings (not a Grok voice):
+`python -m vicekrack video-production-demo --captions`. See [docs/step47.md](docs/step47.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

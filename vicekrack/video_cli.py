@@ -107,6 +107,9 @@ def _workflow_commands(commands):
             command.add_argument("--speech", default=None, metavar="SPEECH_JOB_ID",
                                  help="Step 46: use a COMPLETED Grok speech job (speech-prepare/-submit) as the "
                                       "narration; it must come from this production's saved script")
+            command.add_argument("--captions", default=None, metavar="CAPTION_ID",
+                                 help="Step 47: burn in a caption track from captions-prepare (needs --speech; "
+                                      "SRT/WebVTT sidecars are exported with the reviewed video)")
         if name == "video-production-resume":
             command.add_argument("--allow-network", action="store_true",
                                  help="allow bounded status checks and downloads (never a new paid submission)")
@@ -129,6 +132,9 @@ def _workflow_commands(commands):
             mode = command.add_mutually_exclusive_group()
             mode.add_argument("--narrated", action="store_true",
                               help="Step 45: add synthetic local narration (synthetic tones, not a voice)")
+            mode.add_argument("--captions", action="store_true",
+                              help="Step 47: mocked timestamped speech -> caption track -> captioned narrated video "
+                                   "(synthetic test audio, NOT a Grok voice sample)")
             mode.add_argument("--speech", action="store_true",
                               help="Step 46: mocked Grok speech job -> managed WAV -> narrated video (synthetic test "
                                    "audio, NOT a Grok voice sample)")
@@ -138,6 +144,9 @@ def _run_workflow(args):
     from .video_production import VideoProduction
     if args.command == "video-production-demo":
         from .video_production_demo import run_demo
+        if args.captions:
+            from .caption_demo import run_caption_demo
+            return run_caption_demo(args.output)
         if args.speech:
             from .speech_demo import run_speech_demo
             return run_speech_demo(args.output)
@@ -147,7 +156,7 @@ def _run_workflow(args):
         return flow.start(production_id=args.production, selection_run_id=args.selection, record_id=args.record,
                           model=args.model, resolution=args.resolution, audio_mode=args.audio_mode,
                           allow_draft_preview=args.allow_draft_preview, narration=args.narration,
-                          speech_job=args.speech)
+                          speech_job=args.speech, captions=args.captions)
     if args.command == "video-production-list":
         return {"workflows": flow.list()}
     if args.command == "video-production-inspect":

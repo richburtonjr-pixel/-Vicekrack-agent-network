@@ -63,7 +63,8 @@ NOTES = [
 ]
 REF = re.compile(r"^(?!\.\.?(/|$))[A-Za-z0-9._-]+(/(?!\.\.?(/|$))[A-Za-z0-9._-]+){0,3}$")  # no "." or ".." parts
 ROLE_OF = {"brief_path": "brief", "script_path": "script", "plan_path": "scene_plan", "preview_file": "video",
-           "manifest_file": "preview_manifest", "media_path": "media_manifest", "narration_path": "narration"}
+           "manifest_file": "preview_manifest", "media_path": "media_manifest", "narration_path": "narration",
+           "captions_path": "captions", "captions_srt_path": "captions_srt", "captions_vtt_path": "captions_vtt"}
 CONFIGS = (("verification_policy", "policy"), ("editorial_profile", "editorial_profile"), ("creator", "creator"),
            ("capabilities", "capabilities"))
 
@@ -655,9 +656,55 @@ class QualityChecker:
                 check.fail("poster_unreadable")
         check.details.update(posters_found=posters_ok, posters_sized=sized, posters_hash_bound=bound,
                              media_measured=media is not None)
+        self._check_captions(check, media)
         if not sized:
             check.skip("poster_check_unavailable")
         return check
+
+    def _check_captions(self, check, media):
+        """Step 47: burned-in captions (if this revision has them) are the bound track and sidecars, repeat the
+        script's narration exactly, match the narration they were timed against and stay within it and the video.
+        Estimated timing is never a pass: it needs a person to check it (needs_review)."""
+        preview = self.stages["preview"]["artifacts"]
+        declared = (self.manifest or {}).get("captions")
+        if "captions_path" not in preview:
+            check.details["captions"] = False
+            if declared is not None:
+                check.fail("captions_not_recorded")
+            return
+        from .captions import files_for, track_from_bytes
+        from .speech_jobs import script_digest
+        check.details["captions"] = True
+        files = {}
+        for key, name in (("captions_path", "track.json"), ("captions_srt_path", "captions.srt"),
+                          ("captions_vtt_path", "captions.vtt")):
+            path = self._artifact(check, "preview", key, key.replace("_path", "_sha256"))
+            files[name] = self.snapshot.entries.get(("file", norm(preview.get(key))), {}).get("data") if path else None
+        if files["track.json"] is None:
+            return
+        try:
+            track = track_from_bytes(files["track.json"])
+        except NetworkError:
+            check.fail("captions_invalid")
+            return
+        expected = files_for(track)
+        if any(files[name] is not None and files[name] != expected[name] for name in ("captions.srt", "captions.vtt")):
+            check.fail("captions_sidecar_mismatch")
+        if declared is None or declared.get("track_sha256") != preview.get("captions_sha256") \
+                or declared.get("caption_id") != track["caption_id"]:
+            check.fail("captions_not_matching_manifest")
+        if self.script is not None and script_digest(self.script) != track["source"]["script_sha256"]:
+            check.fail("captions_script_mismatch")
+        if preview.get("narration_sha256") != track["source"]["narration_sha256"]:
+            check.fail("captions_narration_mismatch")
+        last = track["cues"][-1]["end_ms"] / 1000
+        if media is not None and (last > media["duration"] + DURATION_TOLERANCE
+                                  or (media.get("audio_duration") is not None and last > media["audio_duration"] + 0.05)):
+            check.fail("captions_beyond_media")
+        check.details.update(caption_cues=len(track["cues"]), caption_timing=track["timing"]["method"],
+                             caption_timing_review_required=track["timing"]["requires_manual_timing_review"])
+        if track["timing"]["requires_manual_timing_review"]:
+            check.review("caption_timing_estimated")
 
     def _check_history(self):
         check = Check("history")
@@ -699,6 +746,8 @@ class QualityChecker:
             expected = {"production_state", "brief", "script", "scene_plan", "preview_manifest", "video", "poster",
                         "verification_record"} | ({"narration"} if self.state["config"]["narration"]
                                                   or self._revision_narration() is not None else set())
+            if "captions_path" in self.stages["preview"]["artifacts"]:
+                expected |= {"captions", "captions_srt", "captions_vtt"}
             missing = expected - {row["role"] for row in artifacts}
             status = "incomplete" if missing else "bound"
             reasons = sorted("not_read_" + role for role in missing)

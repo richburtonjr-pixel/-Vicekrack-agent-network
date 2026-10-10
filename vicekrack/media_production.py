@@ -23,8 +23,25 @@ def _narration_override(narration):
     return {"data": bytes(data), "sha256": narration["sha256"], "normalized_sha256": metadata["normalized_sha256"]}
 
 
+def _captions_override(captions, narration):
+    """Step 47: re-check a supplied caption track ({"data": track.json bytes, "sha256": ...}) before anything is
+    locked or rendered. Captions are only rendered together with the narration they were timed against."""
+    if captions is None:
+        return None
+    from .captions import files_for, track_from_bytes
+    data = captions.get("data") if isinstance(captions, dict) else None
+    if not isinstance(data, (bytes, bytearray)) or sha256_bytes(bytes(data)) != captions.get("sha256"):
+        raise NetworkError("captions_changed", "The caption track bytes do not match their recorded hash.")
+    track = track_from_bytes(bytes(data))
+    if narration is None:
+        raise NetworkError("captions_need_narration", "Captions need the narration they were timed against.")
+    if track["source"]["narration_sha256"] != narration["sha256"]:
+        raise NetworkError("captions_narration_mismatch", "The captions were timed against different narration audio.")
+    return {"track": track, "sha256": captions["sha256"], "files": files_for(track)}
+
+
 def render_production(production_id, media, media_root, *, root=None, renderer=render_preview, clock=None,
-                      narration=None):
+                      narration=None, captions=None):
     """Revise a completed production's preview with local media.
 
     `narration` (Step 45, optional) is {"data": WAV bytes, "sha256": their hash} from a workflow's
@@ -33,6 +50,7 @@ def render_production(production_id, media, media_root, *, root=None, renderer=r
     rendered package as `narration.wav` so the quality report can bind and re-check them. When
     omitted, the production's Step 14 narration (if any) is used exactly as before."""
     override = _narration_override(narration)
+    caption_override = _captions_override(captions, override)
     pipeline = Pipeline(root=root, clock=clock)
     store = pipeline.store
     with store.lock(production_id):
@@ -51,7 +69,8 @@ def render_production(production_id, media, media_root, *, root=None, renderer=r
         current = state['stages'][-1]['artifacts']
         # A revision is identified by its media AND its narration: the same clips with different
         # (or no) narration are a different video and must be rendered and checked again.
-        if current.get('media_sha256') == digest and current.get('narration_sha256') == (override or {}).get('sha256'):
+        if (current.get('media_sha256') == digest and current.get('narration_sha256') == (override or {}).get('sha256')
+                and current.get('captions_sha256') == (caption_override or {}).get('sha256')):
             raise NetworkError("media_already_attached", "This media manifest is already the current preview.")
         if len(state['trace']) >= 100:
             raise NetworkError("production_step_limit", "Production trace limit reached.")
@@ -67,8 +86,9 @@ def render_production(production_id, media, media_root, *, root=None, renderer=r
             else:
                 narration = state['config']['narration']
                 narration_path = Path(narration['path']) if narration else None
+            extra = {'captions': caption_override['track']} if caption_override is not None else {}
             result = renderer(plan, allow_draft=state['config']['allow_draft_preview'], directory=previews,
-                              narration=narration_path, media=media, media_root=media_root)
+                              narration=narration_path, media=media, media_root=media_root, **extra)
         finally:
             if staged is not None:
                 staged.unlink(missing_ok=True)
@@ -81,6 +101,8 @@ def render_production(production_id, media, media_root, *, root=None, renderer=r
         if override is not None and (document.get('audio_present') is not True
                                      or (document.get('audio') or {}).get('normalized_sha256') != override['normalized_sha256']):
             raise NetworkError('invalid_render_output', 'The rendered preview does not carry the supplied narration.')
+        if (document.get('captions') or {}).get('track_sha256') != (caption_override or {}).get('sha256'):
+            raise NetworkError('invalid_render_output', 'The rendered preview does not carry exactly the supplied captions.')
         media_path = manifest.parent / 'media-manifest.json'
         with media_path.open('xb') as stream:
             stream.write(encoded)
@@ -97,6 +119,18 @@ def render_production(production_id, media, media_root, *, root=None, renderer=r
                 stream.flush()
                 os.fsync(stream.fileno())
             artifacts.update(narration_path=str(kept.relative_to(folder)), narration_sha256=override['sha256'])
+        if caption_override is not None:
+            # Step 47: the track and both sidecars are kept beside the package, hash-bound by the quality report.
+            for key, name in (('captions', 'track.json'), ('captions_srt', 'captions.srt'),
+                              ('captions_vtt', 'captions.vtt')):
+                kept = manifest.parent / ('captions.json' if name == 'track.json' else name)
+                with kept.open('xb') as stream:
+                    stream.write(caption_override['files'][name])
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                artifacts[key + '_path'] = str(kept.relative_to(folder))
+                artifacts[key + '_sha256'] = sha256_bytes(caption_override['files'][name])
+            artifacts['captions_requires_review'] = caption_override['track']['timing']['requires_manual_timing_review']
         state['stages'][-1]['artifacts'] = artifacts
         state['stages'][-1]['finished_at'] = pipeline.clock()
         state['updated_at'] = pipeline.clock()

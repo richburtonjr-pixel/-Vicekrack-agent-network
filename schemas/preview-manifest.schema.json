@@ -201,6 +201,21 @@
             "maxLength": 200
           }
         },
+        "captions": {
+          "description": "Step 47: captions burned into this video (optional). The track and SRT/WebVTT sidecars are kept beside the package and bound by the quality report.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["caption_id", "track_sha256", "timing_method", "requires_manual_timing_review", "burned_in", "cues", "style_sha256"],
+          "properties": {
+            "caption_id": {"type": "string", "pattern": "^cap-[0-9a-f]{24}$"},
+            "track_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "timing_method": {"enum": ["provider_character_timestamps", "estimated_phrase"]},
+            "requires_manual_timing_review": {"type": "boolean"},
+            "burned_in": {"const": true},
+            "cues": {"type": "integer", "minimum": 1, "maximum": 60},
+            "style_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
         "scenes": {
           "type": "array",
           "minItems": 1,

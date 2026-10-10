@@ -60,10 +60,14 @@ STAGES = ("production", "scene_plan", "jobs", "generation", "downloads", "media_
 SCENES = (1, 2, 3, 4)
 CONFIG_PATH = "config/video-production.json"
 BLOCKING = {"workflow_config_changed", "production_changed", "media_tampered", "media_manifest_tampered",
-            "scene_plan_tampered", "production_preview_changed", "narration_tampered", "speech_script_mismatch"}
+            "scene_plan_tampered", "production_preview_changed", "narration_tampered", "speech_script_mismatch",
+            "captions_tampered"}
 NARRATION_FILE = "narration/narration.wav"
 DURATION_POLICY = "pad_shorter_with_silence_reject_longer"
-TAMPERED = {"media-manifest.json": "media_manifest_tampered", NARRATION_FILE: "narration_tampered"}
+CAPTION_FILES = {"track.json": "captions/track.json", "captions.srt": "captions/captions.srt",
+                 "captions.vtt": "captions/captions.vtt"}
+TAMPERED = {"media-manifest.json": "media_manifest_tampered", NARRATION_FILE: "narration_tampered",
+            **{path: "captions_tampered" for path in CAPTION_FILES.values()}}
 NOTICE = ("Draft, illustrative preview workflow. Generated footage is not evidence and its rights are not verified. "
           "publishable stays false; nothing is uploaded or published. Paid generation happens only through "
           "video-production-submit with a job-specific consent phrase.")
@@ -121,11 +125,13 @@ def validate_state(state):
     return state
 
 
-def workflow_id_for(origin, generation, narration_sha256=None):
+def workflow_id_for(origin, generation, narration_sha256=None, captions_sha256=None):
     key = {"production_id": origin["production_id"], "selection_run_id": origin["selection_run_id"],
            "record_id": origin["record_id"], "generation": generation}
     if narration_sha256 is not None:            # Step 45; silent workflows keep their Step 44 IDs
         key["narration_sha256"] = narration_sha256
+    if captions_sha256 is not None:             # Step 47; caption-free workflows keep their IDs
+        key["captions_sha256"] = captions_sha256
     return "vpw-" + sha256_bytes(canonical(key))[:24]
 
 
@@ -323,7 +329,8 @@ class VideoProduction:
 
     # ------------------------------------------------------------------ start
     def start(self, *, production_id=None, selection_run_id=None, record_id=None, model=jobs.DEFAULT_MODEL,
-              resolution="720p", audio_mode="none", allow_draft_preview=False, narration=None, speech_job=None):
+              resolution="720p", audio_mode="none", allow_draft_preview=False, narration=None, speech_job=None,
+              captions=None):
         if (production_id is None) == (selection_run_id is None or record_id is None):
             raise NetworkError("invalid_workflow_origin",
                                "Start from --production PRODUCTION_ID, or from --selection RUN_ID --record RECORD_ID.")
@@ -337,10 +344,12 @@ class VideoProduction:
                 self._check_speech_binding(production_id, narration_meta)
         else:
             narration_data, narration_meta = read_narration(narration) if narration is not None else (None, None)
+        caption_files, caption_meta = self._read_captions(captions, narration_meta) if captions is not None else (None, None)
         origin = {"kind": "production" if production_id else "selection", "production_id": production_id,
                   "selection_run_id": selection_run_id, "record_id": record_id,
                   "allow_draft_preview": bool(allow_draft_preview)}
-        workflow_id = workflow_id_for(origin, generation, narration_meta and narration_meta["source_sha256"])
+        workflow_id = workflow_id_for(origin, generation, narration_meta and narration_meta["source_sha256"],
+                                      caption_meta and caption_meta["track_sha256"])
         if self.store.exists(workflow_id):
             raise NetworkError("workflow_exists", "This workflow already exists; inspect or resume it.")
         now = self.clock()
@@ -358,13 +367,62 @@ class VideoProduction:
                  "trace": [], "state_sha256": "0" * 64}
         if narration_meta is not None:
             state["narration"] = narration_meta
+        if caption_meta is not None:
+            state["captions"] = caption_meta
         with self.store.lock(workflow_id):
             if self.store.exists(workflow_id):
                 raise NetworkError("workflow_exists", "This workflow already exists; inspect or resume it.")
             if narration_data is not None:          # the managed copy exists before the state that names it
                 self.store.publish_once(workflow_id, NARRATION_FILE, narration_data)
+            for name, data in (caption_files or {}).items():
+                self.store.publish_once(workflow_id, CAPTION_FILES[name], data)
             self.store.write(state, create=True)
             return self._advance(state, allow_network=False)
+
+    def _read_captions(self, caption_id, narration_meta):
+        """Step 47: a stored, hash-checked caption track made from THIS speech job's script and audio."""
+        from .captions import load
+        speech = (narration_meta or {}).get("speech")
+        if speech is None:
+            raise NetworkError("captions_need_speech_narration", "Captions need --speech JOB: they are built from that "
+                               "narration's script and timed against its audio.")
+        track, files = load(caption_id, self.root)
+        source = track["source"]
+        if source["speech_job_id"] != speech["job_id"] or source["script_sha256"] != speech["script_sha256"] \
+                or source["text_sha256"] != speech["text_sha256"]:
+            raise NetworkError("captions_script_mismatch", "These captions were made for another speech job or script.")
+        if source["narration_sha256"] != narration_meta["source_sha256"]:
+            raise NetworkError("captions_narration_mismatch", "These captions were timed against different narration audio.")
+        meta = {"caption_id": track["caption_id"], "track_sha256": sha256_bytes(files["track.json"]),
+                "srt_sha256": sha256_bytes(files["captions.srt"]), "vtt_sha256": sha256_bytes(files["captions.vtt"]),
+                "timing_method": track["timing"]["method"],
+                "requires_manual_timing_review": track["timing"]["requires_manual_timing_review"],
+                "cues": len(track["cues"])}
+        return files, meta
+
+    def _captions(self, state):
+        """The workflow's managed caption track bytes ({"data", "sha256"}), or None. Never repaired."""
+        meta = state.get("captions")
+        if not meta:
+            return None
+        folder = self.store.folder(state["workflow_id"])
+        data = {}
+        for name, path in CAPTION_FILES.items():
+            try:
+                file = folder / path
+                data[name] = file.read_bytes() if file.is_file() and not file.is_symlink() else None
+            except OSError:
+                data[name] = None
+        expected = {"track.json": meta["track_sha256"], "captions.srt": meta["srt_sha256"],
+                    "captions.vtt": meta["vtt_sha256"]}
+        if any(data[name] is None or sha256_bytes(data[name]) != digest for name, digest in expected.items()):
+            raise NetworkError("captions_tampered", "The workflow's caption files are missing or changed; start a new "
+                               "workflow.")
+        return {"data": data["track.json"], "sha256": meta["track_sha256"]}
+
+    @staticmethod
+    def _captions_sha(state):
+        return (state.get("captions") or {}).get("track_sha256")
 
     def _generation(self, model, resolution, audio_mode):
         allowed = self.config["generation"]
@@ -431,6 +489,7 @@ class VideoProduction:
         done = {s["name"] for s in state["stages"] if s["status"] == "completed"}
         folder = self.store.folder(state["workflow_id"])
         self._narration(state)                       # Step 45: the managed copy must be byte-identical
+        self._captions(state)                        # Step 47: the managed caption files too
         if "production" in done and state["inputs"]["production_id"]:
             self._check_speech_binding(state["inputs"]["production_id"], state.get("narration"))   # Step 46
         if "scene_plan" in done:
@@ -461,6 +520,7 @@ class VideoProduction:
             artifacts = self._preview_artifacts(state["inputs"]["production_id"])
             if (artifacts.get("media_sha256") != state["outputs"]["media_digest"]
                     or artifacts.get("narration_sha256") != self._narration_sha(state)
+                    or artifacts.get("captions_sha256") != self._captions_sha(state)
                     or artifacts.get("video_sha256") != state["outputs"]["preview_video_sha256"]):
                 raise NetworkError("production_preview_changed",
                                    "The production's current preview is not the one this workflow rendered.")
@@ -718,9 +778,13 @@ class VideoProduction:
         manifest = json.loads((self.store.folder(state["workflow_id"]) / "media-manifest.json").read_bytes())
         narration = self._narration(state)
         current = self._preview_artifacts(production_id)
+        captions = self._captions(state)
         if (current.get("media_sha256") != state["outputs"]["media_digest"]
-                or current.get("narration_sha256") != self._narration_sha(state)):
+                or current.get("narration_sha256") != self._narration_sha(state)
+                or current.get("captions_sha256") != self._captions_sha(state)):
             kwargs = {"renderer": self.renderer} if self.renderer is not None else {}
+            if captions is not None:
+                kwargs["captions"] = captions
             render_production(production_id, manifest, self.media_root(state["workflow_id"]), root=self.root,
                               clock=self.clock, narration=narration, **kwargs)
         else:                                          # rendered before a crash: adopt it, never render twice
@@ -877,8 +941,20 @@ class VideoProduction:
                 "stages": [{k: s[k] for k in ("name", "status", "attempts", "error_code", "started_at", "finished_at")}
                            for s in state["stages"]],
                 "narration": self._narration_view(state),
+                "captions": self._captions_view(state),
                 "scenes": scenes, "outputs": dict(state["outputs"]), "steps": state["steps"],
                 "integrity_problems": list(problems), "next": self.next_actions(state)}
+
+    @staticmethod
+    def _captions_view(state):
+        meta = state.get("captions")
+        if not meta:
+            return {"present": False}
+        out = {"present": True, **meta, "burned_in": True,
+               "sidecars": ["captions/captions.srt", "captions/captions.vtt"]}
+        if meta["requires_manual_timing_review"]:
+            out["warning"] = "ESTIMATED caption timing: check every cue in the preview before approving."
+        return out
 
     @staticmethod
     def _narration_view(state):
