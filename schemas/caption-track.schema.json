@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/caption-track.schema.json",
+  "title": "Caption track (Step 47)",
+  "description": "Phrase captions built from the exact narration of a Grok speech job's script, with timing method, bindings and style. Sidecar SRT/WebVTT files are derived deterministically and hashed here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "caption_id", "publishable", "notice", "language", "source", "timing", "style",
+               "style_sha256", "cues", "sidecars"],
+  "$defs": {"sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "properties": {
+    "contract": {"const": "caption_track"},
+    "version": {"const": "1.0"},
+    "caption_id": {"type": "string", "pattern": "^cap-[0-9a-f]{24}$"},
+    "publishable": {"const": false},
+    "notice": {"type": "string", "minLength": 1, "maxLength": 400},
+    "language": {"type": "string", "pattern": "^[A-Za-z]{2,4}(-[A-Za-z]{2})?$"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["speech_job_id", "script_id", "script_sha256", "text_sha256", "narration_sha256",
+                   "narration_duration_ms", "voice"],
+      "properties": {
+        "speech_job_id": {"type": "string", "pattern": "^sp-[0-9a-f]{24}$"},
+        "script_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "script_sha256": {"$ref": "#/$defs/sha"},
+        "text_sha256": {"$ref": "#/$defs/sha"},
+        "narration_sha256": {"$ref": "#/$defs/sha"},
+        "narration_duration_ms": {"type": "integer", "minimum": 1, "maximum": 15000},
+        "voice": {"type": "string", "pattern": "^[a-z]{2,20}$"}
+      }
+    },
+    "timing": {
+      "type": "object", "additionalProperties": false,
+      "required": ["method", "word_synchronized", "cue_boundaries", "requires_manual_timing_review", "timestamps_sha256",
+                   "note"],
+      "properties": {
+        "method": {"enum": ["provider_character_timestamps", "estimated_phrase"]},
+        "word_synchronized": {"const": false},
+        "cue_boundaries": {"enum": ["provider_word_boundaries", "estimated_from_text_length"]},
+        "requires_manual_timing_review": {"type": "boolean"},
+        "timestamps_sha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha"}]},
+        "note": {"type": "string", "maxLength": 400}
+      }
+    },
+    "style": {
+      "type": "object", "additionalProperties": false,
+      "required": ["burn_in", "font_size", "max_chars_per_line", "max_lines", "max_line_pixels", "box_left", "box_right",
+                   "box_bottom", "box_padding", "box_rgba", "text_color", "estimated_label", "estimated_label_color",
+                   "estimated_label_size"],
+      "properties": {
+        "burn_in": {"type": "boolean"},
+        "font_size": {"type": "integer", "minimum": 28, "maximum": 120},
+        "max_chars_per_line": {"type": "integer", "minimum": 8, "maximum": 60},
+        "max_lines": {"type": "integer", "minimum": 1, "maximum": 2},
+        "max_line_pixels": {"type": "integer", "minimum": 100, "maximum": 1000},
+        "box_left": {"type": "integer", "minimum": 0, "maximum": 1080},
+        "box_right": {"type": "integer", "minimum": 0, "maximum": 1080},
+        "box_bottom": {"type": "integer", "minimum": 0, "maximum": 1920},
+        "box_padding": {"type": "integer", "minimum": 0, "maximum": 100},
+        "box_rgba": {"type": "array", "items": {"type": "integer", "minimum": 0, "maximum": 255}, "minItems": 4, "maxItems": 4},
+        "text_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+        "estimated_label": {"type": "string", "minLength": 1, "maxLength": 80},
+        "estimated_label_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+        "estimated_label_size": {"type": "integer", "minimum": 16, "maximum": 60}
+      }
+    },
+    "style_sha256": {"$ref": "#/$defs/sha"},
+    "cues": {
+      "type": "array", "minItems": 1, "maxItems": 60,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["index", "beat", "start_ms", "end_ms", "text", "lines"],
+        "properties": {
+          "index": {"type": "integer", "minimum": 1, "maximum": 60},
+          "beat": {"type": "integer", "minimum": 1, "maximum": 8},
+          "start_ms": {"type": "integer", "minimum": 0, "maximum": 15000},
+          "end_ms": {"type": "integer", "minimum": 0, "maximum": 15000},
+          "text": {"type": "string", "minLength": 1, "maxLength": 200},
+          "lines": {"type": "array", "minItems": 1, "maxItems": 2,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 60}}
+        }
+      }
+    },
+    "sidecars": {
+      "type": "object", "additionalProperties": false, "required": ["srt_sha256", "vtt_sha256"],
+      "properties": {"srt_sha256": {"$ref": "#/$defs/sha"}, "vtt_sha256": {"$ref": "#/$defs/sha"}}
+    }
+  }
+}

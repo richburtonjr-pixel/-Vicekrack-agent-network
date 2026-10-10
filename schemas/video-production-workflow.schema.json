@@ -660,6 +660,52 @@
           }
         }
       ]
+    },
+    "captions": {
+      "description": "Step 47: optional burned-in captions (a stored caption track made from the speech job's script and audio). Managed copies live in captions/ inside the workflow folder.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caption_id",
+        "track_sha256",
+        "srt_sha256",
+        "vtt_sha256",
+        "timing_method",
+        "requires_manual_timing_review",
+        "cues"
+      ],
+      "properties": {
+        "caption_id": {
+          "type": "string",
+          "pattern": "^cap-[0-9a-f]{24}$"
+        },
+        "track_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "srt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "vtt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "timing_method": {
+          "enum": [
+            "provider_character_timestamps",
+            "estimated_phrase"
+          ]
+        },
+        "requires_manual_timing_review": {
+          "type": "boolean"
+        },
+        "cues": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      }
     }
   }
 }

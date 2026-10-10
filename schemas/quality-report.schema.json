@@ -213,7 +213,10 @@
                   "video",
                   "poster",
                   "verification_record",
-                  "narration"
+                  "narration",
+                  "captions",
+                  "captions_srt",
+                  "captions_vtt"
                 ]
               },
               "ref": {

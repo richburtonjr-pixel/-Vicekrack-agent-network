@@ -44,7 +44,7 @@ def transport(body, *, timeout_seconds, max_bytes):
     key = os.environ.get("XAI_API_KEY", "").strip()
     if not key:
         raise NetworkError("missing_speech_credential", "Set XAI_API_KEY in your local environment.")
-    headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "audio/*"}
+    headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "application/json" if body.get("with_timestamps") else "audio/*"}
     deadline = time.monotonic() + timeout_seconds
     try:
         request = Request(TTS_URL, data=json.dumps(body).encode(), headers=headers, method="POST")

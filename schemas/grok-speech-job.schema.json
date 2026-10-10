@@ -54,6 +54,7 @@
         "text": {"type": "string", "minLength": 1, "maxLength": 60000},
         "voice_id": {"type": "string"},
         "language": {"type": "string"},
+        "with_timestamps": {"const": true, "description": "Step 47: documented per-character timings, used for captions"},
         "output_format": {
           "type": "object", "additionalProperties": false, "required": ["codec", "sample_rate"],
           "properties": {
@@ -103,6 +104,19 @@
         }
       }]
     },
-    "error_code": {"$ref": "#/$defs/code"}
+    "error_code": {"$ref": "#/$defs/code"},
+    "timestamps": {
+      "description": "Step 47: provider character timings saved with the job (only when with_timestamps was requested).",
+      "anyOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false,
+        "required": ["file", "sha256", "characters", "provider_duration_seconds"],
+        "properties": {
+          "file": {"type": "string", "pattern": "^provider-timestamps-[0-9]{1,2}\\.json$"},
+          "sha256": {"$ref": "#/$defs/sha"},
+          "characters": {"type": "integer", "minimum": 0, "maximum": 60000},
+          "provider_duration_seconds": {"type": ["number", "null"]}
+        }
+      }]
+    }
   }
 }

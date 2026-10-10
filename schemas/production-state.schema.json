@@ -69,7 +69,7 @@
           "error_code": { "anyOf": [{ "$ref": "#/$defs/code" }, { "type": "null" }] },
           "artifacts": {
             "type": "object",
-            "maxProperties": 12,
+            "maxProperties": 24,
             "propertyNames": { "pattern": "^[a-z0-9_]{1,40}$" },
             "additionalProperties": { "type": ["string", "boolean", "integer", "null"], "maxLength": 1024 }
           }

@@ -52,6 +52,9 @@ def saved_command():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1].startswith("captions-"):
+        from .captions_cli import main as captions_main
+        return captions_main()
     if len(sys.argv) > 1 and sys.argv[1].startswith("speech-"):
         from .speech_cli import main as speech_main
         return speech_main()

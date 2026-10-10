@@ -271,7 +271,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^(index\\.html|media/preview\\.mp4|media/scene-[1-8]\\.png|content/script\\.json|content/provenance\\.json|quality/quality-report\\.json|review/review-summary\\.json)$"
+            "pattern": "^(index\\.html|media/preview\\.mp4|media/scene-[1-8]\\.png|content/script\\.json|content/provenance\\.json|quality/quality-report\\.json|review/review-summary\\.json|captions/captions\\.(json|srt|vtt))$"
           },
           "role": {
             "enum": [
@@ -281,7 +281,10 @@
               "quality_report",
               "provenance_summary",
               "review_summary",
-              "review_page"
+              "review_page",
+              "captions_track",
+              "captions_srt",
+              "captions_vtt"
             ]
           },
           "bytes": {
@@ -322,6 +325,59 @@
             "minimum": 1,
             "maximum": 8
           }
+        }
+      }
+    },
+    "captions": {
+      "description": "Step 47: present only when the reviewed video has burned-in captions. Distinguishes the burned-in captions (part of media/preview.mp4) from the optional SRT/WebVTT sidecars.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "burned_in_video",
+        "burned_in_file",
+        "sidecars",
+        "sidecars_optional",
+        "track",
+        "caption_id",
+        "timing_method",
+        "requires_manual_timing_review",
+        "statement"
+      ],
+      "properties": {
+        "burned_in_video": {
+          "const": true
+        },
+        "burned_in_file": {
+          "const": "media/preview.mp4"
+        },
+        "sidecars": {
+          "const": [
+            "captions/captions.srt",
+            "captions/captions.vtt"
+          ]
+        },
+        "sidecars_optional": {
+          "const": true
+        },
+        "track": {
+          "const": "captions/captions.json"
+        },
+        "caption_id": {
+          "type": "string",
+          "pattern": "^cap-[0-9a-f]{24}$"
+        },
+        "timing_method": {
+          "enum": [
+            "provider_character_timestamps",
+            "estimated_phrase"
+          ]
+        },
+        "requires_manual_timing_review": {
+          "type": "boolean"
+        },
+        "statement": {
+          "type": "string",
+          "maxLength": 600
         }
       }
     }

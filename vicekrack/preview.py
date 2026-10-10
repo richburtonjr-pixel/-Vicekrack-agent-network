@@ -121,12 +121,14 @@ def invoke(exe, arguments, cwd):
         raise NetworkError("render_failed", "Local encoding failed; no output was published.") from None
 
 
-def render_preview(plan, *, allow_draft=False, directory=None, narration=None, media=None, media_root=None):
+def render_preview(plan, *, allow_draft=False, directory=None, narration=None, media=None, media_root=None,
+                   captions=None):
     preflight(plan,allow_draft)
     from .media_render import prepare_media, render_scene
     media_assets = prepare_media(plan, media, media_root) if media is not None else None
     # Validate optional audio before any encoder launch, folder creation or staging.
     audio, wav = load_narration(narration) if narration is not None else (None, None)
+    caption_info = _check_captions(captions, media, narration) if captions is not None else None
     modules = dependencies()
     exe = modules[3]
     folder = (Path(directory) if directory is not None else ROOT / "runtime/previews").resolve()
@@ -165,7 +167,19 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None, m
                             "-preset","ultrafast","-crf","23","-threads","2",f"scene-{number}.mp4"],work)
             (work / "segments.txt").write_text("".join(f"file 'scene-{i}.mp4'\n" for i in range(1,5)),encoding="ascii")
             silent = "preview.mp4" if audio is None else "silent.mp4"
-            invoke(exe,["-f","concat","-safe","1","-i","segments.txt","-c","copy","-an","-movflags","+faststart",silent],work)
+            joined = "joined.mp4" if captions is not None else silent
+            invoke(exe,["-f","concat","-safe","1","-i","segments.txt","-c","copy","-an","-movflags","+faststart",joined],work)
+            if captions is not None:
+                # Step 47: each cue image is overlaid only while it is spoken; the frame count is unchanged.
+                from .captions import cue_images, overlay_filter
+                images = cue_images(captions, work, modules)
+                inputs = [arg for name, _, _ in images for arg in ("-i", name)]
+                invoke(exe,["-i",joined,*inputs,"-filter_complex",overlay_filter(images),"-map","[out]","-an",
+                            "-map_metadata","-1","-c:v","libx264","-preset","ultrafast","-crf","20","-threads","2",
+                            "-movflags","+faststart",silent],work)
+                for name, _, _ in images:
+                    (work / name).unlink()
+                (work / joined).unlink()
             if audio is not None:
                 # Metadata-free, silence-padded WAV staged locally; container metadata is also dropped.
                 (work / "narration.wav").write_bytes(wav)
@@ -195,6 +209,12 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None, m
                                    "poster_bytes":(work/f"scene-{s['index']}.png").stat().st_size} for s in plan["scenes"]]}
             if audio is not None:
                 manifest["audio"] = dict(audio)
+            if caption_info is not None:
+                manifest["captions"] = caption_info
+                manifest["limitations"] = [item for item in manifest["limitations"] if item != "no word timing or lip sync"]
+                manifest["limitations"].append("burned-in captions; " + ("ESTIMATED phrase timing, check before approval"
+                                               if caption_info["requires_manual_timing_review"] else
+                                               "phrase timing from provider character timestamps") + "; no lip sync")
             if media is not None:
                 manifest["limitations"] = [item for item in manifest["limitations"] if item not in
                                             {"no sourced or generated media", "silent storyboard", "narration displayed as text"}]
@@ -218,6 +238,28 @@ def render_preview(plan, *, allow_draft=False, directory=None, narration=None, m
     finally:
         lock.close()
         reservation.unlink(missing_ok=True)
+
+
+def _check_captions(track, media, narration):
+    """Step 47: captions burn onto media-backed previews with narration only, and must match that narration."""
+    from .captions import canonical, sha256_bytes as digest, validate_track
+    if media is None:
+        raise NetworkError("captions_need_media", "Captions are only rendered on media-backed previews.")
+    if narration is None:
+        raise NetworkError("captions_need_narration", "Captions need the narration they were timed against.")
+    validate_track(track)
+    if not track["style"]["burn_in"]:
+        raise NetworkError("captions_not_burn_in", "This caption style is not meant to be burned in.")
+    try:
+        narration_sha = digest(Path(narration).read_bytes())
+    except OSError:
+        raise NetworkError("narration_unreadable", "Narration must be a readable local file.") from None
+    if narration_sha != track["source"]["narration_sha256"]:
+        raise NetworkError("captions_narration_mismatch", "The captions were timed against different narration audio.")
+    return {"caption_id": track["caption_id"], "track_sha256": digest(canonical(track) + b"\n"),
+            "timing_method": track["timing"]["method"],
+            "requires_manual_timing_review": track["timing"]["requires_manual_timing_review"], "burned_in": True,
+            "cues": len(track["cues"]), "style_sha256": track["style_sha256"]}
 
 
 def main():

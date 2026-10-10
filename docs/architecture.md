@@ -1261,3 +1261,54 @@ verified saved script:
 `speech_script_mismatch` is a blocking code. Clip reuse, revision identity, quality binding,
 review and export gates are the unchanged Step 44/45 mechanisms. `speech_demo` runs the whole
 chain with mock transports and synthetic audio.
+
+# Step 47 captions
+
+`captions` is a pure, offline module: it builds and validates caption tracks and makes no requests.
+
+**Building a track.** `build_track(script, speech_record, narration_wav, method, timestamps)` checks
+three bindings:
+
+- the script's canonical hash equals the speech job's binding;
+- the spoken text equals the job's text;
+- the WAV hash equals the job's audio hash.
+
+It then segments the narration beats into phrase cues (at most 2 lines and 26 characters per line,
+never across beats) and times them by one of two methods:
+
+| Method | How cues are timed |
+|---|---|
+| `provider_character_timestamps` | From the xAI per-character timestamps that `speech_jobs` now saves (requested with `with_timestamps`, delivered as a JSON envelope). They are validated against the exact text, order, bounds and duration first. |
+| `estimated_phrase` | Proportional to phrase length over the measured narration. Labelled `requires_manual_timing_review`. |
+
+**Storage.** Tracks are stored under `runtime/captions/<cap-id>/` (`schemas/caption-track.schema.json`,
+`config/captions.json`). The ID is derived from the content, the sidecars are deterministic, files
+are written once, and every load re-checks them.
+
+**Rendering.** `preview.render_preview(captions=…)` (media plus narration only) draws one
+transparent PNG per cue with Pillow, measuring text and checking the layout against the reserved
+warning band and bottom title box. It overlays them with
+`enable='gte(t,start)*lt(t,end)'` after the scene concat and before the audio mux. The frame count,
+size and audio are unchanged. The preview manifest (1.1) gains an optional `captions` summary.
+
+**Production revision.** `media_production.render_production(captions=…)` re-checks the track
+bytes against their hash and against the narration override. It keeps `captions.json`,
+`captions.srt` and `captions.vtt` beside the package as preview artifacts (the production-state
+`maxProperties` limit for artifacts rose from 12 to 24). The captions hash is part of the revision
+identity.
+
+**Quality.** The `manifest_consistency` check binds the three files (new binding roles) and checks
+the sidecars, manifest, script, narration and duration. Estimated timing makes the check
+`needs_review`.
+
+**Workflow.** `VideoProduction.start(captions=…)`:
+
+- needs `speech_job`;
+- verifies the track against the job's script, text and audio;
+- adds the track hash to the workflow ID;
+- keeps managed copies in `captions/`, re-hashed in `_verify`;
+- passes the track to the preview revision.
+
+**Export.** The export adds `captions/captions.{json,srt,vtt}` (bound roles) and a manifest
+`captions` section that separates the burned-in video from the optional sidecars.
+`verify_package` re-derives the sidecars from the track.

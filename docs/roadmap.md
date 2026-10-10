@@ -246,3 +246,26 @@ The live xAI speech API remains untested.
 
 Deferred: captions, music/SFX, per-scene narration timing, voice cloning, publishing, farmhouse
 visualization, Step 47. Trading and Bot House are unchanged.
+
+# Step 47 implementation checkpoint
+
+Numbering note: PR #47 delivered Step 46, and Step 47 arrives in a later PR.
+
+Implemented: narration-aligned captions ([docs/step47.md](step47.md)). It covers:
+
+- the exact narration text from the speech job's script, with script and audio bindings verified;
+- optional provider timing from documented xAI character timestamps (`speech-prepare
+  --with-timestamps`), validated for order, overlaps, bounds and text correspondence;
+- an explicit estimated mode, labelled, burned in with a visible notice, and `needs_review`;
+- a `caption_track` contract with SRT/WebVTT sidecars in managed storage;
+- burned-in captions on narrated media previews, with no collisions with the warnings and no
+  silent text loss;
+- binding into the production revision, quality report, review and export;
+- caption changes that invalidate earlier approvals;
+- reuse of paid speech and clips.
+
+The offline demo is `video-production-demo --captions`. The live xAI timestamp output remains
+untested.
+
+Deferred: word-by-word highlighting, captions for local recordings, translations and other fonts,
+music/SFX, publishing, farmhouse visualization, Step 48. Trading is unchanged.
