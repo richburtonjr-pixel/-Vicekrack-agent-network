@@ -29,6 +29,30 @@ stays silent. Try it offline with synthetic audio and clips:
 `python -m vicekrack video-production-demo --narrated`. See [docs/step45.md](docs/step45.md).
 ("Step 45" is a development step, not a GitHub PR number.)
 
+Step 46 adds **Grok-generated narration**. It speaks a script's narration with xAI text to speech
+(stock voices only), then uses that audio in the workflow:
+
+```powershell
+python -m vicekrack speech-prepare --production PRODUCTION_ID        # offline: exact text + voice, free
+python -m vicekrack speech-inspect SPEECH_JOB_ID                      # review before paying
+python -m vicekrack speech-submit SPEECH_JOB_ID --consent paid-speech:SPEECH_JOB_ID --allow-network   # PAID
+python -m vicekrack video-production-start --production PRODUCTION_ID --speech SPEECH_JOB_ID
+```
+
+How it behaves:
+
+- **Paid requests:** the submit intent is saved before the request is sent. An uncertain request is
+  never retried automatically; a retry needs `--retry-uncertain --acknowledge-duplicate-billing`.
+  `speech-recover` handles interrupted runs offline.
+- **Audio:** the reply is converted locally into a metadata-free 16-bit WAV. Speech longer than 15 s
+  is kept but refused, never truncated or sped up.
+- **Binding:** the narration must come from the production's own saved script.
+- **Approvals:** already-paid clips are reused, and the narrated video needs fresh quality checks and
+  its own human approval.
+
+Offline demo with mock providers and synthetic test audio (not a Grok voice):
+`python -m vicekrack video-production-demo --speech`. See [docs/step46.md](docs/step46.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

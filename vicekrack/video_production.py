@@ -60,7 +60,7 @@ STAGES = ("production", "scene_plan", "jobs", "generation", "downloads", "media_
 SCENES = (1, 2, 3, 4)
 CONFIG_PATH = "config/video-production.json"
 BLOCKING = {"workflow_config_changed", "production_changed", "media_tampered", "media_manifest_tampered",
-            "scene_plan_tampered", "production_preview_changed", "narration_tampered"}
+            "scene_plan_tampered", "production_preview_changed", "narration_tampered", "speech_script_mismatch"}
 NARRATION_FILE = "narration/narration.wav"
 DURATION_POLICY = "pad_shorter_with_silence_reject_longer"
 TAMPERED = {"media-manifest.json": "media_manifest_tampered", NARRATION_FILE: "narration_tampered"}
@@ -132,10 +132,27 @@ def workflow_id_for(origin, generation, narration_sha256=None):
 def read_narration(path):
     """Step 45: read and validate a local narration ONCE; returns (bytes, safe metadata).
     The same bytes are validated, hashed and stored, so a file edited mid-start cannot slip through."""
-    from .narration import has_sound, normalize_narration, read_bounded
+    from .narration import read_bounded
     if path is None or str(path).strip() == "":
         raise NetworkError("narration_not_found", "Narration file was not found.")
-    data = read_bounded(path)
+    return narration_from_bytes(read_bounded(path))
+
+
+def read_speech(job_id, root=None):
+    """Step 46: the managed WAV of a COMPLETED Grok speech job, hash-checked, plus its binding.
+    The same Step 14/45 rules then apply as to a local recording (format, <= 15 s, not silent)."""
+    from .speech_jobs import managed_audio
+    data, record = managed_audio(job_id, root)
+    data, meta = narration_from_bytes(data)
+    meta["speech"] = {"job_id": record["job_id"], "script_sha256": record["script"]["script_sha256"],
+                      "script_id": record["script"]["script_id"], "voice": record["settings"]["voice"],
+                      "language": record["settings"]["language"], "text_sha256": record["text_sha256"],
+                      "provider": "xai_tts"}
+    return data, meta
+
+
+def narration_from_bytes(data):
+    from .narration import has_sound, normalize_narration
     metadata, _ = normalize_narration(data)              # Step 14 rules: format, size, <= 15 s (never truncated)
     if not has_sound(data):
         raise NetworkError("narration_silent", "Narration contains only silence; supply a recording or omit --narration.")
@@ -306,13 +323,20 @@ class VideoProduction:
 
     # ------------------------------------------------------------------ start
     def start(self, *, production_id=None, selection_run_id=None, record_id=None, model=jobs.DEFAULT_MODEL,
-              resolution="720p", audio_mode="none", allow_draft_preview=False, narration=None):
+              resolution="720p", audio_mode="none", allow_draft_preview=False, narration=None, speech_job=None):
         if (production_id is None) == (selection_run_id is None or record_id is None):
             raise NetworkError("invalid_workflow_origin",
                                "Start from --production PRODUCTION_ID, or from --selection RUN_ID --record RECORD_ID.")
         generation = self._generation(model, resolution, audio_mode)
         # Step 45: invalid, missing, silent or overlong narration is refused before anything is created.
-        narration_data, narration_meta = read_narration(narration) if narration is not None else (None, None)
+        if narration is not None and speech_job is not None:
+            raise NetworkError("narration_source_conflict", "Use either --narration FILE or --speech JOB_ID, not both.")
+        if speech_job is not None:                  # Step 46: Grok-generated narration from a completed speech job
+            narration_data, narration_meta = read_speech(speech_job, self.root)
+            if production_id is not None:           # bound to this production's saved script before anything exists
+                self._check_speech_binding(production_id, narration_meta)
+        else:
+            narration_data, narration_meta = read_narration(narration) if narration is not None else (None, None)
         origin = {"kind": "production" if production_id else "selection", "production_id": production_id,
                   "selection_run_id": selection_run_id, "record_id": record_id,
                   "allow_draft_preview": bool(allow_draft_preview)}
@@ -384,6 +408,21 @@ class VideoProduction:
         return rows
 
     # ------------------------------------------------------------------ integrity of completed work
+    def _check_speech_binding(self, production_id, meta):
+        """Step 46: the speech job must have been made from THIS production's saved script (canonical hash).
+        Checked at start (production origin), after the production stage, and on every resume/submit/export."""
+        from .speech_jobs import script_digest
+        speech = (meta or {}).get("speech")
+        if not speech:
+            return
+        if script_digest(self._script(production_id)) != speech["script_sha256"]:
+            raise NetworkError("speech_script_mismatch", "The narration was generated from a different script than "
+                               "this production's saved script; prepare a speech job from this production.")
+
+    def _script(self, production_id):
+        from .speech_jobs import production_script
+        return production_script(production_id, self.root)
+
     def _verify(self, state):
         """Every completed output must still be what the workflow recorded; nothing is repaired silently."""
         if state["config_sha256"] != self.config_sha:
@@ -392,6 +431,8 @@ class VideoProduction:
         done = {s["name"] for s in state["stages"] if s["status"] == "completed"}
         folder = self.store.folder(state["workflow_id"])
         self._narration(state)                       # Step 45: the managed copy must be byte-identical
+        if "production" in done and state["inputs"]["production_id"]:
+            self._check_speech_binding(state["inputs"]["production_id"], state.get("narration"))   # Step 46
         if "scene_plan" in done:
             plan = self._plan(state["inputs"]["production_id"])
             if sha256_bytes(canonical(plan)) != state["inputs"]["plan_sha256"]:
@@ -544,6 +585,8 @@ class VideoProduction:
         raise NetworkError("production_exists", "This story already has a production that could not be matched.")
 
     def _stage_scene_plan(self, state, stage, allow_network, budget):
+        # Step 46: before any job is prepared (so before any paid video submission is possible).
+        self._check_speech_binding(state["inputs"]["production_id"], state.get("narration"))
         plan = self._plan(state["inputs"]["production_id"])
         data = canonical(plan)
         self.store.publish_once(state["workflow_id"], "scene-plan.json", data)
@@ -845,7 +888,10 @@ class VideoProduction:
         return {"present": True, "managed_file": meta["managed_file"], "source_sha256": meta["source_sha256"],
                 "source_duration_seconds": meta["source_duration_seconds"],
                 "padded_duration_seconds": meta["padded_duration_seconds"], "duration_policy": meta["duration_policy"],
-                "output": "local narration mixed in; generated source audio muted"}
+                **({"speech": dict(meta["speech"]),
+                    "output": "AI-generated narration (xAI text to speech, stock voice) mixed in; generated source "
+                              "audio muted"} if meta.get("speech") else
+                   {"output": "local narration mixed in; generated source audio muted"})}
 
     def next_actions(self, state):
         w, out = state["workflow_id"], []

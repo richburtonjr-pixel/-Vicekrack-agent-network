@@ -219,3 +219,30 @@ Live xAI behaviour remains untested with paid requests.
 
 Deferred: text-to-speech, per-scene narration timing, music/SFX mixing, publishing, farmhouse
 visualization. Trading, Bot House, music and publishing are unchanged.
+
+# Step 46 implementation checkpoint
+
+Numbering note: PR #45 was the Step 44 repair, PR #46 delivered Step 45, and Step 46 arrives in a
+later PR.
+
+Implemented: Grok-generated narration ([docs/step46.md](step46.md)). It covers:
+
+- a separate xAI text-to-speech adapter, with stock voices and documented output settings only;
+- a reviewable request built from the script's narration beats and bound to the script hash and
+  settings;
+- `speech-prepare`, `-inspect`, `-list`, `-submit` and `-recover`;
+- explicit per-job paid consent, with the intent saved before sending;
+- no automatic retry of uncertain requests, and duplicate and concurrency protection;
+- bounded requests and responses;
+- local conversion to a metadata-free 16-bit PCM WAV, refusing malformed or silent audio;
+- the 15-second rule: longer speech is kept but refused, never truncated or sped up;
+- `video-production-start --speech JOB`, with the script binding verified against the
+  production's saved script before any paid video submission;
+- reuse of already-paid clips;
+- fresh quality checks and human review for the narrated video.
+
+The offline demo (`video-production-demo --speech`) uses mock providers and synthetic test audio.
+The live xAI speech API remains untested.
+
+Deferred: captions, music/SFX, per-scene narration timing, voice cloning, publishing, farmhouse
+visualization, Step 47. Trading and Bot House are unchanged.

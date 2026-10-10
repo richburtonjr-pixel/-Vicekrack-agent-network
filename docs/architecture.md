@@ -1217,3 +1217,47 @@ How it runs:
 
 `video_production_demo` runs the same class against a mock transport and synthetic FFmpeg clips,
 inside a fresh root folder with sockets blocked.
+
+# Step 46 Grok speech boundary
+
+Speech generation is its own component, kept apart from video generation and orchestration:
+
+| Module | Job |
+|---|---|
+| `speech_transport` | One bounded HTTPS POST to the fixed `https://api.x.ai/v1/tts`. No redirects, proxies or retries. The key goes only in the header. Failures map to fixed codes: `SpeechRejected` for a 4xx (nothing generated), `speech_not_sent`, or `speech_transport_failed` (outcome unknown). |
+| `speech_jobs` | Job records under `runtime/speech-jobs/<sp-id>/` (`schemas/grok-speech-job.schema.json`, `config/speech.json`). Atomic writes, one OS lock, a deterministic job ID from the script hash plus the request. |
+| `speech_cli` | `speech-prepare`, `speech-inspect`, `speech-list`, `speech-submit` and `speech-recover`. |
+
+The spoken text is built from the validated ShortScript's narration beats, with words unchanged.
+
+**Submit sequence.** Consent and `--allow-network` are checked, then the key's presence. The
+`submitting` intent is saved, then exactly one request is sent:
+
+| Result | Job status |
+|---|---|
+| Audio received | `received` (raw bytes saved), then local conversion |
+| HTTP 4xx | `rejected` |
+| Never sent | The earlier status is kept |
+| Anything else | `uncertain`, until an explicit acknowledged retry |
+
+**Conversion.** WAV goes through `narration.parse_wav`; mp3 or an unusual WAV goes through FFmpeg.
+Both produce `narration.canonical_wav`, with metadata dropped. The result is:
+
+- `invalid_audio` if the audio is malformed or all silence;
+- `too_long` if it is over 15 s (kept, unusable);
+- otherwise `completed`, with the Step 14 normalized hash.
+
+**Workflow integration.** `VideoProduction.start(speech_job=…)` takes the job's hash-checked WAV
+through the same Step 45 path as a local recording (`narration_from_bytes`). It also records
+`narration.speech`: the job, the script hash, the voice and the text hash.
+
+`_check_speech_binding` compares that script hash with the canonical hash of the production's
+verified saved script:
+
+- at start, for a production origin;
+- in the `scene_plan` stage, before any video job exists;
+- in `_verify`, on every resume, submit and export.
+
+`speech_script_mismatch` is a blocking code. Clip reuse, revision identity, quality binding,
+review and export gates are the unchanged Step 44/45 mechanisms. `speech_demo` runs the whole
+chain with mock transports and synthetic audio.

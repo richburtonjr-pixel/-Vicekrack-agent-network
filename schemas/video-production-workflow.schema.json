@@ -612,6 +612,50 @@
             },
             "duration_policy": {
               "const": "pad_shorter_with_silence_reject_longer"
+            },
+            "speech": {
+              "description": "Step 46: present when the narration came from a completed Grok speech job; bound to the production's saved script.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "job_id",
+                "script_sha256",
+                "script_id",
+                "voice",
+                "language",
+                "text_sha256",
+                "provider"
+              ],
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "pattern": "^sp-[0-9a-f]{24}$"
+                },
+                "script_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "script_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "voice": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,20}$"
+                },
+                "language": {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                "text_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "provider": {
+                  "const": "xai_tts"
+                }
+              }
             }
           }
         }

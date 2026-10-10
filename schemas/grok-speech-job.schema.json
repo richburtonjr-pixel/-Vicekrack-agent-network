@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/grok-speech-job.schema.json",
+  "title": "Grok speech job (Step 46)",
+  "description": "One xAI text-to-speech request for a ShortScript's narration. No credentials, headers, raw provider errors or environment values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "job_id", "status", "created_at", "updated_at", "notice", "publishable", "script",
+               "text", "text_sha256", "text_characters", "settings", "request", "consent_phrase", "provider_request_id",
+               "attempts", "raw_audio", "audio", "error_code"],
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "time": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "code": {"type": ["string", "null"], "pattern": "^[a-z0-9_]{1,64}$"}
+  },
+  "properties": {
+    "contract": {"const": "grok_speech_job"},
+    "version": {"const": "1.0"},
+    "job_id": {"type": "string", "pattern": "^sp-[0-9a-f]{24}$"},
+    "status": {"enum": ["prepared", "submitting", "uncertain", "rejected", "received", "completed", "too_long", "invalid_audio"]},
+    "created_at": {"$ref": "#/$defs/time"},
+    "updated_at": {"$ref": "#/$defs/time"},
+    "notice": {"type": "string", "minLength": 1, "maxLength": 400},
+    "publishable": {"const": false},
+    "script": {
+      "type": "object", "additionalProperties": false,
+      "required": ["script_id", "script_sha256", "source", "production_id", "title"],
+      "properties": {
+        "script_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "script_sha256": {"$ref": "#/$defs/sha"},
+        "source": {"enum": ["script_file", "production"]},
+        "production_id": {"type": ["string", "null"], "pattern": "^prod-[0-9a-f]{24}$"},
+        "title": {"type": "string", "maxLength": 300}
+      }
+    },
+    "text": {"type": "string", "minLength": 1, "maxLength": 60000},
+    "text_sha256": {"$ref": "#/$defs/sha"},
+    "text_characters": {"type": "integer", "minimum": 1, "maximum": 60000},
+    "settings": {
+      "type": "object", "additionalProperties": false,
+      "required": ["voice", "language", "codec", "sample_rate", "bit_rate"],
+      "properties": {
+        "voice": {"type": "string", "pattern": "^[a-z]{2,20}$"},
+        "language": {"type": "string", "pattern": "^[A-Za-z]{2,4}(-[A-Za-z]{2})?$"},
+        "codec": {"enum": ["wav", "mp3"]},
+        "sample_rate": {"enum": [8000, 16000, 22050, 24000, 44100, 48000]},
+        "bit_rate": {"enum": [null, 32000, 64000, 96000, 128000, 192000]}
+      }
+    },
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["text", "voice_id", "language", "output_format"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1, "maxLength": 60000},
+        "voice_id": {"type": "string"},
+        "language": {"type": "string"},
+        "output_format": {
+          "type": "object", "additionalProperties": false, "required": ["codec", "sample_rate"],
+          "properties": {
+            "codec": {"enum": ["wav", "mp3"]},
+            "sample_rate": {"type": "integer"},
+            "bit_rate": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "consent_phrase": {"type": "string", "pattern": "^paid-speech:sp-[0-9a-f]{24}$"},
+    "provider_request_id": {"type": "null", "description": "The synchronous REST endpoint documents no request ID; none is recorded or invented."},
+    "attempts": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["at", "outcome", "http_status"],
+        "properties": {
+          "at": {"$ref": "#/$defs/time"},
+          "outcome": {"enum": ["uncertain", "received", "rejected", "not_sent"]},
+          "http_status": {"type": ["integer", "null"], "minimum": 400, "maximum": 499}
+        }
+      }
+    },
+    "raw_audio": {
+      "anyOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false, "required": ["file", "sha256", "bytes", "content_type"],
+        "properties": {
+          "file": {"type": "string", "pattern": "^provider-audio-[0-9]{1,2}\\.(wav|mp3)$"},
+          "sha256": {"$ref": "#/$defs/sha"},
+          "bytes": {"type": "integer", "minimum": 1},
+          "content_type": {"type": "string", "maxLength": 100}
+        }
+      }]
+    },
+    "audio": {
+      "anyOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false,
+        "required": ["managed_file", "sha256", "bytes", "channels", "sample_rate", "duration_seconds", "normalized_sha256"],
+        "properties": {
+          "managed_file": {"const": "narration.wav"},
+          "sha256": {"$ref": "#/$defs/sha"},
+          "bytes": {"type": "integer", "minimum": 46},
+          "channels": {"enum": [1, 2]},
+          "sample_rate": {"type": "integer", "minimum": 8000, "maximum": 48000},
+          "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+          "normalized_sha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha"}]}
+        }
+      }]
+    },
+    "error_code": {"$ref": "#/$defs/code"}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "config_version": "1.0",
+  "description": "Step 46 Grok-generated narration (xAI text to speech, POST https://api.x.ai/v1/tts). Stock voices only; no voice cloning. Every submission is a paid request that needs the job-specific consent phrase.",
+  "voices": ["eve", "ara", "leo", "rex", "sal", "carina", "zagan", "helix", "orion", "luna", "iris", "altair", "zenith",
+             "perseus", "helios", "lux", "kepler", "rigel", "cosmo", "celeste", "ursa", "sirius", "lumen", "castor",
+             "naksh", "atlas", "aurora", "liora"],
+  "languages": ["en", "auto", "ar-EG", "ar-SA", "ar-AE", "bn", "zh", "fr", "de", "hi", "id", "it", "ja", "ko", "pt-BR",
+                "pt-PT", "ru", "es-MX", "es-ES", "tr", "vi"],
+  "codecs": ["wav", "mp3"],
+  "sample_rates": [8000, 16000, 22050, 24000, 44100, 48000],
+  "bit_rates": [32000, 64000, 96000, 128000, 192000],
+  "defaults": {"voice": "eve", "language": "en", "codec": "wav", "sample_rate": 24000, "bit_rate": 128000},
+  "limits": {
+    "max_text_characters": 1000,
+    "request_timeout_seconds": 90,
+    "max_response_bytes": 16777216,
+    "max_attempts": 5
+  }
+}
