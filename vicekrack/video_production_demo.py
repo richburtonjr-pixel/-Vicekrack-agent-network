@@ -20,11 +20,22 @@ It runs inside a fresh demo folder (default runtime/video-production-demo/<run>/
 
 Every socket connection is blocked for the whole run. The mock provider only ever receives
 the request body ViceKrack built; a placeholder (not a key) satisfies the XAI_API_KEY check.
+
+Step 45 (`narrated=True`, `python -m vicekrack video-production-demo --narrated` or
+`scripts/step45_demo.py`): the same run with a SYNTHETIC local narration (tone bursts written
+by Python, not a voice). The synthetic clips then carry their own loud tone, so the demo can
+measure that the generated source audio is muted. It also proves that overlong and all-silent
+narration are refused before anything is created, that the managed copy is hash-checked on
+resume, and that the exported MP4 has 15 seconds of narration audio (speech where the narration
+is, silence after it).
 """
 
 import json
+import math
 import os
+import re
 import secrets
+import struct
 import socket
 import subprocess
 import tempfile
@@ -66,28 +77,68 @@ def placeholder_credential():
             os.environ["XAI_API_KEY"] = previous
 
 
-def synthetic_clip(duration, index, folder):
-    """A real, decodable 720x1280 (9:16) H.264 clip made locally; clearly synthetic test media."""
+def synthetic_clip(duration, index, folder, with_audio=False):
+    """A real, decodable 720x1280 (9:16) H.264 clip made locally; clearly synthetic test media.
+    `with_audio` adds a loud 440 Hz tone (like a provider's generated sound) that must be muted."""
     from .preview import dependencies
     exe = dependencies()[3]
     colors = ("0x1d4ed8", "0x047857", "0xb45309", "0x7c3aed")
     target = Path(folder) / f"synthetic-{index}.mp4"
+    audio = (["-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=48000:duration={duration}"] if with_audio else [])
+    encode = (["-map", "[v]", "-map", "2:a", "-c:a", "aac", "-shortest"] if with_audio else ["-map", "[v]", "-an"])
     subprocess.run([exe, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
                     f"testsrc2=size=720x1280:rate=24:duration={duration}", "-f", "lavfi", "-i",
-                    f"color=c={colors[(index - 1) % 4]}:size=720x1280:rate=24:duration={duration}",
-                    "-filter_complex", "[0:v][1:v]blend=all_mode=overlay:all_opacity=0.5,format=yuv420p",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-an", str(target)],
+                    f"color=c={colors[(index - 1) % 4]}:size=720x1280:rate=24:duration={duration}", *audio,
+                    "-filter_complex", "[0:v][1:v]blend=all_mode=overlay:all_opacity=0.5,format=yuv420p[v]",
+                    *encode, "-c:v", "libx264", "-preset", "ultrafast", str(target)],
                    check=True, capture_output=True, timeout=120)
     return target.read_bytes()
+
+
+def synthetic_narration(path, seconds=11.5, rate=22050):
+    """A 16-bit mono PCM WAV of 'syllable' tone bursts. Synthetic test audio, NOT a voice or a recording."""
+    frames = []
+    for n in range(int(seconds * rate)):
+        t = n / rate
+        syllable = t % 0.42                                   # a burst roughly every 0.42 s, with short gaps
+        envelope = math.sin(math.pi * syllable / 0.32) if syllable < 0.32 else 0.0
+        pitch = 180 + 60 * math.sin(2 * math.pi * 0.7 * t)    # a gently moving "voice" pitch
+        value = envelope * (0.55 * math.sin(2 * math.pi * pitch * t) + 0.25 * math.sin(4 * math.pi * pitch * t))
+        frames.append(struct.pack("<h", int(max(-1.0, min(1.0, value)) * 20000)))
+    pcm = b"".join(frames)
+    header = struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + len(pcm), b"WAVE", b"fmt ", 16, 1, 1, rate, rate * 2, 2,
+                         16, b"data", len(pcm))
+    Path(path).write_bytes(header + pcm)
+    return Path(path)
+
+
+def silent_wav(path, seconds=3, rate=16000):
+    pcm = bytes(seconds * rate * 2)
+    Path(path).write_bytes(struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + len(pcm), b"WAVE", b"fmt ", 16, 1, 1, rate,
+                                       rate * 2, 2, 16, b"data", len(pcm)) + pcm)
+    return Path(path)
+
+
+def loudness(video, start, length):
+    """Peak level (dBFS) of the MP4's audio between start and start+length, decoded locally."""
+    from .preview import dependencies
+    exe = dependencies()[3]
+    done = subprocess.run([exe, "-hide_banner", "-nostdin", "-ss", str(start), "-t", str(length), "-i", str(video),
+                           "-map", "0:a:0", "-af", "volumedetect", "-f", "null", "-"],
+                          capture_output=True, timeout=120, check=True)
+    found = re.search(r"max_volume: (-?[0-9.]+|-inf) dB", done.stderr.decode("utf-8", "replace"))
+    if found is None:
+        raise AssertionError("demo could not measure the narration audio")
+    return -999.0 if found.group(1) == "-inf" else float(found.group(1))
 
 
 class MockGrok:
     """Stands in for xAI's video API. Never opens a connection; keeps counts for the demo report."""
 
-    def __init__(self, clip_folder, fail_first_post_numbers=(2,), pending_once=("demo-request-3",)):
+    def __init__(self, clip_folder, fail_first_post_numbers=(2,), pending_once=("demo-request-3",), clip_audio=False):
         from .video_transport import GENERATE_URL, STATUS_URL, check_download_url
         self.generate_url, self.status_url, self.check_download_url = GENERATE_URL, STATUS_URL, check_download_url
-        self.clip_folder = clip_folder
+        self.clip_folder, self.clip_audio = clip_folder, clip_audio
         self.fail_first = set(fail_first_post_numbers)      # 1-based POST numbers that "time out"
         self.pending_once = set(pending_once)               # request IDs whose first status check is pending
         self.posts, self.status_checks, self.downloads = 0, 0, 0
@@ -118,7 +169,7 @@ class MockGrok:
                 raise NetworkError("video_transport_refused", "Media downloads cannot carry credentials.")
             request_id = url.rsplit("/", 1)[1][:-4]
             self.downloads += 1
-            return synthetic_clip(self.durations[request_id], self.downloads, self.clip_folder)
+            return synthetic_clip(self.durations[request_id], self.downloads, self.clip_folder, self.clip_audio)
         raise NetworkError("video_transport_refused", "Unsupported provider request.")
 
 
@@ -175,7 +226,7 @@ def _expect_refusal(function, code, log, label):
     raise AssertionError(f"demo expected {label} to be refused with {code}")
 
 
-def run_demo(output=None, clock=None):
+def run_demo(output=None, clock=None, narrated=False):
     from .export import verify_package
     from .review import ReviewRecorder, reviewable
     from .video_production import VideoProduction, WorkflowStore
@@ -189,10 +240,11 @@ def run_demo(output=None, clock=None):
     root.mkdir(parents=True, exist_ok=True)
     proofs = []
     with network_blocked(), placeholder_credential(), review_time(clock), tempfile.TemporaryDirectory() as clips:
-        provider = MockGrok(clips)
+        provider = MockGrok(clips, clip_audio=narrated)
         flow = VideoProduction(root=root, clock=clock, transport=provider)
         run_id, record_id = _story(root, clock)
-        started = flow.start(selection_run_id=run_id, record_id=record_id)
+        narration = _narration_inputs(flow, root, run_id, record_id, proofs) if narrated else None
+        started = flow.start(selection_run_id=run_id, record_id=record_id, narration=narration)
         workflow_id = started["workflow_id"]
         assert started["status"] == "waiting_for_consent", started["status"]
         again = flow.resume(workflow_id, allow_network=True)
@@ -240,6 +292,8 @@ def run_demo(output=None, clock=None):
         manifest = json.loads((package / "package.json").read_text(encoding="utf-8"))
         page = (package / "index.html").read_text(encoding="utf-8")
         posts_before = provider.posts
+        if narrated:
+            _narration_integrity(flow, root, workflow_id, proofs)
         final = flow.resume(workflow_id, allow_network=True)
         assert provider.posts == posts_before and final["status"] == "exported"
         proofs.append({"check": "resume_after_export_repeats_nothing", "provider_posts": provider.posts})
@@ -247,6 +301,7 @@ def run_demo(output=None, clock=None):
         state = ProductionStore(root).read(production_id)
         preview = next(s for s in state["stages"] if s["name"] == "preview")["artifacts"]
         video = ProductionStore(root).folder(production_id) / preview["preview_file"]
+        audio = _narration_audio(video, package, narration, proofs) if narrated else None
         return {
             "demo": True, "network": "blocked for the whole run", "paid_requests": 0,
             "provider": "MOCK (no xAI request was made)", "media": "synthetic test clips generated locally with ffmpeg",
@@ -262,4 +317,55 @@ def run_demo(output=None, clock=None):
             "mock_provider_counts": {"posts": provider.posts, "status_checks": provider.status_checks,
                                      "downloads": provider.downloads},
             "proofs": proofs, "demo_folder": str(root),
+            **({"narration": audio} if narrated else {}),
         }
+
+
+def _narration_inputs(flow, root, run_id, record_id, proofs):
+    """Synthetic narration (and two invalid ones) in the demo folder; invalid input is refused before anything exists."""
+    inputs = root / "inputs"
+    inputs.mkdir()
+    overlong = synthetic_narration(inputs / "synthetic-narration-16s.wav", seconds=16)
+    before = sorted(p.name for p in (root / "runtime" / "video-production").glob("*")) \
+        if (root / "runtime" / "video-production").exists() else []
+    _expect_refusal(lambda: flow.start(selection_run_id=run_id, record_id=record_id, narration=overlong),
+                    "narration_too_long", proofs, "overlong_narration_refused_never_truncated")
+    _expect_refusal(lambda: flow.start(selection_run_id=run_id, record_id=record_id,
+                                       narration=silent_wav(inputs / "all-silence.wav")),
+                    "narration_silent", proofs, "all_silent_narration_refused")
+    after = sorted(p.name for p in (root / "runtime" / "video-production").glob("*")) \
+        if (root / "runtime" / "video-production").exists() else []
+    assert before == after, "a refused narration must not create a workflow"
+    proofs.append({"check": "refused_narration_created_nothing", "workflows": len(after)})
+    return synthetic_narration(inputs / "synthetic-narration.wav", seconds=11.5)
+
+
+def _narration_integrity(flow, root, workflow_id, proofs):
+    """A changed managed copy is refused on resume; restoring the exact bytes makes it usable again."""
+    from .video_production import NARRATION_FILE, WorkflowStore
+    managed = WorkflowStore(root).folder(workflow_id) / NARRATION_FILE
+    original = managed.read_bytes()
+    managed.write_bytes(original[:-2] + bytes(2))                     # one sample changed
+    try:
+        _expect_refusal(lambda: flow.resume(workflow_id), "narration_tampered", proofs,
+                        "changed_narration_refused_on_resume")
+    finally:
+        managed.write_bytes(original)
+
+
+def _narration_audio(video, package, source, proofs):
+    """Measure the real MP4: narration audio for 15 s, speech where the narration is, silence after it."""
+    from .quality import probe_media
+    from .video_production import sha256_bytes
+    info = probe_media(video)
+    exported = package / "media" / "preview.mp4"
+    assert exported.read_bytes() == video.read_bytes(), "the export must carry the exact reviewed video"
+    speech, tail = loudness(video, 1.0, 9.0), loudness(video, 12.2, 2.5)
+    assert info["audio_present"] and abs(info["audio_duration"] - 15) <= 0.1, info
+    assert speech > -30 and tail < -60, (speech, tail)
+    proofs.append({"check": "narration_mixed_source_audio_muted", "speech_peak_db": speech, "after_narration_peak_db": tail})
+    return {"source": "SYNTHETIC tone bursts written by the demo (not a voice)",
+            "source_seconds": 11.5, "source_sha256": sha256_bytes(Path(source).read_bytes()),
+            "padded_to_seconds": 15, "audio_codec": info["audio_codec"], "audio_seconds": info["audio_duration"],
+            "speech_peak_db": speech, "after_narration_peak_db": tail,
+            "generated_clip_audio": "synthetic clips carried a loud 440 Hz tone; it is muted in the preview"}

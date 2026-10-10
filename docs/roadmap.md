@@ -197,3 +197,25 @@ remains untested with paid requests.
 
 Deferred: automatic fallback media selection, voice/music mixing, publishing, farmhouse
 visualization. Trading is unchanged.
+
+# Step 45 implementation checkpoint
+
+Numbering note: development steps and GitHub pull requests are counted separately. GitHub PR #45
+was the Step 44 repair; Step 45 is delivered in a later PR.
+
+Implemented: optional local narration in the Step 44 video-production workflow
+(`video-production-start --narration FILE`, [docs/step45.md](step45.md)):
+
+- validation with the Step 14 rules plus a new all-silence refusal, before anything is created;
+- a managed, hash-recorded copy inside the workflow, re-verified on every resume, submit and export;
+- narration mixed into the media-backed preview with generated source audio muted;
+- duration policy: shorter is padded with silence to 15 s, longer is refused, never truncated;
+- narration bound into the quality report; silent and narrated previews need separate approvals;
+- reuse of already-paid clips when narration is added after a silent run (hash-checked, no requests).
+
+Silent output is unchanged when narration is omitted. The offline demo
+(`video-production-demo --narrated`) renders a real narrated MP4 with synthetic audio and clips.
+Live xAI behaviour remains untested with paid requests.
+
+Deferred: text-to-speech, per-scene narration timing, music/SFX mixing, publishing, farmhouse
+visualization. Trading, Bot House, music and publishing are unchanged.

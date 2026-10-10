@@ -41,6 +41,7 @@ SHA = re.compile(r"^[0-9a-f]{64}$")
 MAX_JSON_BYTES = 4 * 1024 * 1024
 MAX_VIDEO_BYTES = 64 * 1024 * 1024
 MAX_POSTER_BYTES = 8 * 1024 * 1024
+MAX_NARRATION_BYTES = 16 * 1024 * 1024
 MIN_VIDEO_BYTES = 100
 PNG = b"\x89PNG\r\n\x1a\n"
 BINDING_VERSION = "1.0"
@@ -224,9 +225,12 @@ class Snapshot:
 def current_hash(row, *, folder, state, root, project):
     """Current SHA-256 of what a binding row describes, read-only; None if it cannot be read safely."""
     role = row["role"]
-    if role == "narration":
+    if role == "narration" and row.get("ref") is None:
         narration = state["config"]["narration"]
         return narration["sha256"] if narration else None       # the user's file is never re-read here
+    if role == "narration":                                     # Step 45: narration kept inside the production
+        path, _ = safe_file(folder, row["ref"], MAX_NARRATION_BYTES)
+        return sha256_file(path) if path is not None else None
     if role == "verification_record":
         records = Path(root if root is not None else ROOT) / "runtime/verification/records"
         path, _ = safe_file(records, f"{row['id']}.json", MAX_JSON_BYTES) if isinstance(row.get("id"), str) \
@@ -254,7 +258,8 @@ def verify_binding(report, state, folder, root=None, project=ROOT):
     stages = {s["name"]: s["artifacts"] for s in state["stages"]}
     expected_refs = {"brief": ("brief", "brief_path"), "script": ("creator", "script_path"),
                      "scene_plan": ("plan", "plan_path"), "preview_manifest": ("preview", "manifest_file"),
-                     "video": ("preview", "preview_file"), "media_manifest": ("preview", "media_path")}
+                     "video": ("preview", "preview_file"), "media_manifest": ("preview", "media_path"),
+                     "narration": ("preview", "narration_path")}
     for row in binding["artifacts"]:
         label = row["role"] if row["index"] is None else f"{row['role']}_{row['index']}"
         if row["role"] in expected_refs:

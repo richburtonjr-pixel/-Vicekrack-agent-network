@@ -107,7 +107,22 @@ def canonical_wav(channels, rate, pcm):
 
 def load_narration(path, target_seconds=MAX_SECONDS):
     """Validate, strip metadata and pad with silence. Returns safe metadata and WAV bytes."""
-    channels, rate, pcm = parse_wav(read_bounded(path))
+    return normalize_narration(read_bounded(path), target_seconds)
+
+
+def has_sound(data):
+    """True if a supported WAV contains at least one non-zero sample (Step 45: all-silent input is refused)."""
+    _, _, pcm = parse_wav(data)
+    return any(pcm)
+
+
+def normalize_narration(data, target_seconds=MAX_SECONDS):
+    """Step 14 rules applied to bytes already read (Step 45 validates exactly the bytes it stores)."""
+    if not data:
+        _fail("narration_empty", "Narration file is empty.")
+    if len(data) > MAX_BYTES:
+        _fail("narration_too_large", "Narration WAV must be 12 MB or smaller.")
+    channels, rate, pcm = parse_wav(data)
     frames = len(pcm) // (channels * 2)
     target_frames = target_seconds * rate
     if frames > target_frames:

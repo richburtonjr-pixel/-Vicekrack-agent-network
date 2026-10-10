@@ -209,7 +209,8 @@ the same duplicate protection.
 - Live xAI behaviour has not been tested with a paid request. Only mocked provider responses are
   tested.
 - The demo's clips are synthetic colour bars, not Grok output.
-- Assembly mutes source audio. There is no automatic voice, music or SFX mixing.
+- Assembly mutes source audio. There is no automatic voice, music or SFX mixing. Step 45 adds
+  optional mixing of your own local narration recording: see [step45.md](step45.md).
 - Fallback media (stock, stills, motion graphics) is not chosen automatically when generation
   fails. Use `retry-scene` or the existing local text-card preview.
 - Nothing is uploaded or published.
