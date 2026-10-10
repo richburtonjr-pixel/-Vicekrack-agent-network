@@ -21,6 +21,14 @@ Try it offline, with no network and no credits:
 `python -m vicekrack video-production-demo`. The commands, statuses and recovery steps are in
 [docs/step44.md](docs/step44.md).
 
+Step 45 adds **optional local narration** to that workflow: `video-production-start ... --narration voice.wav`
+mixes your own 16-bit PCM WAV into the generated-footage preview (clip audio stays muted), and the
+same narrated video goes through quality, human review and export. Shorter narration is padded with
+silence to 15 seconds; longer narration is refused, never cut off. Without `--narration` the output
+stays silent. Try it offline with synthetic audio and clips:
+`python -m vicekrack video-production-demo --narrated`. See [docs/step45.md](docs/step45.md).
+("Step 45" is a development step, not a GitHub PR number.)
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

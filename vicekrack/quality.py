@@ -63,7 +63,7 @@ NOTES = [
 ]
 REF = re.compile(r"^(?!\.\.?(/|$))[A-Za-z0-9._-]+(/(?!\.\.?(/|$))[A-Za-z0-9._-]+){0,3}$")  # no "." or ".." parts
 ROLE_OF = {"brief_path": "brief", "script_path": "script", "plan_path": "scene_plan", "preview_file": "video",
-           "manifest_file": "preview_manifest", "media_path": "media_manifest"}
+           "manifest_file": "preview_manifest", "media_path": "media_manifest", "narration_path": "narration"}
 CONFIGS = (("verification_policy", "policy"), ("editorial_profile", "editorial_profile"), ("creator", "creator"),
            ("capabilities", "capabilities"))
 
@@ -249,7 +249,7 @@ class QualityChecker:
 
     def _artifact(self, check, stage, key, digest_key):
         artifacts = self.stages[stage]["artifacts"]
-        limit = MAX_VIDEO_BYTES if key == "preview_file" else MAX_JSON_BYTES
+        limit = MAX_VIDEO_BYTES if key in ("preview_file", "narration_path") else MAX_JSON_BYTES
         path, problem = safe_file(self.folder, artifacts.get(key), limit)
         if path is None:
             check.fail(f"{stage}_artifact_missing" if problem == "missing" else
@@ -536,11 +536,22 @@ class QualityChecker:
             check.fail("video_frame_count_wrong")
         return check
 
+    def _revision_narration(self):
+        """Step 45: narration a media revision brought with it (kept beside its package), else None."""
+        stages = getattr(self, "stages", None)
+        if not stages or "preview" not in stages:
+            return None
+        artifacts = stages["preview"]["artifacts"]
+        return artifacts if "narration_path" in artifacts else None
+
     def _check_audio(self):
         check = Check("audio")
         narration = self.state["config"]["narration"]
-        expected = narration is not None
+        revision = self._revision_narration()
+        expected = narration is not None or revision is not None
         check.details["narration_configured"] = expected
+        if revision is not None:
+            check.details["narration_source"] = "media_revision"
         if self.manifest is not None:
             if bool(self.manifest.get("audio_present")) != expected or bool(self.stages["preview"]["artifacts"].get("audio_present")) != expected:
                 check.fail("manifest_audio_flag_mismatch")
@@ -554,7 +565,9 @@ class QualityChecker:
             elif expected and not (EXPECTED["duration"] - DURATION_TOLERANCE <= media["audio_duration"]
                                    <= EXPECTED["duration"] + AUDIO_MAX_EXTRA):
                 check.fail("audio_duration_wrong")
-        if expected and self.manifest is not None:
+        if revision is not None:
+            self._check_revision_narration(check, revision)
+        elif expected and self.manifest is not None:
             from .narration import load_narration
             audio = self.manifest.get("audio") or {}
             path = Path(narration["path"])
@@ -575,6 +588,24 @@ class QualityChecker:
             except NetworkError:
                 check.fail("narration_source_invalid")
         return check
+
+    def _check_revision_narration(self, check, artifacts):
+        """The kept narration is inside the production, hash-bound, and is what the manifest says was mixed."""
+        from .narration import normalize_narration
+        path = self._artifact(check, "preview", "narration_path", "narration_sha256")
+        if path is None:
+            return
+        data = self.snapshot.entries.get(("file", norm(artifacts["narration_path"])), {}).get("data")
+        try:
+            metadata, _ = normalize_narration(data)
+        except NetworkError:
+            check.fail("narration_source_invalid")
+            return
+        check.details["source_duration_seconds"] = metadata["source_duration_seconds"]
+        audio = (self.manifest or {}).get("audio") or {}
+        if self.manifest is not None and (metadata["normalized_sha256"] != audio.get("normalized_sha256")
+                                          or metadata["source_duration_seconds"] != audio.get("source_duration_seconds")):
+            check.fail("narration_not_matching_manifest")
 
     def _check_manifest_consistency(self):
         check = Check("manifest_consistency")
@@ -666,7 +697,8 @@ class QualityChecker:
             reasons = ["not_every_artifact_could_be_read"]
         else:
             expected = {"production_state", "brief", "script", "scene_plan", "preview_manifest", "video", "poster",
-                        "verification_record"} | ({"narration"} if self.state["config"]["narration"] else set())
+                        "verification_record"} | ({"narration"} if self.state["config"]["narration"]
+                                                  or self._revision_narration() is not None else set())
             missing = expected - {row["role"] for row in artifacts}
             status = "incomplete" if missing else "bound"
             reasons = sorted("not_read_" + role for role in missing)

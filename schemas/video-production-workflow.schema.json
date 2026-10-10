@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vicekrack.local/schemas/video-production-workflow.schema.json",
-  "title": "Step 44 controlled video-production workflow state",
+  "title": "Step 44/45 controlled video-production workflow state",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -553,6 +553,69 @@
     "state_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "narration": {
+      "description": "Step 45 optional local narration. Absent or null: silent output (Step 44 behaviour). The original path is never stored; the bytes are copied to narration/narration.wav inside the workflow folder.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "managed_file",
+            "source_sha256",
+            "source_bytes",
+            "normalized_sha256",
+            "source_duration_seconds",
+            "padded_duration_seconds",
+            "channels",
+            "sample_rate",
+            "duration_policy"
+          ],
+          "properties": {
+            "managed_file": {
+              "const": "narration/narration.wav"
+            },
+            "source_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "normalized_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "source_bytes": {
+              "type": "integer",
+              "minimum": 45,
+              "maximum": 12582912
+            },
+            "source_duration_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 15
+            },
+            "padded_duration_seconds": {
+              "const": 15
+            },
+            "channels": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "sample_rate": {
+              "type": "integer",
+              "minimum": 8000,
+              "maximum": 48000
+            },
+            "duration_policy": {
+              "const": "pad_shorter_with_silence_reject_longer"
+            }
+          }
+        }
+      ]
     }
   }
 }
