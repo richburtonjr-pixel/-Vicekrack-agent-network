@@ -87,7 +87,8 @@
     get("/api/studio/session").then(function (doc) {
       ST.session = doc;
       if (!doc.actions_enabled) { render(); return null; }
-      ST.form.model = doc.options.models[0];
+      // The owner's choice (Step 50): the lite clip model is the default until they say otherwise.
+      ST.form.model = doc.options.models.filter(function (m) { return /-lite$/.test(m); })[0] || doc.options.models[0];
       ST.form.voice = doc.options.default_voice;
       return loadProductions();
     }).catch(function (error) {
@@ -100,6 +101,8 @@
       if (!ST.productionId) {
         var first = doc.productions.filter(function (p) { return p.eligible; })[0];
         if (first) { return loadProduction(first.production_id); }
+      } else if (!ST.production || ST.production.production_id !== ST.productionId) {
+        return loadProduction(ST.productionId);
       }
       render();
       return null;
@@ -224,7 +227,7 @@
   function renderProductions(box) {
     if (!ST.productions) { h("p", { class: "muted" }, box, "Loading productions…"); return; }
     if (!ST.productions.length) {
-      h("p", { class: "notice" }, box, "No productions are saved here yet. Produce one first (python -m vicekrack produce …).");
+      h("p", { class: "notice" }, box, "No productions yet. Open Research, type a topic, pick a story and press Make video.");
       return;
     }
     var grid = h("div", { class: "studio-grid" }, box);
@@ -580,5 +583,13 @@
   }
 
   document.addEventListener("hq:view", function (event) { if (event.detail === "studio") { open(); } });
-  window.HQStudio = { state: ST };
+  /* Step 50: Research hands over a finished production ("Open in Video Studio"). */
+  function show(productionId) {
+    ST.workflowId = null; ST.workflow = null; ST.error = null; ST.message = null;
+    ST.productionId = productionId || ST.productionId;
+    if (!ST.loaded) { open(); return; }
+    loadProductions().then(function () { return ST.productionId ? loadProduction(ST.productionId) : null; })
+      .catch(function (error) { ST.error = { code: error.code, message: error.message }; }).then(render);
+  }
+  window.HQStudio = { state: ST, show: show };
 }());

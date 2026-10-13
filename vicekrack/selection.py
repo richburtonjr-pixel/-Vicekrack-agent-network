@@ -280,6 +280,9 @@ def evaluate_story(record, profile, history, now):
     priority = topics[0]["priority"] if topics else 1
     core = _has_term(text, profile["relevance"]["core_terms"])
     related = _has_term(text, profile["relevance"]["related_terms"])
+    if profile["relevance"].get("required") is False:
+        # Step 50 (any-topic research): every candidate already matched the user's typed topic.
+        core = core or ["research_topic"]
     rumor = bool(_has_term(text, profile["rumor_terms"]))
 
     now_moment = _parse(now)

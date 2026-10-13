@@ -1,0 +1,29 @@
+{
+  "config_version": "1.0",
+  "description": "Step 50 Research Desk: one paid Grok web-search request per research run (any topic), then free local page checks, Verification and Selection. Prices are for the on-screen estimate only.",
+  "model": "grok-4.3",
+  "prices": {
+    "as_of": "2026-10-13",
+    "source": "https://docs.x.ai/docs/models.md",
+    "input_per_million": 1.25,
+    "output_per_million": 2.5,
+    "web_search_per_thousand": 5.0
+  },
+  "estimate_per_topic": { "input_tokens_low": 8000, "input_tokens_high": 60000, "output_tokens": 1500, "searches_low": 2, "searches_high": 10 },
+  "writer_estimate": { "input_tokens": 2500, "output_tokens": 1500 },
+  "limits": {
+    "max_topics": 3,
+    "max_stories_per_topic": 4,
+    "max_sources_per_story": 3,
+    "max_output_tokens": 6000,
+    "timeout_seconds": 240,
+    "page_timeout_seconds": 10,
+    "max_page_bytes": 1500000,
+    "max_redirects": 3
+  },
+  "pipeline": {
+    "policy": "config/verification.open.json",
+    "editorial_profile": "config/editorial.open.json",
+    "creator": "config/creator.xai.json"
+  }
+}

@@ -15,7 +15,8 @@
       "required": ["core_terms", "related_terms"],
       "properties": {
         "core_terms": { "$ref": "#/$defs/terms", "minItems": 1 },
-        "related_terms": { "$ref": "#/$defs/terms" }
+        "related_terms": { "$ref": "#/$defs/terms" },
+        "required": { "type": "boolean", "description": "Step 50: false for any-topic research, where the Scout step already kept only items matching the topic the user typed. Default true." }
       }
     },
     "topics": {

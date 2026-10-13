@@ -69,7 +69,9 @@ RUN_ID = re.compile(r"^sel-[0-9a-f]{24}$")
 RECORD_ID = re.compile(r"^ver-[0-9a-f]{24}$")
 # Failures known to happen before any provider request: safe to retry without consent.
 PRE_REQUEST_CODES = {"missing_credentials", "missing_model", "invalid_provider_configuration", "unsupported_model",
-                     "adapter_unavailable", "invalid_story_brief", "sensitive_state", "invalid_configuration"}
+                     "adapter_unavailable", "invalid_story_brief", "sensitive_state", "invalid_configuration",
+                     # Step 50 (Grok writer): refused or never sent, so nothing was billed.
+                     "missing_xai_credential", "xai_rejected", "xai_not_sent"}
 PROJECT = ROOT  # Configuration always loads from the project; storage root may differ.
 DEFAULTS = {"policy": "config/verification.mock.json", "editorial_profile": "config/editorial.mock.json",
             "creator": "config/creator.json", "capabilities": "config/visual-capabilities.json"}

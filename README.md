@@ -130,6 +130,20 @@ frame, the script must say "reportedly", "rumored" or "unconfirmed" wherever it 
 and the quality report asks for human review. Disputed, contradicted, stale and off-topic
 stories are still refused. See [docs/step49.md](docs/step49.md).
 
+### Step 50: Research to Video (any topic, no Command Prompt)
+
+Open the HQ with the Studio enabled (the **Start ViceKrack REAL** icon, or `hq-serve --studio`) and
+click **Research**:
+
+1. Type up to 3 topics and press **Go** (free: shows the exact Grok request and its estimated cost).
+2. **Approve and research (paid)**: Grok searches the web; ViceKrack then opens every source page itself
+   and labels each story (MULTIPLE REPORTS, RUMOR, CONFIRMED, ON HOLD or NOT USABLE).
+3. **Make video** on a card, then **Approve and write script (paid)**: Grok writes the script and the
+   story opens in **Video Studio**.
+
+Offline demo: `python -m vicekrack hq-serve --studio-demo`. See [docs/step50.md](docs/step50.md). The
+approved headquarters look is recorded in [docs/visual-direction.md](docs/visual-direction.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

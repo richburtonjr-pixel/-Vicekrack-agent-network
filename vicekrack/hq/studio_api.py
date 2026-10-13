@@ -10,11 +10,14 @@ Read routes (GET):
   /api/studio/production?id=prod-...  script, scene plan, speech jobs, caption tracks, workflows
   /api/studio/workflow?id=vpw-...     saved progress, prepared requests, quality, review, export, actions
   /api/studio/export?workflow=vpw-...&package=pkg-...   a zip of a verified export package (download)
+  /api/studio/research/jobs, /api/studio/research/job?id=rsj-...   Step 50 research runs and story cards
 
 Action routes (POST, JSON body, every one explicitly user-triggered):
   /api/studio/speech/prepare, /speech/submit, /speech/recover, /captions/prepare,
   /api/studio/workflow/start, /workflow/resume, /workflow/submit, /workflow/retry-scene,
   /workflow/export, /review/record
+  Step 50: /api/studio/research/prepare, /research/submit (PAID: Grok web search), /research/recover,
+  /research/make-video (PAID: Grok script writer, then the existing production pipeline)
 
 Every POST must pass, in order:
   1. the server's loopback Host and an Origin header equal to this server (no cross-site, no missing Origin);
@@ -47,7 +50,11 @@ ID = {"production": re.compile(r"^prod-[0-9a-f]{24}$"), "workflow": re.compile(r
       "speech": re.compile(r"^sp-[0-9a-f]{24}$"), "caption": re.compile(r"^cap-[0-9a-f]{24}$"),
       "package": re.compile(r"^pkg-[0-9a-f]{24}$"), "review": re.compile(r"^rev-[0-9a-f]{24}$"),
       "request": re.compile(r"^[A-Za-z0-9-]{8,64}$"), "digest": re.compile(r"^[0-9a-f]{12,64}$"),
-      "consent": re.compile(r"^paid-(generate:vid|speech:sp)-[0-9a-f]{24}$"), "voice": re.compile(r"^[A-Za-z]{2,20}$")}
+      "consent": re.compile(r"^paid-(generate:vid|speech:sp)-[0-9a-f]{24}$"), "voice": re.compile(r"^[A-Za-z]{2,20}$"),
+      # Step 50: research runs and their paid consents
+      "research": re.compile(r"^rsj-[0-9a-f]{24}$"),
+      "research_consent": re.compile(r"^paid-research:rsj-[0-9a-f]{24}$"),
+      "script_consent": re.compile(r"^paid-script:prod-[0-9a-f]{24}$")}
 CHOICE = {"timing": ("provider", "estimated"), "narration": ("silent", "speech"),
           "purpose": ("review_copy", "approved_preview"),
           "decision": ("approved_for_preview", "changes_requested", "rejected"),
@@ -73,6 +80,14 @@ ACTIONS = {
     "workflow/retry-scene": ("workflow_retry_scene", {"workflow_id": ("workflow", True), "scene": ("scene", True),
                                                       "model": ("model", False), "resolution": ("resolution", False)}),
     "workflow/export": ("workflow_export", {"workflow_id": ("workflow", True), "purpose": ("purpose", True)}),
+    "research/prepare": ("research_prepare", {"topics": ("topics", True)}),
+    "research/submit": ("research_submit", {"job_id": ("research", True), "consent": ("research_consent", True),
+                                            "retry_uncertain": ("bool", False),
+                                            "acknowledge_duplicate_billing": ("bool", False)}),
+    "research/recover": ("research_recover", {"job_id": ("research", True)}),
+    "research/make-video": ("research_make_video", {"job_id": ("research", True), "story": ("story", True),
+                                                    "consent": ("script_consent", True),
+                                                    "retry_uncertain": ("bool", False)}),
     "review/record": ("review_record", {"workflow_id": ("workflow", True), "decision": ("decision", True),
                                         "reviewer": ("reviewer", True), "binding": ("digest", True),
                                         "acknowledgments": ("acks", False), "notes": ("notes", False),
@@ -138,6 +153,11 @@ def _check_value(key, kind, value):
         return isinstance(value, bool)
     if kind == "scene":
         return type(value) is int and 1 <= value <= 4
+    if kind == "story":
+        return type(value) is int and 0 <= value <= 30
+    if kind == "topics":
+        return (isinstance(value, list) and 1 <= len(value) <= 5
+                and all(isinstance(v, str) and 1 <= len(v) <= 80 and not re.search(r"[\x00-\x1f<>\\`{}]", v) for v in value))
     if kind == "reviewer":
         return isinstance(value, str) and 1 <= len(value.strip()) <= 80 and not re.search(r"[\x00-\x1f<>]", value)
     if kind == "notes":
@@ -253,6 +273,10 @@ def _read(gate, path, query_text):
             return _json(200, studio.productions())
         if path == PREFIX + "production" and set(query) == {"id"}:
             return _json(200, studio.production(_one(query, "id", "production")))
+        if path == PREFIX + "research/jobs" and not query:
+            return _json(200, studio.research_jobs())
+        if path == PREFIX + "research/job" and set(query) == {"id"}:
+            return _json(200, studio.research_job(_one(query, "id", "research")))
         if path == PREFIX + "workflow" and set(query) == {"id"}:
             return _json(200, studio.workflow(_one(query, "id", "workflow")))
         if path == PREFIX + "export" and set(query) == {"workflow", "package"}:

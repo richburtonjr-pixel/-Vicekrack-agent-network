@@ -10,8 +10,10 @@ def default_providers():
     from .openai_provider import OpenAIResearchProvider
     from .anthropic_provider import AnthropicResearchProvider
 
+    from .xai_responses import XAIScriptProvider
+
     return {"mock": MockResearchProvider(), "openai": OpenAIResearchProvider(),
-            "anthropic": AnthropicResearchProvider()}
+            "anthropic": AnthropicResearchProvider(), "xai": XAIScriptProvider()}
 
 
 class ResearchProvider(Protocol):

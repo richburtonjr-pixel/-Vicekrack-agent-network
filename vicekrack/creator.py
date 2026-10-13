@@ -30,7 +30,7 @@ from .story_brief import validate_story_brief
 
 
 ROOT = Path(__file__).resolve().parent.parent
-ADAPTERS = ("mock", "openai", "anthropic")
+ADAPTERS = ("mock", "openai", "anthropic", "xai")   # Step 50: xai = Grok writer
 AI_DISCLOSURE = "Some visuals may be AI-generated."
 
 _NULLABLE_TEXT = {"type": ["string", "null"]}

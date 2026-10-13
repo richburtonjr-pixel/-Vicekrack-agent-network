@@ -304,3 +304,19 @@ Implemented: the opt-in rumor lane ([docs/step49.md](step49.md)):
 - rumor fingerprints in story history.
 
 Deferred: non-news "cool clips" content, new rumor sources, Studio badge for rumor productions.
+
+# Step 50 implementation checkpoint
+
+Implemented: Research to Video from the app ([docs/step50.md](step50.md)):
+
+- a Research view: any topic, one paid Grok web-search request on approval, with an estimate first;
+- ViceKrack opens every source page itself; only page text becomes evidence;
+- any-topic verification policy and editorial profile (`open`) with the rumor lane;
+- labelled story cards with sources, dates and plain reasons;
+- the Grok script writer (`xai` Creator adapter) and Make video into Video Studio;
+- demo mode with mock Grok and fixture pages.
+
+Recorded: the approved headquarters visual direction ([docs/visual-direction.md](visual-direction.md)).
+
+Deferred: the headquarters redesign, ChatGPT as an optional writer/second opinion, official sources
+for non-GTA topics, publishing.

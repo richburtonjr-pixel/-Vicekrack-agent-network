@@ -190,6 +190,7 @@
                 "mock",
                 "openai",
                 "anthropic",
+                "xai",
                 "human"
               ]
             },

@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 from ..orchestrator import ROOT
 
-NOTICE = ("STUDIO DEMO - mock xAI providers, synthetic clips and synthetic test audio (not a Grok voice), no network, "
+NOTICE = ("STUDIO DEMO - mock xAI providers (research, writer, clips, voice), demo stories, synthetic clips and synthetic test audio (not a Grok voice), no network, "
           "no credits. Demo data lives in its own folder; reviews here are demo reviews and never touch real "
           "productions.")
 
@@ -66,7 +66,10 @@ def demo_studio(stack, output=None):
     dependencies()                                       # fail early, clearly, without FFmpeg/Pillow
     run_id, record_id = _story(folder, clock)
     Pipeline(root=folder, clock=clock).produce(run_id, record_id)
+    from ..research_demo import FixturePages, MockGrokResearch, MockGrokWriter
+    pages = FixturePages()                               # Step 50: research runs on fixture pages, offline
     studio = Studio(folder, demo=True, clock=clock, notice=NOTICE,
                     video_transport=MockGrok(clips, fail_first_post_numbers=(), pending_once=("demo-request-3",)),
-                    speech_transport=DemoSpeech(clips))
+                    speech_transport=DemoSpeech(clips), research_transport=MockGrokResearch(pages, clock),
+                    page_fetcher=pages, writer_transport=MockGrokWriter())
     return studio, folder
