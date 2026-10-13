@@ -14,7 +14,7 @@ Read routes (GET):
 
 Action routes (POST, JSON body, every one explicitly user-triggered):
   /api/studio/speech/prepare, /speech/submit, /speech/recover, /captions/prepare,
-  /api/studio/workflow/start, /workflow/resume, /workflow/submit, /workflow/retry-scene,
+  /api/studio/workflow/start, /workflow/resume, /workflow/submit, /workflow/submit-all, /workflow/retry-scene,
   /workflow/export, /review/record
   Step 50: /api/studio/research/prepare, /research/submit (PAID: Grok web search), /research/recover,
   /research/make-video (PAID: Grok script writer, then the existing production pipeline)
@@ -54,7 +54,9 @@ ID = {"production": re.compile(r"^prod-[0-9a-f]{24}$"), "workflow": re.compile(r
       # Step 50: research runs and their paid consents
       "research": re.compile(r"^rsj-[0-9a-f]{24}$"),
       "research_consent": re.compile(r"^paid-research:rsj-[0-9a-f]{24}$"),
-      "script_consent": re.compile(r"^paid-script:prod-[0-9a-f]{24}$")}
+      "script_consent": re.compile(r"^paid-script:prod-[0-9a-f]{24}$"),
+      # Step 52: one approval for all of a workflow's prepared clips
+      "bundle_consent": re.compile(r"^paid-generate-all:vpw-[0-9a-f]{24}$")}
 CHOICE = {"timing": ("provider", "estimated"), "narration": ("silent", "speech"),
           "purpose": ("review_copy", "approved_preview"),
           "decision": ("approved_for_preview", "changes_requested", "rejected"),
@@ -77,6 +79,8 @@ ACTIONS = {
     "workflow/submit": ("workflow_submit", {"workflow_id": ("workflow", True), "scene": ("scene", True),
                                             "consent": ("consent", True), "retry_uncertain": ("bool", False),
                                             "acknowledge_duplicate_billing": ("bool", False)}),
+    "workflow/submit-all": ("workflow_submit_all", {"workflow_id": ("workflow", True),
+                                                    "consent": ("bundle_consent", True)}),
     "workflow/retry-scene": ("workflow_retry_scene", {"workflow_id": ("workflow", True), "scene": ("scene", True),
                                                       "model": ("model", False), "resolution": ("resolution", False)}),
     "workflow/export": ("workflow_export", {"workflow_id": ("workflow", True), "purpose": ("purpose", True)}),

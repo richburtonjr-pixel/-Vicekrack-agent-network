@@ -66,6 +66,10 @@ REASONS = {
 }
 
 
+# Step 52: per-second video prices (docs.x.ai, as of 2026-10-13), used only for the on-screen estimate.
+VIDEO_PRICES = {"grok-imagine-video-1.5-lite": 0.02, "grok-imagine-video-1.5": 0.08}
+
+
 def _env_key():
     return os.environ.get("XAI_API_KEY", "").strip()
 
@@ -398,6 +402,15 @@ class Studio:
         status, actions = view["status"], []
         failed = next((s for s in view["stages"] if s["status"] == "failed"), None)
         if status == "waiting_for_consent":
+            ready = [s for s in doc["scenes"] if s["job_status"] == "prepared"]
+            if len(ready) > 1:
+                # Step 52: one approval for every clip that is ready (each clip is still its own job).
+                seconds = sum(s["request"]["duration"] for s in ready)
+                cost = sum(s["request"]["duration"] * VIDEO_PRICES.get(s["request"]["model"], 0.08) for s in ready)
+                actions.append({"action": "workflow_submit_all", "paid": True,
+                                "consent": f"paid-generate-all:{doc['workflow_id']}",
+                                "scenes": [s["scene_index"] for s in ready], "seconds": seconds,
+                                "estimate_usd": round(cost, 2)})
             for scene in doc["scenes"]:
                 if scene["job_status"] == "prepared":
                     actions.append({"action": "workflow_submit", "scene": scene["scene_index"], "paid": True,
@@ -490,6 +503,37 @@ class Studio:
         self.flow().submit(workflow_id, scene, consent=consent, allow_network=True, retry_uncertain=retry_uncertain,
                            acknowledge_duplicate_billing=acknowledge_duplicate_billing)
         return self.workflow(workflow_id)
+
+    def workflow_submit_all(self, workflow_id, consent):
+        """Step 52: send every prepared clip request after ONE approval of the whole set.
+
+        Each clip is still sent through the same per-job path (its own saved request, its own job record),
+        one after another. Sending stops at the first clip whose outcome is unknown or that fails, so a
+        problem never fans out; the remaining clips stay prepared for a later approval.
+        """
+        if consent != f"paid-generate-all:{workflow_id}":
+            raise NetworkError("generation_consent_required", "Tick the approval for these exact clip requests.")
+        doc = self.workflow(workflow_id)
+        ready = [s for s in doc["scenes"] if s["job_status"] == "prepared"]
+        if doc["status"] != "waiting_for_consent" or not ready:
+            raise NetworkError("nothing_to_generate", "No clip is waiting for approval.")
+        sent, stopped = [], None
+        for scene in ready:
+            try:
+                view = self.flow().submit(workflow_id, scene["scene_index"], consent=scene["consent"],
+                                          allow_network=True)
+            except NetworkError as error:
+                if not sent:
+                    raise
+                stopped = {"scene": scene["scene_index"], "code": error.code}
+                break
+            sent.append(scene["scene_index"])
+            if view["submission"]["outcome"] == "uncertain":
+                stopped = {"scene": scene["scene_index"], "code": "video_submit_uncertain"}
+                break
+        result = self.workflow(workflow_id)
+        result["bundle"] = {"sent": sent, "stopped": stopped}
+        return result
 
     def workflow_retry_scene(self, workflow_id, scene, model=None, resolution=None):
         self.flow().retry_scene(workflow_id, scene, model=model, resolution=resolution)
