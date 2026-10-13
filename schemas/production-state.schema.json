@@ -32,7 +32,7 @@
           "properties": {
             "path": { "$ref": "#/$defs/relative_path" },
             "sha256": { "$ref": "#/$defs/sha256" },
-            "adapter": { "enum": ["mock", "openai", "anthropic"] },
+            "adapter": { "enum": ["mock", "openai", "anthropic", "xai"] },
             "model": { "type": ["string", "null"], "maxLength": 100 },
             "paid": { "type": "boolean" }
           }

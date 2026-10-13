@@ -1046,13 +1046,14 @@
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
-    var sessions = view === "sessions", broker = view === "broker", studio = view === "studio";
+    var sessions = view === "sessions", broker = view === "broker", studio = view === "studio" || view === "research";
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
     $("sessions-view").hidden = !sessions;
     $("broker-view").hidden = !broker;
-    $("studio-view").hidden = !studio;                  // Step 48: the Video Studio lives in studio.js
+    $("studio-view").hidden = view !== "studio";        // Step 48: the Video Studio lives in studio.js
+    $("research-view").hidden = view !== "research";    // Step 50: Research lives in research.js
     $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || S.list;
     $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio);
     document.body.classList.toggle("results-open", results || content || sessions || broker || studio);

@@ -62,6 +62,7 @@ REASONS = {
     "speech_text_has_markup": "The narration contains [ ] or < > characters, so Grok narration and captions are unavailable "
                               "(silent videos still work).",
     "caption_unsupported_character": "The narration has characters the caption font cannot draw, so captions are unavailable.",
+    "production_busy": "Another action is using this production right now. Reload in a moment.",
 }
 
 
@@ -77,12 +78,76 @@ class Studio:
     """One studio per HQ server. `demo` uses mock providers and an isolated root (see studio_demo)."""
 
     def __init__(self, root=None, *, demo=False, clock=None, video_transport=None, speech_transport=None,
-                 renderer=None, prober=None, poster_reader=None, notice=None):
+                 renderer=None, prober=None, poster_reader=None, notice=None, research_transport=None,
+                 page_fetcher=None, writer_transport=None):
         self.root, self.demo = root, demo
         self.clock = clock
         self.video_transport, self.speech_transport = video_transport, speech_transport
         self.renderer, self.prober, self.poster_reader = renderer, prober, poster_reader
         self.notice = notice
+        # Step 50: Research Desk (Grok research + free page checks) and the Grok script writer.
+        self.research_transport, self.page_fetcher, self.writer_transport = research_transport, page_fetcher, writer_transport
+
+    # ------------------------------------------------------------------ Step 50: research
+    def desk(self):
+        from ..research_desk import ResearchDesk
+        return ResearchDesk(self.root, clock=self.clock, transport=self.research_transport,
+                            page_fetcher=self.page_fetcher, fetch_mode="fixture" if self.demo else "http")
+
+    def research_session(self):
+        from ..research_desk import load_config
+        config, _ = load_config()
+        return {"model": config["model"], "max_topics": config["limits"]["max_topics"],
+                "prices_as_of": config["prices"]["as_of"]}
+
+    def research_jobs(self):
+        return {"contract": "hq_research_jobs", "demo": self.demo, "jobs": self.desk().list()}
+
+    def research_job(self, job_id):
+        job = self.desk().read(job_id)
+        from ..production import ProductionStore
+        store = ProductionStore(self.root)
+        for card in job.get("cards") or []:
+            offer = card.get("make_video")
+            if offer:
+                path = store.state_path(offer["production_id"])
+                offer["production_status"] = store.read(offer["production_id"])["status"] if path.exists() else None
+        view = {k: job[k] for k in ("job_id", "topics", "status", "created_at", "updated_at", "consent_phrase",
+                                    "estimate_usd", "error_code", "usage", "cost_usd", "cards", "selection_run_id",
+                                    "attempts")}
+        view.update(contract="hq_research_job", demo=self.demo, model=job["request"]["model"],
+                    request_preview={"model": job["request"]["model"], "tools": job["request"].get("tools", []),
+                                     "topics": job["topics"]})
+        return view
+
+    def research_prepare(self, topics):
+        return self.research_job(self.desk().prepare(topics)["job_id"])
+
+    def research_submit(self, job_id, consent, retry_uncertain=False, acknowledge_duplicate_billing=False):
+        if not self.demo and not credentials_configured():
+            raise NetworkError("missing_xai_credential", "Set XAI_API_KEY in the window that starts ViceKrack.")
+        self.desk().submit(job_id, consent, retry_uncertain=retry_uncertain,
+                           acknowledge_duplicate_billing=acknowledge_duplicate_billing)
+        return self.research_job(job_id)
+
+    def research_recover(self, job_id):
+        self.desk().recover(job_id)
+        return self.research_job(job_id)
+
+    def research_make_video(self, job_id, story, consent, retry_uncertain=False):
+        if not self.demo and not credentials_configured():
+            raise NetworkError("missing_xai_credential", "Set XAI_API_KEY in the window that starts ViceKrack.")
+        from ..production import Pipeline
+        providers = None
+        if self.writer_transport is not None:
+            from ..xai_responses import XAIScriptProvider
+            providers = {"xai": XAIScriptProvider(transport_fn=self.writer_transport)}
+        pipeline = Pipeline(root=self.root, clock=self.clock, renderer=self.renderer, providers=providers)
+        result = self.desk().make_video(job_id, story, consent, pipeline=pipeline, retry_uncertain=retry_uncertain)
+        view = self.research_job(job_id)
+        view["made"] = {"production_id": result.get("production_id"), "status": result.get("status"),
+                        "error": result.get("error")}
+        return view
 
     # ------------------------------------------------------------------ shared helpers
     def flow(self):
@@ -109,7 +174,8 @@ class Studio:
             script, plan = self._script_and_plan(production_id)
         except NetworkError as error:
             code = {"production_incomplete": "production_incomplete", "production_not_found": "production_not_found",
-                    "invalid_production_state": "invalid_production_state"}.get(error.code)
+                    "invalid_production_state": "invalid_production_state",
+                    "production_locked": "production_busy"}.get(error.code)
             if code is None:
                 code = "scene_plan_invalid" if "plan" in error.code else "artifact_changed"
             reasons.append(code)
@@ -152,7 +218,7 @@ class Studio:
                             "models": [m for m in video["models"] if m in ALLOWED_MODELS],
                             "resolutions": video["resolutions"], "voices": speech["voices"],
                             "default_voice": speech["defaults"]["voice"]},
-                "acknowledgments": ACK_TEXT}
+                "acknowledgments": ACK_TEXT, "research": self.research_session()}
 
     def productions(self):
         from ..production import ProductionStore

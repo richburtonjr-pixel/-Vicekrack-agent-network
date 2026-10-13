@@ -1,0 +1,307 @@
+{
+  "policy_version": "1.0",
+  "profile": "open",
+  "description": "Any-topic research (Step 50). Secondary = widely recognized news outlets; no official sources are configured, so stories are labelled MULTIPLE REPORTS or RUMOR, never CONFIRMED. Unlisted outlets are unrated.",
+  "primary_sources": [],
+  "secondary_sources": [
+    {
+      "source_id": "ap",
+      "hosts": [
+        "apnews.com"
+      ],
+      "note": "AP"
+    },
+    {
+      "source_id": "reuters",
+      "hosts": [
+        "www.reuters.com",
+        "reuters.com"
+      ],
+      "note": "Reuters"
+    },
+    {
+      "source_id": "bbc",
+      "hosts": [
+        "www.bbc.com",
+        "www.bbc.co.uk",
+        "bbc.com"
+      ],
+      "note": "BBC"
+    },
+    {
+      "source_id": "cnn",
+      "hosts": [
+        "www.cnn.com",
+        "edition.cnn.com",
+        "cnn.com"
+      ],
+      "note": "CNN"
+    },
+    {
+      "source_id": "nytimes",
+      "hosts": [
+        "www.nytimes.com",
+        "nytimes.com"
+      ],
+      "note": "The New York Times"
+    },
+    {
+      "source_id": "washpost",
+      "hosts": [
+        "www.washingtonpost.com"
+      ],
+      "note": "The Washington Post"
+    },
+    {
+      "source_id": "guardian",
+      "hosts": [
+        "www.theguardian.com"
+      ],
+      "note": "The Guardian"
+    },
+    {
+      "source_id": "npr",
+      "hosts": [
+        "www.npr.org"
+      ],
+      "note": "NPR"
+    },
+    {
+      "source_id": "wsj",
+      "hosts": [
+        "www.wsj.com"
+      ],
+      "note": "The Wall Street Journal"
+    },
+    {
+      "source_id": "bloomberg",
+      "hosts": [
+        "www.bloomberg.com"
+      ],
+      "note": "Bloomberg"
+    },
+    {
+      "source_id": "cnbc",
+      "hosts": [
+        "www.cnbc.com"
+      ],
+      "note": "CNBC"
+    },
+    {
+      "source_id": "usatoday",
+      "hosts": [
+        "www.usatoday.com"
+      ],
+      "note": "USA Today"
+    },
+    {
+      "source_id": "nbcnews",
+      "hosts": [
+        "www.nbcnews.com"
+      ],
+      "note": "NBC News"
+    },
+    {
+      "source_id": "abcnews",
+      "hosts": [
+        "abcnews.go.com"
+      ],
+      "note": "ABC News"
+    },
+    {
+      "source_id": "cbsnews",
+      "hosts": [
+        "www.cbsnews.com"
+      ],
+      "note": "CBS News"
+    },
+    {
+      "source_id": "axios",
+      "hosts": [
+        "www.axios.com"
+      ],
+      "note": "Axios"
+    },
+    {
+      "source_id": "espn",
+      "hosts": [
+        "www.espn.com"
+      ],
+      "note": "ESPN"
+    },
+    {
+      "source_id": "bleacherreport",
+      "hosts": [
+        "bleacherreport.com"
+      ],
+      "note": "Bleacher Report"
+    },
+    {
+      "source_id": "cbssports",
+      "hosts": [
+        "www.cbssports.com"
+      ],
+      "note": "CBS Sports"
+    },
+    {
+      "source_id": "ign",
+      "hosts": [
+        "www.ign.com",
+        "ign.com"
+      ],
+      "note": "IGN"
+    },
+    {
+      "source_id": "gamespot",
+      "hosts": [
+        "www.gamespot.com",
+        "gamespot.com"
+      ],
+      "note": "GameSpot"
+    },
+    {
+      "source_id": "polygon",
+      "hosts": [
+        "www.polygon.com"
+      ],
+      "note": "Polygon"
+    },
+    {
+      "source_id": "kotaku",
+      "hosts": [
+        "kotaku.com"
+      ],
+      "note": "Kotaku"
+    },
+    {
+      "source_id": "eurogamer",
+      "hosts": [
+        "www.eurogamer.net"
+      ],
+      "note": "Eurogamer"
+    },
+    {
+      "source_id": "theverge",
+      "hosts": [
+        "www.theverge.com"
+      ],
+      "note": "The Verge"
+    },
+    {
+      "source_id": "techcrunch",
+      "hosts": [
+        "techcrunch.com"
+      ],
+      "note": "TechCrunch"
+    },
+    {
+      "source_id": "wired",
+      "hosts": [
+        "www.wired.com"
+      ],
+      "note": "Wired"
+    },
+    {
+      "source_id": "engadget",
+      "hosts": [
+        "www.engadget.com"
+      ],
+      "note": "Engadget"
+    },
+    {
+      "source_id": "arstechnica",
+      "hosts": [
+        "arstechnica.com"
+      ],
+      "note": "Ars Technica"
+    },
+    {
+      "source_id": "variety",
+      "hosts": [
+        "variety.com"
+      ],
+      "note": "Variety"
+    },
+    {
+      "source_id": "hollywoodreporter",
+      "hosts": [
+        "www.hollywoodreporter.com"
+      ],
+      "note": "The Hollywood Reporter"
+    },
+    {
+      "source_id": "deadline",
+      "hosts": [
+        "deadline.com"
+      ],
+      "note": "Deadline"
+    },
+    {
+      "source_id": "billboard",
+      "hosts": [
+        "www.billboard.com"
+      ],
+      "note": "Billboard"
+    },
+    {
+      "source_id": "rollingstone",
+      "hosts": [
+        "www.rollingstone.com"
+      ],
+      "note": "Rolling Stone"
+    },
+    {
+      "source_id": "complex",
+      "hosts": [
+        "www.complex.com"
+      ],
+      "note": "Complex"
+    },
+    {
+      "source_id": "hypebeast",
+      "hosts": [
+        "hypebeast.com"
+      ],
+      "note": "Hypebeast"
+    },
+    {
+      "source_id": "sneakernews",
+      "hosts": [
+        "sneakernews.com"
+      ],
+      "note": "Sneaker News"
+    },
+    {
+      "source_id": "people",
+      "hosts": [
+        "people.com"
+      ],
+      "note": "People"
+    },
+    {
+      "source_id": "forbes",
+      "hosts": [
+        "www.forbes.com"
+      ],
+      "note": "Forbes"
+    }
+  ],
+  "attribution_aliases": {},
+  "rules": {
+    "min_independent_secondary_origins": 2,
+    "match_threshold": 0.6,
+    "near_duplicate_threshold": 0.85,
+    "max_candidates": 500,
+    "max_evidence_per_claim": 20,
+    "max_record_age_days": 7
+  },
+  "brief_defaults": {
+    "avoid": [
+      "Brand logos",
+      "Likenesses of real people"
+    ],
+    "disclosures": [
+      "Fan-made commentary. Not affiliated with any company or person mentioned."
+    ]
+  }
+}

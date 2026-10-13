@@ -81,7 +81,7 @@
       "required": ["created_by", "provider", "model", "created_at"],
       "properties": {
         "created_by": { "$ref": "#/$defs/identifier" },
-        "provider": { "enum": ["mock", "openai", "anthropic", "human"] },
+        "provider": { "enum": ["mock", "openai", "anthropic", "xai", "human"] },
         "model": { "type": ["string", "null"], "maxLength": 100 },
         "created_at": { "$ref": "#/$defs/timestamp" }
       }

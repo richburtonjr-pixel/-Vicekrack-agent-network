@@ -1,0 +1,185 @@
+{
+  "profile_version": "1.0",
+  "profile": "open",
+  "description": "Any-topic research (Step 50). Relevance comes from the topic the user typed; the rumor lane labels unconfirmed stories.",
+  "relevance": {
+    "core_terms": [
+      "breaking"
+    ],
+    "related_terms": [],
+    "required": false
+  },
+  "topics": [
+    {
+      "topic_id": "announcement",
+      "priority": 5,
+      "terms": [
+        "announces",
+        "announced",
+        "announcement",
+        "official",
+        "confirms",
+        "confirmed",
+        "reveals",
+        "revealed",
+        "unveils"
+      ],
+      "angle": "What was just announced, and what it means."
+    },
+    {
+      "topic_id": "release",
+      "priority": 5,
+      "terms": [
+        "release",
+        "release date",
+        "launch",
+        "launches",
+        "drops",
+        "drop",
+        "premiere",
+        "debut",
+        "coming"
+      ],
+      "angle": "When it's coming and what to expect."
+    },
+    {
+      "topic_id": "leak_rumor",
+      "priority": 4,
+      "terms": [
+        "leak",
+        "leaked",
+        "rumor",
+        "rumors",
+        "reportedly",
+        "insider",
+        "insiders",
+        "report",
+        "reports"
+      ],
+      "angle": "What's being reported, and how solid it is."
+    },
+    {
+      "topic_id": "media",
+      "priority": 4,
+      "terms": [
+        "trailer",
+        "teaser",
+        "video",
+        "first look",
+        "photos",
+        "images",
+        "clip"
+      ],
+      "angle": "What the newest footage shows."
+    },
+    {
+      "topic_id": "deal_move",
+      "priority": 4,
+      "terms": [
+        "trade",
+        "signs",
+        "signed",
+        "deal",
+        "contract",
+        "acquires",
+        "acquisition",
+        "partnership",
+        "collab",
+        "collaboration"
+      ],
+      "angle": "Who's moving, and why it matters."
+    },
+    {
+      "topic_id": "result",
+      "priority": 3,
+      "terms": [
+        "wins",
+        "won",
+        "beats",
+        "record",
+        "results",
+        "score",
+        "sales",
+        "sold",
+        "numbers"
+      ],
+      "angle": "The result and the numbers behind it."
+    },
+    {
+      "topic_id": "controversy",
+      "priority": 3,
+      "terms": [
+        "backlash",
+        "controversy",
+        "lawsuit",
+        "sued",
+        "banned",
+        "delay",
+        "delayed",
+        "canceled",
+        "cancelled"
+      ],
+      "angle": "What happened and why people are talking."
+    },
+    {
+      "topic_id": "general",
+      "priority": 2,
+      "terms": [
+        "new",
+        "update",
+        "latest",
+        "today",
+        "week"
+      ],
+      "angle": "The latest, in fifteen seconds."
+    }
+  ],
+  "rumor_terms": [
+    "rumor",
+    "rumors",
+    "rumour",
+    "leak",
+    "leaks",
+    "leaked",
+    "leaker",
+    "insider",
+    "insiders",
+    "allegedly",
+    "reportedly",
+    "speculation"
+  ],
+  "weights": {
+    "confidence": 35,
+    "authority": 20,
+    "corroboration": 10,
+    "recency": 15,
+    "relevance": 10,
+    "significance": 10
+  },
+  "thresholds": {
+    "select_min_score": 60,
+    "hold_min_score": 30,
+    "select_max_age_days": 7,
+    "stale_after_days": 30,
+    "max_selections_per_run": 10
+  },
+  "history": {
+    "max_entries": 200,
+    "window_days": 60,
+    "duplicate_threshold": 0.9,
+    "similar_threshold": 0.6
+  },
+  "limits": {
+    "max_records": 200
+  },
+  "rumor_lane": {
+    "enabled": true,
+    "allow_single_report": true,
+    "select_min_score": 40,
+    "angle": "What's being reported so far, not yet officially confirmed.",
+    "disclosures": {
+      "multiple_reports": "MULTIPLE REPORTS - UNCONFIRMED. Reported by several outlets; not officially confirmed.",
+      "single_report": "RUMOR - UNCONFIRMED. One outlet reports this; not officially confirmed."
+    }
+  }
+}
