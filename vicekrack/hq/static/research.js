@@ -16,7 +16,8 @@
   var R = { loaded: false, session: null, jobs: [], job: null, busy: false, message: null, error: null,
             topics: "", openCard: null };
   var LABEL_TONE = { "MULTIPLE REPORTS": "multi", "RUMOR": "rumor", "CONFIRMED": "confirmed",
-                     "ON HOLD": "hold", "NOT USABLE": "no", "NOT CHECKED": "no" };
+                     "ON HOLD": "hold", "NOT USABLE": "no", "NOT CHECKED": "no",
+                     "UNVERIFIED SITE": "rumor", "YOUR CALL": "pick" };
   var CHECKS = { opened: "opened by ViceKrack", page_does_not_mention_topic: "page doesn't mention the topic",
                  page_has_no_article_text: "no article text on the page", article_unavailable: "couldn't open the page",
                  article_blocked_url: "link not allowed", article_blocked_host: "redirected to another site",
@@ -235,12 +236,14 @@
       return;
     }
     if (R.openCard !== card.index) {
-      button(el, offer.production_status ? "Continue making video" : "Make video", function () { R.openCard = card.index; render(); }, "go");
+      button(el, offer.production_status ? "Continue making video" : offer.pick ? "Use anyway" : "Make video",
+        function () { R.openCard = card.index; render(); }, "go");
       return;
     }
     var lines = [offer.writer + " writes a 15-second script from this story's checked facts. Estimated cost: " +
                  money(offer.estimate_usd) + ".",
-                 offer.rumor ? "This story isn't officially confirmed: the video is labelled " + card.label +
+                 offer.pick ? "Your call: it didn't pass the automatic checks (" + (card.reason || "see above") + ")" :
+                   offer.rumor ? "This story isn't officially confirmed: the video is labelled " + card.label +
                    " on screen and the script must say it's reported, not fact." : "This story is confirmed by an official source.",
                  "Then ViceKrack builds the story (free) and opens it in Video Studio, where clips and narration are approved separately."];
     paidBox(el, "Write the script with Grok", lines, offer.consent, "Approve and write script (paid)",

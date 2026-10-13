@@ -48,6 +48,7 @@ Labels on the cards:
 | CONFIRMED | an official source says it (profiles with official sources) | yes |
 | ON HOLD | for example another card covers the same story, or it is over a week old | no |
 | NOT USABLE | for example only unlisted sites, page couldn't be opened, too old, contradicted | no, with the reason |
+| YOUR CALL | Step 51: old, undated, low score or unlisted site, see [step51.md](step51.md) | Use anyway, labelled on screen |
 
 Outlets that copy the same wire story count as **one** origin, exactly as in Verification.
 

@@ -16,7 +16,7 @@ from vicekrack.orchestrator import ROOT, read_json
 from vicekrack.production import Pipeline, ProductionStore
 from vicekrack.research_demo import FixturePages, MockGrokResearch, MockGrokWriter, _envelope
 from vicekrack.research_desk import (
-    RESEARCH_SCHEMA, ResearchDesk, _article_url, estimate, load_config, topic_keywords, writer_estimate,
+    RESEARCH_SCHEMA, ResearchDesk, _article_url, estimate, load_config, loose_date, topic_keywords, writer_estimate,
 )
 from vicekrack.scout_cli import store_paths
 from vicekrack.video_production_demo import demo_clock
@@ -99,11 +99,14 @@ class ResearchTests(Base):
         self.assertEqual(job["status"], "completed")
         self.assertEqual(len(self.grok.calls), 1)
         labels = [c["label"] for c in job["cards"]]
-        self.assertEqual(labels, ["MULTIPLE REPORTS", "RUMOR", "NOT USABLE"])
-        multi, rumor, unusable = job["cards"]
+        self.assertEqual(labels, ["MULTIPLE REPORTS", "RUMOR", "YOUR CALL"])      # Step 51: the fan site is your call
+        multi, rumor, unlisted = job["cards"]
         self.assertTrue(multi["make_video"] and rumor["make_video"])
-        self.assertIsNone(unusable["make_video"])
-        self.assertIn("trusted outlet list", unusable["reason"])
+        self.assertNotIn("pick", multi["make_video"])
+        self.assertTrue(unlisted["make_video"]["pick"])
+        self.assertEqual(unlisted["make_video"]["video_label"], "UNVERIFIED SOURCE - UNCONFIRMED")
+        self.assertIn("trusted outlet list", unlisted["reason"])
+        self.assertIn("You can still use it", unlisted["reason"])
         self.assertTrue(multi["make_video"]["rumor"])
         self.assertEqual(multi["make_video"]["consent"], "paid-script:" + multi["make_video"]["production_id"])
         self.assertEqual({s["check"] for c in job["cards"] for s in c["sources"]}, {"opened"})
@@ -126,7 +129,7 @@ class ResearchTests(Base):
         def lying(body, *, timeout_seconds):
             self.pages.add("https://apnews.com/article/real-page", "Weather today", ["Rain is expected all day long here."],
                            "2026-01-05T10:00:00Z")
-            story = {"topic": "GTA 6", "headline": "GTA 6 news", "summary": "x",
+            story = {"topic": "GTA 6", "headline": "GTA 6 news", "summary": "x", "aliases": [],
                      "sources": [{"url": "https://www.ign.com/articles/made-up", "publisher": "IGN", "published": ""},
                                  {"url": "https://apnews.com/article/real-page", "publisher": "AP", "published": ""},
                                  {"url": "https://www.ign.com/articles/q?id=1", "publisher": "IGN", "published": ""}]}
@@ -232,10 +235,33 @@ class MakeVideoTests(Base):
         self.assertEqual(again["status"], "completed")
         self.assertEqual(len(self.writer.calls), 1)                          # never written (or paid) twice
 
+    def test_your_call_story_is_labelled_unverified_source(self):
+        card = self.card(self.job, "YOUR CALL")
+        result = self.desk.make_video(self.job["job_id"], card["index"], card["make_video"]["consent"],
+                                      pipeline=self.pipeline)
+        self.assertEqual(result["status"], "completed")
+        state = ProductionStore(self.root).read(card["make_video"]["production_id"])
+        self.assertEqual(state["config"]["editorial_profile"]["path"], "config/editorial.open.pick.json")
+        folder = ProductionStore(self.root).folder(state["production_id"])
+        brief = read_json(folder / state["stages"][0]["artifacts"]["brief_path"])
+        self.assertEqual((brief["editorial"]["lane"], brief["editorial"]["rumor_label"]), ("rumor", "unrated_source"))
+        self.assertTrue(brief["constraints"]["disclosures"][0].startswith("UNVERIFIED SOURCE - UNCONFIRMED"))
+        self.assertTrue(all(c["verification_status"] != "verified" for c in brief["verification"]["claims"]))
+
     def test_refusals(self):
-        unusable, rumor = self.card(self.job, "NOT USABLE"), self.card(self.job, "RUMOR")
-        cases = ((unusable["index"], "paid-script:prod-" + "0" * 24, "story_not_makeable"),
-                 (rumor["index"], "paid-script:prod-" + "0" * 24, "script_consent_required"),
+        def lying(body, *, timeout_seconds):
+            story = {"topic": "GTA 6", "headline": "GTA 6 news", "summary": "x", "aliases": [],
+                     "sources": [{"url": "https://www.ign.com/articles/made-up", "publisher": "IGN", "published": ""}]}
+            return _envelope({"stories": [story]}, 100, 100)
+        self.desk.transport = lying
+        nothing = self.researched(["GTA 6"])
+        self.assertEqual(nothing["cards"][0]["label"], "NOT USABLE")      # no real page: never makeable
+        self.assertIsNone(nothing["cards"][0]["make_video"])
+        with self.assertRaises(NetworkError) as raised:
+            self.desk.make_video(nothing["job_id"], 0, "paid-script:prod-" + "0" * 24, pipeline=self.pipeline)
+        self.assertEqual(raised.exception.code, "story_not_makeable")
+        unusable, rumor = nothing["cards"][0], self.card(self.job, "RUMOR")
+        cases = ((rumor["index"], "paid-script:prod-" + "0" * 24, "script_consent_required"),
                  (99, "x", "research_story_not_found"))
         for index, consent, code in cases:
             with self.assertRaises(NetworkError) as raised:
@@ -357,3 +383,92 @@ class StudioResearchTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Step51ResearchFixes(Base):
+    """Step 51: real news pages with loose dates, nicknames, parallel page checks and the deciding reason."""
+
+    def raw(self, url, head, sentences):
+        self.pages.pages[url] = (f"<html><head><title>Sixers news</title>{head}</head><body><article>"
+                                 + "".join(f"<p>{s}</p>" for s in sentences) + "</article></body></html>").encode()
+
+    def test_loose_date_rules(self):
+        now = "2026-10-13T19:00:00Z"
+        self.assertEqual(loose_date(["2026-10-13T12:00:00"], now), "2026-10-13T12:00:00Z")          # no timezone
+        self.assertEqual(loose_date(["2026-10-13"], now), "2026-10-13T00:00:00Z")                   # day only
+        self.assertEqual(loose_date(["2026-10-13T12:00:00-04:00"], now), "2026-10-13T16:00:00Z")
+        self.assertEqual(loose_date(["nonsense", "2026-10-12T01:00:00Z"], now), "2026-10-12T01:00:00Z")
+        self.assertIsNone(loose_date(["2027-01-01"], now))                                           # future
+        self.assertIsNone(loose_date([], now))
+
+    def test_nickname_and_loose_dates_make_usable_cards(self):
+        now = self.clock()
+        day = now[:10]
+        sentences = ["The Sixers are close to a deal for a veteran guard, according to league sources.",
+                     "Philadelphia has been looking for backcourt depth since the start of camp.",
+                     "The trade would send two second round picks to the other team."]
+        self.raw("https://apnews.com/article/sixers-guard", f'<meta name="parsely-pub-date" content="{day}">', sentences)
+        self.raw("https://www.reuters.com/sports/sixers-guard",
+                 f'<script type="application/ld+json">[{{"datePublished":"{day}T08:00:00"}},'
+                 f'{{"datePublished":"{day}T09:00:00-04:00"}}]</script>',
+                 ["Sixers executives have discussed a trade for a veteran guard this week.",
+                  "Philadelphia wants more depth in the backcourt before the season begins.",
+                  "Two second round picks could be part of the package, people familiar said."])
+
+        def grok(body, *, timeout_seconds):
+            self.assertIn("Sixers for 76ers", body["input"][0]["content"])
+            self.assertIn("Reuters", body["input"][0]["content"])                   # prefers trusted outlets
+            story = {"topic": "76ers", "headline": "Sixers near guard trade", "summary": "x",
+                     "aliases": ["Sixers", "Philadelphia", "<bad>", "Sixers"],
+                     "sources": [{"url": "https://apnews.com/article/sixers-guard", "publisher": "AP", "published": ""},
+                                 {"url": "https://www.reuters.com/sports/sixers-guard", "publisher": "Reuters",
+                                  "published": ""}]}
+            return _envelope({"stories": [story]}, 100, 100)
+        self.desk.transport = grok
+        job = self.researched(["76ers"])
+        card = job["cards"][0]
+        self.assertEqual([s["check"] for s in card["sources"]], ["opened", "opened"], card)
+        self.assertNotEqual(card["label"], "NOT USABLE", card)
+        self.assertEqual(job["stories"][0]["aliases"], ["Sixers", "Philadelphia"])
+
+    def test_pages_open_in_parallel_once_each(self):
+        import threading
+        import time
+        active, peak, lock = [0], [0], threading.Lock()
+        fetch = self.pages.fetch
+
+        def slow(url, rule, limits):
+            with lock:
+                active[0] += 1
+                peak[0] = max(peak[0], active[0])
+            time.sleep(0.05)
+            try:
+                return fetch(url, rule, limits)
+            finally:
+                with lock:
+                    active[0] -= 1
+        self.pages.fetch = slow
+        job = self.researched(["Jordan 4 release", "GTA 6"])
+        self.assertGreater(peak[0], 1)
+        self.assertEqual(len(self.pages.calls), len(set(self.pages.calls)))
+        self.assertTrue(job["cards"])
+
+    def test_plain_reason_follows_selection_order(self):
+        story = {"sources": [{"check": "opened", "trusted": True}]}
+        hold = {"disposition": "hold", "reasons": ["single_report", "not_recent", "below_rumor_score"]}
+        self.assertTrue(ResearchDesk._plain_reason(hold, story).startswith("Older than a week"))
+        weak = {"disposition": "reject", "reasons": ["single_report", "below_rumor_score", "new_story"]}
+        self.assertTrue(ResearchDesk._plain_reason(weak, story).startswith("Too weak"))
+
+
+class PickRules(unittest.TestCase):
+    def test_hand_picks_never_waive_falsehood_or_injection(self):
+        from vicekrack.selection import PICK_WAIVED
+        for code in ("contradicted_claims", "disputed_claims", "instruction_like_text", "future_date",
+                     "duplicate_of_previous", "no_verified_claims", "not_relevant"):
+            self.assertNotIn(code, PICK_WAIVED)
+        pick = json.loads((ROOT / "config/editorial.open.pick.json").read_text(encoding="utf-8"))
+        standard = json.loads((ROOT / "config/editorial.open.json").read_text(encoding="utf-8"))
+        self.assertEqual(pick["profile"], standard["profile"])            # shared history and production IDs
+        self.assertNotIn("user_pick", standard)
+        self.assertFalse(standard["rumor_lane"].get("allow_unrated", False))

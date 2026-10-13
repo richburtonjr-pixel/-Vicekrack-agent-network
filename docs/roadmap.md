@@ -320,3 +320,14 @@ Recorded: the approved headquarters visual direction ([docs/visual-direction.md]
 
 Deferred: the headquarters redesign, ChatGPT as an optional writer/second opinion, official sources
 for non-GTA topics, publishing.
+
+# Step 51 implementation checkpoint
+
+Implemented: looser research, you pick ([docs/step51.md](step51.md)):
+
+- "Use anyway" on any story ViceKrack could open a real page for (old, undated, low score or unlisted
+  site), labelled on screen; the `user_pick` profile `config/editorial.open.pick.json`;
+- a third rumor label, `unrated_source` ("UNVERIFIED SOURCE - UNCONFIRMED");
+- page dates read the way news sites actually write them; topic nicknames from Grok (Sixers for 76ers);
+- source pages opened in parallel; the card reason is the deciding one;
+- Make video selects the story again at click time, so yesterday's cards still work.

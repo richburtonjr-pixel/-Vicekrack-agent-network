@@ -51,6 +51,8 @@ REJECT_REASONS = ("instruction_like_text", "no_verified_claims", "not_relevant",
 HOLD_REASONS = ("corroborated_only", "contradicted_claims", "disputed_claims", "unconfirmed_rumor", "not_recent",
                 "publish_date_unknown", "near_duplicate_of_previous", "similar_to_higher_ranked",
                 "below_select_score", "selection_limit")
+PICK_WAIVED = ("not_recent", "stale", "publish_date_unknown", "near_duplicate_of_previous",
+               "below_rumor_score", "below_hold_score", "below_select_score")
 PHRASES = {
     "primary_verified": "verified by a first-hand primary source",
     "independent_corroboration": "supported by independent origins",
@@ -80,6 +82,7 @@ PHRASES = {
     # Step 49 (rumor lane, opt-in): informational labels, never an upgrade to verified.
     "rumor_multiple_reports": "RUMOR LANE: multiple independent outlets report it; not officially confirmed",
     "rumor_single_report": "RUMOR LANE: one reputable outlet reports it; not officially confirmed",
+    "rumor_unrated_source": "RUMOR LANE: only sites outside the trusted list report it; not confirmed",
     "below_rumor_score": "score below the rumor-lane threshold",
 }
 
@@ -337,6 +340,10 @@ def evaluate_story(record, profile, history, now):
         reasons.append("below_hold_score")
     elif score < thresholds["select_min_score"]:
         reasons.append("below_select_score")
+    if profile.get("user_pick") and (rumor_label or verified):
+        # Step 51: the user picked this story by hand. Age, a missing date, a low score and a
+        # near-repeat stop being blockers; contradictions, instructions and future dates still block.
+        reasons = [r for r in reasons if r not in PICK_WAIVED]
     if verified and primary:
         reasons.append("primary_verified")
     if origins >= 2:

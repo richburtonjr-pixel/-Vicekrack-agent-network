@@ -24,6 +24,7 @@
   "pipeline": {
     "policy": "config/verification.open.json",
     "editorial_profile": "config/editorial.open.json",
-    "creator": "config/creator.xai.json"
+    "creator": "config/creator.xai.json",
+    "pick_profile": "config/editorial.open.pick.json"
   }
 }
