@@ -351,7 +351,8 @@ class StudioResearchTests(Base):
                           "XAI_API_KEY"):
             self.assertNotIn(forbidden, text)
         status, _, body = self.call("GET", "/static/research.js")
-        self.assertEqual((status, body.decode("utf-8")), (200, text))
+        # Compare bytes: a Windows checkout may use CRLF line endings, which read_text would normalize.
+        self.assertEqual((status, body), (200, (ROOT / "vicekrack/hq/static/research.js").read_bytes()))
 
 
 if __name__ == "__main__":
