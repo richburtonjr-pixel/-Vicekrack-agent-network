@@ -75,6 +75,27 @@
       "additionalProperties": false,
       "required": ["max_records"],
       "properties": { "max_records": { "type": "integer", "minimum": 1, "maximum": 500 } }
+    },
+    "rumor_lane": {
+      "description": "Optional (Step 49). Opt-in lane for clearly labelled stories without official confirmation. Absent or disabled: verified-only, exactly as before.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "allow_single_report", "select_min_score", "angle", "disclosures"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allow_single_report": { "type": "boolean", "description": "Also allow stories that exactly one reputable press origin reports (label single_report)." },
+        "select_min_score": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Score a rumor needs; below it the rumor is rejected (below_rumor_score)." },
+        "angle": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+        "disclosures": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["multiple_reports", "single_report"],
+          "properties": {
+            "multiple_reports": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "single_report": { "type": "string", "minLength": 1, "maxLength": 120 }
+          }
+        }
+      }
     }
   },
   "$defs": {

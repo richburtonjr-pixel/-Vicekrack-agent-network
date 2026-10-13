@@ -71,8 +71,11 @@
             }
           },
           "reasons": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/reason" } },
-          "rationale": { "type": "string", "minLength": 1, "maxLength": 1000 }
-        }
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "lane": { "enum": ["rumor"], "description": "Step 49: present only for a rumor-lane entry (no verified claim; labelled)." },
+          "rumor_label": { "enum": ["multiple_reports", "single_report"] }
+        },
+        "dependentRequired": { "lane": ["rumor_label"], "rumor_label": ["lane"] }
       }
     },
     "summary": {
@@ -115,7 +118,8 @@
         "update_to_previous", "supersedes_older_official", "no_verified_claims", "corroborated_only", "contradicted_claims", "disputed_claims",
         "unconfirmed_rumor", "not_relevant", "stale", "not_recent", "publish_date_unknown", "future_date",
         "instruction_like_text", "duplicate_of_previous", "near_duplicate_of_previous", "similar_to_higher_ranked",
-        "duplicate_in_batch", "below_select_score", "below_hold_score", "selection_limit"
+        "duplicate_in_batch", "below_select_score", "below_hold_score", "selection_limit",
+        "rumor_multiple_reports", "rumor_single_report", "below_rumor_score"
       ]
     }
   }

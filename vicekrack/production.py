@@ -56,6 +56,7 @@ from .scene_plan import build_scene_plan, capabilities as normalize_capabilities
 from .scout_cli import _publish
 from .selection import load_profile, prune_history, select_brief, story_features, utc_now
 from .short_script import validate_short_script
+from .rumor import check_hedging
 from .story_brief import count_unverified, validate_story_brief
 from .verification import load_policy
 
@@ -296,7 +297,10 @@ def _check_saved_config(state):
 # ---------------------------------------------------------------- history reservation
 
 def _history_entry(brief, record, now, production_id, state):
-    features = story_features(record)
+    # Step 49: a rumor-lane brief fingerprints the record claims it used (all unverified).
+    rumor_ids = [link["record_claim_id"] for link in brief["verification"]["claims"]
+                 if link["verification_status"] != "verified"] if brief["editorial"].get("lane") == "rumor" else []
+    features = story_features(record, rumor_ids)
     return {"selection_id": brief["editorial"]["selection_id"], "record_id": record["record_id"],
             "candidate_id": record["candidate"]["candidate_id"], "url_sha256": record["candidate"]["url_sha256"],
             "brief_id": brief["brief_id"], "topics": list(brief["editorial"]["topics"]), **features,
@@ -357,9 +361,13 @@ class Pipeline:
         if self.store.state_path(production_id).exists():
             raise NetworkError("production_exists", "This story already has a production; inspect or resume it.")
         history, _ = load_history(loaded["profile"], self.root)
-        select_brief(record, report, profile=loaded["profile"], profile_sha256=loaded["profile_sha"],
-                     policy=loaded["policy"], policy_sha256=loaded["policy_sha"],
-                     history=prune_history(history, loaded["profile"], now), now=now)
+        brief, _ = select_brief(record, report, profile=loaded["profile"], profile_sha256=loaded["profile_sha"],
+                                policy=loaded["policy"], policy_sha256=loaded["policy_sha"],
+                                history=prune_history(history, loaded["profile"], now), now=now)
+        if brief["editorial"].get("lane") == "rumor" and not allow_draft_preview:
+            # Step 49: a rumor is always a labelled draft; say so before any state exists.
+            raise NetworkError("rumor_requires_draft_preview",
+                               "This is a rumor-lane story (unconfirmed); start it with --allow-draft-preview.")
         files = loaded["files"]
         state = {
             "contract": "production_run", "version": "1.0", "production_id": production_id, "status": "ready",
@@ -651,6 +659,7 @@ class Pipeline:
         validate_short_script(script)
         if script["claims"] != brief["claims"] or script["sources"] != brief["sources"]:
             raise NetworkError("creator_changed_facts", "The script's claims or sources differ from the brief.")
+        check_hedging(brief, script)   # Step 49: a rumor must be worded as a rumor.
         unverified = count_unverified(script)
         return {"script_sha256": state["stages"][1]["artifacts"]["script_sha256"], "draft": unverified > 0,
                 "claims_unverified": unverified, "claims_total": len(script["claims"])}

@@ -7,6 +7,10 @@ record is re-validated by decision replay against the current policy and must be
 Each brief claim cites only the sources whose evidence supports it, and the brief's
 optional `verification` block links every claim to its record so later stages (and the
 Story Brief validator) can check that no status was upgraded.
+
+Step 49: with rumor_claim_ids (the rumor lane), exactly those record claims are added as
+`unverified`: corroborated claims and, when the lane allows it, single-report claims. The
+same draft-only rules apply; the lane only decides which unconfirmed claims may be used.
 """
 
 import hashlib
@@ -26,12 +30,14 @@ def _parse(stamp):
 
 
 def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=None, brief_id=None,
-                         include_corroborated=False, clock=utc_now):
+                         include_corroborated=False, rumor_claim_ids=None, clock=utc_now):
     """Return a validated Story Brief built only from sufficiently supported claims."""
     if not records:
         raise NetworkError("no_verification_records", "Select at least one Verification Record.")
     if len(records) > MAX_BRIEF_CLAIMS:
         raise NetworkError("brief_too_large", "Select at most 8 Verification Records for one brief.")
+    if rumor_claim_ids and len(records) != 1:
+        raise NetworkError("rumor_brief_single_record", "A rumor-lane brief is built from exactly one record.")
     now = _parse(clock())
     max_age = timedelta(days=policy["rules"]["max_record_age_days"])
     seen_records = set()
@@ -48,7 +54,9 @@ def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=No
     sources, claims, links, texts = {}, [], [], set()
     for record in records:
         for claim in record["claims"]:
-            if claim["status"] not in accepted:
+            if claim["status"] not in accepted and not (
+                    rumor_claim_ids and claim["claim_id"] in rumor_claim_ids
+                    and claim["status"] in ("corroborated", "insufficient_evidence")):
                 continue
             key = " ".join(re.findall(r"[a-z0-9]+", claim["text"].lower()))
             if key in texts:
@@ -85,7 +93,8 @@ def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=No
         raise NetworkError("brief_too_large", "A Story Brief may contain at most 8 claims; select fewer records.")
 
     record_ids = [record["record_id"] for record in records]
-    digest = hashlib.sha256(("\n".join(sorted(record_ids)) + f"\n{include_corroborated}").encode()).hexdigest()
+    flag = f"\n{include_corroborated}" + (f"\nrumor:{','.join(sorted(rumor_claim_ids))}" if rumor_claim_ids else "")
+    digest = hashlib.sha256(("\n".join(sorted(record_ids)) + flag).encode()).hexdigest()
     first = records[0]["candidate"]
     brief = {
         "contract": "story_brief", "version": "1.0",
@@ -102,5 +111,8 @@ def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=No
     }
     if any(record["content_profile"] != brief["content_profile"] for record in records):
         raise NetworkError("profile_mismatch", "All selected records must use the same profile.")
-    validate_story_brief(brief)
+    if not rumor_claim_ids:
+        validate_story_brief(brief)
+    # A rumor-lane brief is validated by its caller once the editorial lane block and the
+    # label disclosure are attached (a single-report link is only valid with them).
     return brief

@@ -90,7 +90,16 @@ def validate_story_brief(brief, *, require_verified_claims=False):
             _fail("editorial", "requires the verification block")
         if brief["editorial"]["record_id"] not in brief["verification"]["record_ids"]:
             _fail("editorial.record_id", "must be one of the verification records")
-        if not any(claim["status"] == "verified" for claim in brief["claims"]):
+        if brief["editorial"].get("lane") == "rumor":
+            # Step 49: a rumor-lane story is never presented as verified, and its label
+            # disclosure (burned into the video) cannot be dropped.
+            from .rumor import BANDS
+            if any(claim["status"] == "verified" for claim in brief["claims"]):
+                _fail("editorial.lane", "a rumor-lane story cannot carry verified claims")
+            band = BANDS[brief["editorial"]["rumor_label"]]
+            if not any(text.startswith(band) for text in brief["constraints"]["disclosures"]):
+                _fail("constraints.disclosures", "a rumor-lane story must carry its label disclosure")
+        elif not any(claim["status"] == "verified" for claim in brief["claims"]):
             _fail("editorial", "a selected story needs at least one verified claim")
 
     if require_verified_claims:
@@ -120,6 +129,10 @@ def _check_verification_links(brief):
         mapped[link["claim_id"]] = link
     if set(mapped) != {claim["claim_id"] for claim in brief["claims"]}:
         _fail("verification.claims", "must link every claim exactly once")
+    rumor_lane = (brief.get("editorial") or {}).get("lane") == "rumor"
+    for index, link in enumerate(links["claims"]):
+        if link["verification_status"] == "insufficient_evidence" and not rumor_lane:
+            _fail(f"verification.claims[{index}].verification_status", "a single report needs the rumor lane")
     for index, claim in enumerate(brief["claims"]):
         expected = "verified" if mapped[claim["claim_id"]]["verification_status"] == "verified" else "unverified"
         if claim["status"] != expected:

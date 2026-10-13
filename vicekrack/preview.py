@@ -16,6 +16,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .errors import NetworkError
+from .rumor import band_label
 from .narration import load_narration
 from .orchestrator import ROOT, read_json
 from .artifact_binding import check_package, sha256_bytes
@@ -92,6 +93,7 @@ def make_card(plan, scene, path, modules, narrated=False):
     accent = "#ffbe55" if plan["blocked_for_production"] else "#59d6c1"
     draw.rounded_rectangle((60,60,1020,168),radius=20,fill=accent)
     label = "DRAFT - NOT FOR PRODUCTION" if plan["blocked_for_production"] else "LOCAL PREVIEW - NOT FOR PUBLISHING"
+    label = band_label(plan, label)   # Step 49: "RUMOR - UNCONFIRMED" for a rumor-lane draft
     draw_text(draw,ImageFont,label,(88,88,905,70),36,"#0c1425")
     subtitle = "VICEKRACK / LOCAL NARRATION STORYBOARD" if narrated else "VICEKRACK / SILENT STORYBOARD"
     draw_text(draw,ImageFont,subtitle,(76,222,928,70),30,"#b9c7db")

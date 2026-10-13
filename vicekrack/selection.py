@@ -31,6 +31,7 @@ from jsonschema import Draft202012Validator
 
 from .errors import NetworkError
 from .persistence import reject_secrets
+from .rumor import REASON as RUMOR_REASON, lane_config, qualifying_claims, validate_lane
 from .story_brief import validate_story_brief
 from .verification import INSTRUCTION_TEXT, analyze
 from .verified_brief import build_verified_brief
@@ -43,9 +44,10 @@ COMPONENTS = ("confidence", "authority", "corroboration", "recency", "relevance"
 DISPOSITION_ORDER = {"select": 0, "hold": 1, "reject": 2}
 UNAVAILABLE = {"status": "unavailable", "used_in_score": False}
 REPORT_MAX_AGE = timedelta(days=1)
+RUMOR_AVOID = "Presenting unconfirmed reports as fact; say they are reported, rumored or unconfirmed"
 
 REJECT_REASONS = ("instruction_like_text", "no_verified_claims", "not_relevant", "future_date", "stale",
-                  "duplicate_of_previous", "duplicate_in_batch", "below_hold_score")
+                  "duplicate_of_previous", "duplicate_in_batch", "below_hold_score", "below_rumor_score")
 HOLD_REASONS = ("corroborated_only", "contradicted_claims", "disputed_claims", "unconfirmed_rumor", "not_recent",
                 "publish_date_unknown", "near_duplicate_of_previous", "similar_to_higher_ranked",
                 "below_select_score", "selection_limit")
@@ -75,6 +77,10 @@ PHRASES = {
     "below_select_score": "score below the selection threshold",
     "below_hold_score": "score below the hold threshold",
     "selection_limit": "selection limit for this run reached",
+    # Step 49 (rumor lane, opt-in): informational labels, never an upgrade to verified.
+    "rumor_multiple_reports": "RUMOR LANE: multiple independent outlets report it; not officially confirmed",
+    "rumor_single_report": "RUMOR LANE: one reputable outlet reports it; not officially confirmed",
+    "below_rumor_score": "score below the rumor-lane threshold",
 }
 
 
@@ -133,6 +139,7 @@ def validate_profile(profile):
     ids = [topic["topic_id"] for topic in profile["topics"]]
     if len(ids) != len(set(ids)):
         fail("topic IDs must be unique")
+    validate_lane(profile)
 
 
 def load_profile(path, root=ROOT):
@@ -198,16 +205,24 @@ def _claim_fingerprint(text):
     return _sha256(" ".join(sorted(analyze(text)["content"])))
 
 
-def story_features(record):
-    """Deterministic fingerprints of a record's verified story (no article text kept)."""
+def story_features(record, rumor_claim_ids=()):
+    """Deterministic fingerprints of a record's verified story (no article text kept).
+
+    Step 49: a rumor-lane story has no verified claim; its rumor claims (record claim IDs)
+    are fingerprinted instead, under a separate namespace, so the same rumor is not made
+    twice while a later official confirmation of it still counts as new.
+    """
+    rumor = [c for c in record["claims"] if c["claim_id"] in set(rumor_claim_ids) and c["status"] != "verified"]
     verified = [c for c in record["claims"] if c["status"] == "verified"]
     tokens, facts = set(analyze(record["candidate"]["title"])["content"]), set()
-    for claim in verified:
+    for claim in verified + rumor:
         features = analyze(claim["text"])
         tokens |= features["content"]
         facts |= features["facts"]
     clean = sorted(t for t in tokens if len(t) <= 40)
-    return {"claim_fingerprints": sorted({_claim_fingerprint(c["text"]) for c in verified}),
+    fingerprints = {_claim_fingerprint(c["text"]) for c in verified}
+    fingerprints |= {_sha256("rumor\n" + _claim_fingerprint(c["text"])) for c in rumor}
+    return {"claim_fingerprints": sorted(fingerprints),
             "story_tokens": clean[:80], "fact_tokens": sorted(t for t in facts if len(t) <= 40)[:40]}
 
 
@@ -252,6 +267,11 @@ def evaluate_story(record, profile, history, now):
     claims = record["claims"]
     verified = [c for c in claims if c["status"] == "verified"]
     usable = [c for c in claims if c["status"] in ("verified", "corroborated")]
+    lane = lane_config(profile)
+    rumor_label, rumor_claims = qualifying_claims(record, lane) if lane else (None, [])
+    singles = [c for c in rumor_claims if c["status"] == "insufficient_evidence"]
+    if rumor_label:
+        usable = usable + singles   # Scored (weakly) and checked for relevance; never verified.
     primary = max((c["primary_support"] for c in verified), default=0)
     origins = max((c["independent_origins"] for c in usable), default=0)
     text = _normalized(" ".join([record["candidate"]["title"], *(c["text"] for c in usable)]))
@@ -267,28 +287,31 @@ def evaluate_story(record, profile, history, now):
     age = (now_moment - _parse(dated)).total_seconds() / 86400
     stale_after = thresholds["stale_after_days"]
     components = {
-        "confidence": (summary["verified"] + 0.5 * summary["corroborated"]) / len(claims),
-        "authority": 1.0 if primary else (0.5 if usable else 0.0),
+        "confidence": (summary["verified"] + 0.5 * summary["corroborated"] + 0.25 * len(singles)) / len(claims),
+        "authority": 1.0 if primary else (0.5 if summary["verified"] + summary["corroborated"]
+                                          else (0.25 if usable else 0.0)),
         "corroboration": min(1.0, origins / 3),
         "recency": 1.0 if age <= 1 else max(0.0, 1 - (age - 1) / (stale_after - 1)),
         "relevance": 1.0 if core else (0.5 if related else 0.0),
         "significance": priority / 5,
     }
     score = int(round(sum(weights[name] * components[name] for name in COMPONENTS)))
-    features = story_features(record)
+    features = story_features(record, [c["claim_id"] for c in rumor_claims])
     novelty, related_id, similarity = classify_novelty(record, features, history, profile, now)
 
     reasons = []
     texts = [record["candidate"]["title"], *(c["text"] for c in claims)]
     if any(INSTRUCTION_TEXT.search(t) for t in texts):
         reasons.append("instruction_like_text")
-    if not verified:
+    if rumor_label:
+        reasons.append(RUMOR_REASON[rumor_label])
+    elif not verified:
         reasons.append("corroborated_only" if summary["corroborated"] else "no_verified_claims")
     if summary["rejected"]:
         reasons.append("contradicted_claims")
     if summary["disputed"]:
         reasons.append("disputed_claims")
-    if rumor and not primary:
+    if rumor and not primary and not rumor_label:
         reasons.append("unconfirmed_rumor")
     if not core and not related:
         reasons.append("not_relevant")
@@ -304,7 +327,10 @@ def evaluate_story(record, profile, history, now):
         reasons.append("duplicate_of_previous")
     elif novelty == "near_duplicate":
         reasons.append("near_duplicate_of_previous")
-    if score < thresholds["hold_min_score"]:
+    if rumor_label:
+        if score < lane["select_min_score"]:
+            reasons.append("below_rumor_score")
+    elif score < thresholds["hold_min_score"]:
         reasons.append("below_hold_score")
     elif score < thresholds["select_min_score"]:
         reasons.append("below_select_score")
@@ -338,6 +364,8 @@ def evaluate_story(record, profile, history, now):
                          "verified_at": record["verified_at"]},
         "reasons": reasons, "rationale": "",
     }
+    if rumor_label:
+        entry.update(lane="rumor", rumor_label=rumor_label)
     _finalize(entry)
     return entry, features
 
@@ -451,13 +479,28 @@ def select_brief(record, report, *, profile, profile_sha256, policy, policy_sha2
         raise NetworkError("selection_changed", "The story no longer qualifies (for example, it was already made).")
     topics = {t["topic_id"]: t for t in profile["topics"]}
     angle = topics[entry["topics"][0]]["angle"] if entry["topics"] else None
-    brief = build_verified_brief([record], policy, policy_sha256, topic=record["candidate"]["title"],
-                                 angle=angle, brief_id=brief_id, clock=lambda: now)
+    rumor_ids = []
+    if entry.get("lane") == "rumor":
+        lane = lane_config(profile)
+        _, rumor_claims = qualifying_claims(record, lane)
+        rumor_ids = [c["claim_id"] for c in rumor_claims]
+        brief = build_verified_brief([record], policy, policy_sha256, topic=record["candidate"]["title"],
+                                     angle=lane["angle"], brief_id=brief_id, clock=lambda: now,
+                                     rumor_claim_ids=rumor_ids)
+        constraints = brief["constraints"]
+        constraints["disclosures"] = [lane["disclosures"][entry["rumor_label"]], *constraints["disclosures"]][:4]
+        if len(constraints["avoid"]) < 5:
+            constraints["avoid"].append(RUMOR_AVOID)
+    else:
+        brief = build_verified_brief([record], policy, policy_sha256, topic=record["candidate"]["title"],
+                                     angle=angle, brief_id=brief_id, clock=lambda: now)
     selection_id = "pick-" + _sha256(f"{report['selection_run_id']}\n{record['record_id']}")[:24]
     brief["editorial"] = {"selection_id": selection_id, "selection_run_id": report["selection_run_id"],
                           "record_id": record["record_id"], "editorial_profile_sha256": profile_sha256,
                           "score": entry["score"], "topics": entry["topics"],
                           "novelty": entry["novelty"]["status"], "reasons": entry["reasons"]}
+    if rumor_ids:
+        brief["editorial"].update(lane="rumor", rumor_label=entry["rumor_label"])
     validate_story_brief(brief)
     history_entry = {"selection_id": selection_id, "record_id": record["record_id"],
                      "candidate_id": record["candidate"]["candidate_id"],
