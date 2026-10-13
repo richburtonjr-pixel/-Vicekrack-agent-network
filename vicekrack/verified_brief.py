@@ -68,6 +68,9 @@ def build_verified_brief(records, policy, policy_sha256, *, topic=None, angle=No
             else:
                 backing = [e for e in claim["evidence"]
                            if e["relation"] == "supports" and e["tier"] in ("primary", "secondary")]
+                if not backing and rumor_claim_ids:
+                    # Step 51: an unrated_source rumor (hand-picked) cites the unlisted pages it came from.
+                    backing = [e for e in claim["evidence"] if e["relation"] == "supports"]
             # Step 19: never cite a statement that a newer official statement superseded.
             current = [e for e in backing if "superseded_by" not in e]
             backing = current or backing

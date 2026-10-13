@@ -10,7 +10,11 @@ source, under two labels:
                     `insufficient_evidence` with `single_origin_only`); only when the
                     profile sets allow_single_report
 
-Disputed, contradicted, rejected, unrated-only and instruction-like claims never qualify.
+  unrated_source    Step 51: only sites that are not on the trusted outlet list report it
+                    (Verification: `insufficient_evidence` with `unrated_sources_only`); only
+                    when the profile sets allow_unrated (the user-pick profile)
+
+Disputed, contradicted, rejected and instruction-like claims never qualify.
 A rumor is never upgraded: its claims enter the Story Brief as `unverified`, so the
 existing draft path applies (a watermarked draft that needs --allow-draft-preview, and a
 quality report that needs human review). On top of that, the label is carried forward:
@@ -29,11 +33,13 @@ import re
 
 from .errors import NetworkError
 
-LABELS = ("multiple_reports", "single_report")
+LABELS = ("multiple_reports", "single_report", "unrated_source")
 # The warning band text per label. A label disclosure must start with its band text so the
 # renderer can find it in the script's disclosures (the plan carries no other rumor field).
-BANDS = {"multiple_reports": "MULTIPLE REPORTS - UNCONFIRMED", "single_report": "RUMOR - UNCONFIRMED"}
-REASON = {"multiple_reports": "rumor_multiple_reports", "single_report": "rumor_single_report"}
+BANDS = {"multiple_reports": "MULTIPLE REPORTS - UNCONFIRMED", "single_report": "RUMOR - UNCONFIRMED",
+         "unrated_source": "UNVERIFIED SOURCE - UNCONFIRMED"}
+REASON = {"multiple_reports": "rumor_multiple_reports", "single_report": "rumor_single_report",
+          "unrated_source": "rumor_unrated_source"}
 HEDGE_PREFIX = "Reportedly:"
 HEDGE_WORDS = frozenset("""reportedly reported reports report rumor rumors rumored rumour rumours rumoured leak leaks
 leaked leaker leakers insiders unconfirmed allegedly alleged claim claims claimed supposedly apparently could may
@@ -52,8 +58,11 @@ def validate_lane(profile):
     lane = profile.get("rumor_lane")
     if lane is None:
         return
+    if lane.get("allow_unrated") and "unrated_source" not in lane["disclosures"]:
+        raise NetworkError("invalid_editorial_profile",
+                           "Editorial profile rejected: allow_unrated needs an unrated_source disclosure.")
     for label in LABELS:
-        if not lane["disclosures"][label].startswith(BANDS[label]):
+        if label in lane["disclosures"] and not lane["disclosures"][label].startswith(BANDS[label]):
             raise NetworkError("invalid_editorial_profile",
                                f"Editorial profile rejected: the {label} disclosure must start with '{BANDS[label]}'.")
     if lane["select_min_score"] >= profile["thresholds"]["select_min_score"] + 40:
@@ -74,6 +83,12 @@ def qualifying_claims(record, lane):
         return "multiple_reports", multiple + single
     if single:
         return "single_report", single
+    if lane.get("allow_unrated"):
+        unrated = [c for c in claims if c["status"] == "insufficient_evidence"
+                   and "unrated_sources_only" in c["rationale_codes"]
+                   and "claim_contains_instructions" not in c["rationale_codes"]]
+        if unrated:
+            return "unrated_source", unrated
     return None, []
 
 

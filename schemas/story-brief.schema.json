@@ -112,7 +112,7 @@
         "reasons": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
                      "items": { "type": "string", "pattern": "^[a-z_]+$", "maxLength": 40 } },
         "lane": { "enum": ["rumor"], "description": "Step 49: present only for a rumor-lane selection. Its claims are all unverified." },
-        "rumor_label": { "enum": ["multiple_reports", "single_report"], "description": "Step 49: required with lane." }
+        "rumor_label": { "enum": ["multiple_reports", "single_report", "unrated_source"], "description": "Step 49: required with lane." }
       },
       "dependentRequired": { "lane": ["rumor_label"], "rumor_label": ["lane"] }
     }

@@ -489,6 +489,7 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
 .story-label.multi { color: #fde68a; border-color: #d97706; background: #241805; }
 .story-label.rumor { color: #fecaca; border-color: #dc2626; background: #260a0a; }
 .story-label.confirmed { color: #a7f3d0; border-color: #059669; background: #062019; }
+.story-label.pick { color: #bfdbfe; border-color: #2563eb; background: #0b1630; }
 .story-label.hold, .story-label.no { color: #b3bcc8; border-color: #2a3440; background: #121922; }
 .story-card.no, .story-card.hold { opacity: 0.8; }
 .story-topic { font-size: 12px; color: var(--muted); }

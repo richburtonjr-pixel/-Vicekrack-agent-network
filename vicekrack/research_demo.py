@@ -100,14 +100,14 @@ class MockGrokResearch:
             stories += [
                 {"topic": topic, "headline": f"DEMO: {topic} {one.split(' for ')[0].split(' with ')[0]}",
                  "summary": f"Two outlets report this about {topic}. Demo data, not real news.",
-                 "sources": [{"url": a, "publisher": "AP", "published": day},
+                 "aliases": [], "sources": [{"url": a, "publisher": "AP", "published": day},
                              {"url": b, "publisher": "The Verge", "published": day}]},
                 {"topic": topic, "headline": f"DEMO: Exclusive report on a {topic} {change}",
                  "summary": f"A single outlet reports a {topic} {change}. Demo data, not real news.",
-                 "sources": [{"url": c, "publisher": "Reuters", "published": day}]},
+                 "aliases": [], "sources": [{"url": c, "publisher": "Reuters", "published": day}]},
                 {"topic": topic, "headline": f"DEMO: Fan site theory about {topic}",
                  "summary": f"An unlisted fan site makes a claim about {topic}. Demo data, not real news.",
-                 "sources": [{"url": d, "publisher": "Fan Rumors", "published": day}]},
+                 "aliases": [], "sources": [{"url": d, "publisher": "Fan Rumors", "published": day}]},
             ]
         return _envelope({"stories": stories}, 21000 * len(topics), 900 * len(topics), 4 * len(topics))
 
