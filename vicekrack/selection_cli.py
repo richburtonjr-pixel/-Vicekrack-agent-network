@@ -176,7 +176,8 @@ def main():
             result = {"report_file": str(path), "selection_run_id": report["selection_run_id"],
                       "summary": report["summary"], "skipped": report["skipped"],
                       "audience_signals": report["audience_signals"],
-                      "ranking": [{key: e[key] for key in ("rank", "record_id", "disposition", "score", "title", "reasons")}
+                      "ranking": [{**{key: e[key] for key in ("rank", "record_id", "disposition", "score", "title", "reasons")},
+                                   **({"rumor_label": e["rumor_label"]} if "rumor_label" in e else {})}
                                   for e in report["entries"]],
                       "published": False}
         elif args.command == "selection-history":

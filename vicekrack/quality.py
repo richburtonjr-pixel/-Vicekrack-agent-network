@@ -458,6 +458,18 @@ class QualityChecker:
             check.review("draft_content")
             if not self.state["config"]["allow_draft_preview"]:
                 check.fail("draft_rendered_without_consent")
+        editorial = (self.brief or {}).get("editorial") or {}
+        if editorial.get("lane") == "rumor":
+            # Step 49: a rumor is always reviewed by a person, keeps its label and its hedges.
+            from .rumor import BANDS, check_hedging
+            check.details.update(rumor_label=editorial["rumor_label"])
+            check.review("rumor_content")
+            if not any(text.startswith(BANDS[editorial["rumor_label"]]) for text in self.script.get("disclosures", [])):
+                check.fail("rumor_label_missing")
+            try:
+                check_hedging(self.brief, self.script)
+            except NetworkError:
+                check.fail("rumor_not_labeled")
         posters = [s.get("poster") for s in self.manifest.get("scenes", [])]
         colours_ok, available = True, True
         for poster in posters:

@@ -108,6 +108,28 @@ Plain `hq-serve` stays read-only. With `--studio`:
 
 See [docs/step48.md](docs/step48.md).
 
+### Step 49: the rumor lane (opt-in, always labelled)
+
+By default ViceKrack only makes stories an official source confirmed. The new profile
+`config/editorial.gta.rumors.json` also lets through **unconfirmed** stories, under two labels:
+
+| Label | When | Shown as |
+|---|---|---|
+| `multiple_reports` | 2+ independent reputable outlets report it, no official confirmation | **MULTIPLE REPORTS - UNCONFIRMED** |
+| `single_report` | exactly one reputable outlet reports it | **RUMOR - UNCONFIRMED** |
+
+```powershell
+python -m vicekrack scout --sources config/scout-sources.gta.json --live
+python -m vicekrack verify --all --policy config/verification.gta.json
+python -m vicekrack select-stories --all --policy config/verification.gta.json --profile config/editorial.gta.rumors.json
+python -m vicekrack produce SELECTION_RUN_ID RECORD_ID --policy config/verification.gta.json --profile config/editorial.gta.rumors.json --allow-draft-preview
+```
+
+A rumor is never upgraded to verified. It is a labelled draft: the label is burned into every
+frame, the script must say "reportedly", "rumored" or "unconfirmed" wherever it states the rumor,
+and the quality report asks for human review. Disputed, contradicted, stale and off-topic
+stories are still refused. See [docs/step49.md](docs/step49.md).
+
 A provider-neutral agent network with a controlled Researcher -> Analyst -> Reviewer
 workflow. The orchestrator owns the sequence. Each role independently selects mock,
 OpenAI, or Anthropic through its registry entry. The default demos stay offline.

@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from .errors import NetworkError
+from .rumor import band_label
 from .media_manifest import validate_media_manifest, load_asset
 
 
@@ -63,6 +64,7 @@ def render_scene(plan, scene, row, asset_and_data, work, modules):
     accent = "#ffbe55" if plan["blocked_for_production"] else "#59d6c1"
     draw.rounded_rectangle((60, 60, 1020, 168), radius=20, fill=accent)
     label = "DRAFT - NOT FOR PRODUCTION" if plan["blocked_for_production"] else "LOCAL PREVIEW - NOT FOR PUBLISHING"
+    label = band_label(plan, label)   # Step 49: "RUMOR - UNCONFIRMED" for a rumor-lane draft
     draw_text(draw, ImageFont, label, (88, 88, 905, 70), 36, "#0c1425")
     draw.rectangle((45, 1420, 1035, 1880), fill=(5, 12, 25, 225))
     draw_text(draw, ImageFont, scene["beat"]["on_screen_text"] or plan["script"]["title"], (75, 1450, 930, 180), 54, "white")

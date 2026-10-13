@@ -90,7 +90,7 @@
               "claim_id": { "$ref": "#/$defs/identifier" },
               "record_id": { "type": "string", "pattern": "^ver-[0-9a-f]{24}$" },
               "record_claim_id": { "enum": ["k1", "k2", "k3"] },
-              "verification_status": { "enum": ["verified", "corroborated"] }
+              "verification_status": { "enum": ["verified", "corroborated", "insufficient_evidence"], "description": "insufficient_evidence only in a Step 49 rumor-lane brief (single report)." }
             }
           }
         }
@@ -110,8 +110,11 @@
         "topics": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/identifier" } },
         "novelty": { "enum": ["new", "update"] },
         "reasons": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
-                     "items": { "type": "string", "pattern": "^[a-z_]+$", "maxLength": 40 } }
-      }
+                     "items": { "type": "string", "pattern": "^[a-z_]+$", "maxLength": 40 } },
+        "lane": { "enum": ["rumor"], "description": "Step 49: present only for a rumor-lane selection. Its claims are all unverified." },
+        "rumor_label": { "enum": ["multiple_reports", "single_report"], "description": "Step 49: required with lane." }
+      },
+      "dependentRequired": { "lane": ["rumor_label"], "rumor_label": ["lane"] }
     }
   },
   "$defs": {

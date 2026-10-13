@@ -288,3 +288,19 @@ CSRF, size limits, de-duplication and one action at a time. The read-only HQ is 
 the flag. The offline demo uses mocks and a separate folder.
 
 Deferred: farmhouse redesign, trading changes, music, social publishing, Step 49.
+
+# Step 49 implementation checkpoint
+
+Implemented: the opt-in rumor lane ([docs/step49.md](step49.md)):
+
+- `rumor_lane` in the editorial profile (`config/editorial.gta.rumors.json`,
+  `config/editorial.mock.rumors.json`); default profiles unchanged;
+- `multiple_reports` (corroborated) and `single_report` (one reputable origin) labels;
+- rumor claims enter briefs as unverified, with the label disclosure, which the validator
+  protects;
+- the script must hedge every unconfirmed claim (`rumor_not_labeled`);
+- a "RUMOR - UNCONFIRMED" / "MULTIPLE REPORTS - UNCONFIRMED" warning band on previews and videos;
+- `rumor_content` needs review in the quality report;
+- rumor fingerprints in story history.
+
+Deferred: non-news "cool clips" content, new rumor sources, Studio badge for rumor productions.
