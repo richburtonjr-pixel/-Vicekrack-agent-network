@@ -1,8 +1,8 @@
 /* ViceKrack Mobile service worker: keeps the app's own files so it opens fast and can say "PC offline".
  * Only the app shell is stored. Live data (/m/api/...) is never stored: it always comes from the PC. */
 "use strict";
-const CACHE = "vicekrack-shell-v2";
-const SHELL = ["/", "/static/app.css", "/static/app.js", "/manifest.webmanifest",
+const CACHE = "vicekrack-shell-v3";
+const SHELL = ["/", "/static/app.css", "/static/app.js", "/static/screens.js", "/manifest.webmanifest",
                "/static/icon-180.png", "/static/icon-192.png", "/static/icon-512.png"];
 
 self.addEventListener("install", (event) => {

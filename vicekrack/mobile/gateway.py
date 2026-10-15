@@ -8,7 +8,8 @@ Who may connect
   X-VK-Mobile-CSRF header must match. Bodies are JSON objects of at most 16 KB.
 
 What the phone may do
-- Read: status, its session, the Home and System summaries, and an allowlist of HQ Studio reads.
+- Read: status, its session, the Home and System summaries, Studio options, an allowlist of HQ Studio reads,
+  finished videos (byte ranges) and verified export zips.
 - Act: an allowlist of HQ Studio actions, forwarded through HQClient (the HQ's own rules still apply).
 - Paid actions also need the PIN, a cost estimate the HQ itself reports, and room under the daily cap.
   Retrying an uncertain paid request (possible double billing) and narration purchases stay PC-only.
@@ -19,7 +20,7 @@ import hmac
 import json
 import re
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 from ..errors import NetworkError
 from . import security
@@ -28,6 +29,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
          "/static/app.css": ("app.css", "text/css; charset=utf-8"),
+         "/static/screens.js": ("screens.js", "text/javascript; charset=utf-8"),
          "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
          "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
          "/static/icon-180.png": ("icon-180.png", "image/png"),
@@ -38,6 +40,11 @@ COOKIE = "vk_mobile"
 CSRF_HEADER = "x-vk-mobile-csrf"
 LOGIN_HEADER = "tailscale-user-login"
 REQUEST_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+PRODUCTION = re.compile(r"^prod-[0-9a-f]{24}$")
+WORKFLOW = re.compile(r"^vpw-[0-9a-f]{24}$")
+PACKAGE = re.compile(r"^pkg-[0-9a-f]{24}$")
+MEDIA = re.compile(r"^med-[0-9a-f]{8,64}$")
+RANGE = re.compile(r"^bytes=\d{0,15}-\d{0,15}$")
 NAME = re.compile(r"^[^\x00-\x1f<>\\`{}]{1,40}$")
 HEADERS = {
     "Content-Security-Policy": ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
@@ -47,9 +54,9 @@ HEADERS = {
     "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
-STATUS_TEXT = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+STATUS_TEXT = {200: "OK", 206: "Partial Content", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
                405: "Method Not Allowed", 409: "Conflict", 413: "Content Too Large", 422: "Unprocessable Content",
-               429: "Too Many Requests", 500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable"}
+               416: "Range Not Satisfiable", 429: "Too Many Requests", 500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable"}
 
 # HQ Studio reads the phone may make (GET /m/api/hq/<name>?<query>; the HQ validates the query itself)
 HQ_READS = {"overview", "productions", "production", "workflow", "research/jobs", "research/job"}
@@ -181,6 +188,14 @@ class Gateway:
                     return _error(401, "not_paired", "Pair this phone first.")
                 return _json(200, {"contract": "mobile_session", "device": device,
                                    "csrf": security.csrf_for(_cookie(headers))})
+            if method == "GET" and path in ("/m/api/media", "/m/api/export"):
+                return self._file(headers, path, parts.query)
+            if method == "GET" and path == "/m/api/options" and not parts.query:
+                if self._device(headers) is None:
+                    return _error(401, "not_paired", "Pair this phone first.")
+                info = self.hq.refresh_session()
+                return _json(200, {"contract": "mobile_options", **{k: info.get(k) for k in
+                                   ("actions_enabled", "demo", "options", "acknowledgments", "research")}})
             if method == "GET" and path.startswith("/m/api/hq/"):
                 return self._hq_read(headers, path[len("/m/api/hq/"):], parts.query)
             if method == "POST" and path == "/m/api/pair":
@@ -246,7 +261,46 @@ class Gateway:
         if name not in HQ_READS or len(query) > 200:
             return _error(404, "not_found", "No such page.")
         status, document = self.hq.get("/api/studio/" + name + (f"?{query}" if query else ""))
+        if name == "workflow" and status == 200:
+            self._clip_estimates(document)
         return _json(status if status in STATUS_TEXT else 502, document)
+
+    @staticmethod
+    def _clip_estimates(flow):
+        """Add the same per-clip estimate the cap uses to each single-clip approval, so the phone can show it."""
+        from ..hq.studio import VIDEO_PRICES
+        scenes = {s.get("scene_index"): s for s in flow.get("scenes") or []}
+        for action in flow.get("actions") or []:
+            if action.get("action") == "workflow_submit":
+                request = (scenes.get(action.get("scene")) or {}).get("request") or {}
+                if isinstance(request.get("duration"), (int, float)):
+                    price = VIDEO_PRICES.get(request.get("model"), max(VIDEO_PRICES.values()))
+                    action["estimate_usd"] = round(request["duration"] * price, 4)
+
+    def _file(self, headers, path, query):
+        """A finished video/poster (byte ranges, for the phone's player) or a verified export zip, from the HQ."""
+        if self._device(headers) is None:
+            return _error(401, "not_paired", "Pair this phone first.")
+        values = {k: v[0] for k, v in parse_qs(query, max_num_fields=3).items() if len(v) == 1}
+        if path == "/m/api/media":
+            if set(values) != {"production", "id"} or not PRODUCTION.match(values["production"]) \
+                    or not MEDIA.match(values["id"]):
+                return _error(400, "invalid_request", "Use production=prod-... and id=med-....")
+            target = f"/api/content/media?production={values['production']}&id={values['id']}"
+            wanted = headers.get("range")
+            extra = {"Range": wanted} if wanted and RANGE.match(wanted) else {}
+        else:
+            if set(values) != {"workflow", "package"} or not WORKFLOW.match(values["workflow"]) \
+                    or not PACKAGE.match(values["package"]):
+                return _error(400, "invalid_request", "Use workflow=vpw-... and package=pkg-....")
+            target = f"/api/studio/export?workflow={values['workflow']}&package={values['package']}"
+            extra = {}
+        status, hq_headers, data = self.hq.get_raw(target, extra)
+        out = {**HEADERS, "Content-Type": hq_headers.get("content-type", "application/octet-stream")}
+        for key in ("content-range", "accept-ranges", "content-disposition"):
+            if key in hq_headers:
+                out["-".join(part.capitalize() for part in key.split("-"))] = hq_headers[key]
+        return (status if status in STATUS_TEXT or status in (206, 416) else 502), out, data
 
     # ------------------------------------------------------------ actions
     def _estimate(self, action, document):

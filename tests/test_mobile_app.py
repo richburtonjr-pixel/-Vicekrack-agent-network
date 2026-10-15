@@ -144,3 +144,79 @@ class AppFiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FileHQ(RecordsHQ):
+    def __init__(self):
+        super().__init__()
+        self.raw = []
+
+    def get_raw(self, path, headers=None):
+        self.raw.append((path, headers))
+        if path.startswith("/api/content/media"):
+            return 206, {"content-type": "video/mp4", "content-range": "bytes 0-1/10", "accept-ranges": "bytes"}, b"ab"
+        return 200, {"content-type": "application/zip", "content-disposition": 'attachment; filename="pkg.zip"'}, b"PK"
+
+    def refresh_session(self):
+        return {"actions_enabled": True, "demo": True, "options": {"models": ["grok-imagine-video-1.5-lite"]},
+                "research": {"max_topics": 3}, "acknowledgments": {}, "notice": "x"}
+
+
+class PhoneFiles(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = MobileStore(self.tmp.name)
+        self.hq = FileHQ()
+        self.gw = Gateway(self.store, self.hq, port=8770, clock=lambda: NOW)
+        code = security.new_pairing_code(self.store, NOW)
+        token, _ = security.redeem_pairing_code(self.store, code, "iPhone", NOW)
+        self.headers = {"host": "127.0.0.1:8770", "cookie": f"vk_mobile={token}"}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_video_byte_ranges_pass_through(self):
+        prod, med = "prod-" + "e" * 24, "med-" + "1" * 24
+        status, headers, body = self.gw.respond("GET", f"/m/api/media?production={prod}&id={med}",
+                                                {**self.headers, "range": "bytes=0-1"})
+        self.assertEqual((status, body), (206, b"ab"))
+        self.assertEqual(headers["Content-Range"], "bytes 0-1/10")
+        self.assertEqual(self.hq.raw[-1], (f"/api/content/media?production={prod}&id={med}", {"Range": "bytes=0-1"}))
+
+    def test_bad_range_not_forwarded_and_bad_ids_refused(self):
+        prod, med = "prod-" + "e" * 24, "med-" + "1" * 24
+        self.gw.respond("GET", f"/m/api/media?production={prod}&id={med}", {**self.headers, "range": "bytes=0-1, 5-9"})
+        self.assertEqual(self.hq.raw[-1][1], {})
+        for query in ("production=x&id=y", f"production={prod}&id=../secret", f"production={prod}"):
+            self.assertEqual(self.gw.respond("GET", "/m/api/media?" + query, self.headers)[0], 400)
+
+    def test_export_download(self):
+        wf, pkg = "vpw-" + "a" * 24, "pkg-" + "b" * 24
+        status, headers, body = self.gw.respond("GET", f"/m/api/export?workflow={wf}&package={pkg}", self.headers)
+        self.assertEqual((status, body), (200, b"PK"))
+        self.assertIn("attachment", headers["Content-Disposition"])
+
+    def test_files_need_pairing(self):
+        status = self.gw.respond("GET", "/m/api/media?production=prod-" + "e" * 24 + "&id=med-" + "1" * 24,
+                                 {"host": "127.0.0.1:8770"})[0]
+        self.assertEqual(status, 401)
+        self.assertEqual(self.hq.raw, [])
+
+    def test_options_have_no_session_secrets(self):
+        status, _, body = self.gw.respond("GET", "/m/api/options", self.headers)
+        doc = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertNotIn("csrf", doc)
+        self.assertEqual(doc["research"], {"max_topics": 3})
+
+    def test_single_clip_estimate_added(self):
+        wf = "vpw-" + "z" * 24
+        self.hq.get = lambda path: (200, {"scenes": [{"scene_index": 2, "request": {"duration": 6, "model": "grok-imagine-video-1.5-lite"}}],
+                                          "actions": [{"action": "workflow_submit", "scene": 2, "paid": True}]})
+        doc = json.loads(self.gw.respond("GET", f"/m/api/hq/workflow?id={wf}", self.headers)[2])
+        self.assertAlmostEqual(doc["actions"][0]["estimate_usd"], 0.12)
+
+    def test_screens_file_served(self):
+        status, headers, body = self.gw.respond("GET", "/static/screens.js", {"host": "127.0.0.1:8770"})
+        self.assertEqual(status, 200)
+        self.assertNotIn(b"innerHTML", body)
