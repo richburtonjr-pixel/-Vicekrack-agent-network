@@ -69,6 +69,10 @@ def main():
         from .hq.server import main as hq_main
         return hq_main()
 
+    if len(sys.argv) > 1 and sys.argv[1].startswith("mobile-"):
+        from .mobile.cli import main as mobile_main
+        return mobile_main()
+
     if len(sys.argv) > 1 and sys.argv[1] in {"events-list", "events-inspect", "events-replay"}:
         from .events.cli import main as events_main
         return events_main()
