@@ -51,7 +51,13 @@ FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/hq-core.js": ("hq-core.js", "text/javascript; charset=utf-8"),
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
          "/static/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
-         "/static/research.js": ("research.js", "text/javascript; charset=utf-8")}
+         "/static/research.js": ("research.js", "text/javascript; charset=utf-8"),
+         # HQ 2.0: the 3D headquarters (ES modules) and the pinned, vendored Three.js r169 (MIT)
+         "/static/hq3d/main.js": ("hq3d/main.js", "text/javascript; charset=utf-8"),
+         "/static/hq3d/world.js": ("hq3d/world.js", "text/javascript; charset=utf-8"),
+         "/static/hq3d/layout.js": ("hq3d/layout.js", "text/javascript; charset=utf-8"),
+         "/static/hq3d/agents.js": ("hq3d/agents.js", "text/javascript; charset=utf-8"),
+         "/static/vendor/three.module.min.js": ("vendor/three.module.min.js", "text/javascript; charset=utf-8")}
 TIMELINE = re.compile(r"^(demo|tl-[0-9a-f]{24}|rar-[0-9a-f]{24}|srun-[0-9a-f]{24}|prod-[0-9a-f]{24}|wfr-[0-9a-f]{32})$")
 MAX_TIMELINES = 200
 RESULTS_ROUTES = {"/api/results": {"timeline"}, "/api/results/at": {"timeline", "position"},

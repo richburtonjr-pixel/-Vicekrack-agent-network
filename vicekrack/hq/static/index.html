@@ -25,7 +25,8 @@
         <div class="brand-text"><span>VICEKRACK</span><strong>HQ</strong></div>
       </div>
       <nav class="views" aria-label="Views">
-        <button type="button" class="view-btn" data-view="house" aria-pressed="true"><span class="ico ico-house" aria-hidden="true"></span>House</button>
+        <button type="button" class="view-btn" data-view="hq3d" aria-pressed="false"><span class="ico ico-hq3d" aria-hidden="true"></span>Headquarters</button>
+        <button type="button" class="view-btn" data-view="house" aria-pressed="true"><span class="ico ico-house" aria-hidden="true"></span>Classic house</button>
         <button type="button" class="view-btn" data-view="trading" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading</button>
         <button type="button" class="view-btn" data-view="results" aria-pressed="false"><span class="ico ico-results" aria-hidden="true"></span>Results</button>
         <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
@@ -60,6 +61,42 @@
         <span id="timeline-meta"></span>
         <span class="issues" id="timeline-issues"></span>
       </div>
+
+      <section class="hq3d-view" id="hq3d-view" aria-labelledby="hq3d-title" hidden>
+        <div class="hq3d-canvas" id="hq3d-canvas"></div>
+        <div class="hq3d-top">
+          <h2 id="hq3d-title">ViceKrack HQ</h2>
+          <span class="hq3d-badge loading" id="hq3d-badge" role="status">Loading</span>
+          <span class="hq3d-spacer"></span>
+          <button type="button" id="hq3d-refresh">Refresh numbers</button>
+          <button type="button" id="hq3d-quality" aria-pressed="false">Graphics: high</button>
+          <button type="button" id="hq3d-help-toggle" aria-expanded="false" aria-controls="hq3d-help">Controls</button>
+        </div>
+        <nav class="hq3d-departments" id="hq3d-departments" aria-label="Go to a department"></nav>
+        <div class="hq3d-help" id="hq3d-help" hidden>
+          <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys walk, <kbd>Shift</kbd> runs.
+             Drag to look around, scroll to zoom. <kbd>E</kbd> opens the department you are standing in,
+             <kbd>Esc</kbd> closes it. The stairs in the middle lead to the upper floor.</p>
+          <p>The building and furniture are early placeholders. Every number comes from your saved ViceKrack
+             records, and the agents' places stay empty until their characters are made from your reference photos.</p>
+        </div>
+        <p class="hq3d-prompt" id="hq3d-prompt" hidden></p>
+        <aside class="hq3d-panel" id="hq3d-panel" aria-labelledby="hq3d-panel-title" hidden>
+          <button type="button" class="hq3d-close" id="hq3d-close" aria-label="Close">&times;</button>
+          <div id="hq3d-panel-body"></div>
+        </aside>
+        <div class="hq3d-pad" aria-hidden="true">
+          <button type="button" tabindex="-1" data-dir="0,1">&#9650;</button>
+          <button type="button" tabindex="-1" data-dir="-1,0">&#9664;</button>
+          <button type="button" tabindex="-1" data-dir="0,-1">&#9660;</button>
+          <button type="button" tabindex="-1" data-dir="1,0">&#9654;</button>
+        </div>
+        <div class="hq3d-fallback" id="hq3d-fallback" hidden>
+          <h3>3D graphics aren't available in this browser</h3>
+          <p>Turn on hardware acceleration in your browser settings, or use the other screens in the menu:
+             Research and Video Studio work the same without 3D.</p>
+        </div>
+      </section>
 
       <section class="stage-wrap" id="stage-wrap" aria-label="Headquarters">
         <svg id="stage" class="stage" role="img" aria-labelledby="stage-title" focusable="false">
@@ -229,5 +266,6 @@
   <script src="/static/app.js"></script>
   <script src="/static/studio.js"></script>
   <script src="/static/research.js"></script>
+  <script type="module" src="/static/hq3d/main.js"></script>
 </body>
 </html>

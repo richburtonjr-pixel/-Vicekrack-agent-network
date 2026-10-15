@@ -512,7 +512,7 @@ class StudioBrowserTests(unittest.TestCase):
                     page.on("pageerror", lambda e: problems.append(str(e)))
                     page.on("request", lambda r: posts.append(r.url) if r.method == "POST" else None)
                     idle = "#studio-view[data-busy=false]"
-                    page.goto(url)
+                    page.goto(url + "#house")                            # HQ 2.0 opens the 3D HQ by default
                     page.wait_for_selector(".bot[data-bot='creator']")
                     self.assertEqual(posts, [])                              # nothing acts on load
                     page.click(".view-btn[data-view='studio']")
@@ -570,7 +570,7 @@ class StudioBrowserTests(unittest.TestCase):
                     self.assertEqual(problems, [])
                     self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 1440)
                     phone = browser.new_page(viewport={"width": 390, "height": 844})
-                    phone.goto(url)
+                    phone.goto(url + "#house")
                     phone.wait_for_selector(".bot[data-bot='creator']")
                     phone.click(".view-btn[data-view='studio']")
                     phone.wait_for_selector("text=Script and scene plan")
