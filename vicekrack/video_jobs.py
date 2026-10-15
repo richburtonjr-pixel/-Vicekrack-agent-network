@@ -263,7 +263,17 @@ def _load(job_id):
 
 def _validate(record):
     try:
-        reject_secrets(record)
+        # Step 53: xAI's media URLs look like https://vidgen.x.ai/xai-vidgen-bucket/xai-video-<uuid>.mp4,
+        # which the generic credential-shape check mistakes for an "xai-" key. The URL is checked on its
+        # own instead: it must be on the approved media host and must not contain an active key.
+        url = record.get("download_url")
+        reject_secrets({k: v for k, v in record.items() if k != "download_url"})
+        if url is not None:
+            check_download_url(url)
+            for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY"):
+                secret = os.environ.get(name, "").strip()
+                if secret and secret in url:
+                    raise NetworkError("sensitive_state", "Saved data contains an active credential.")
         required = {"contract", "version", "job_id", "status", "plan_id", "scene_index", "audio_mode",
                     "illustrative_only", "publishable", "request", "request_id", "uncertain", "attempts", "updated_at"}
         if set(record) - required - {"download_url", "media"} or not required <= set(record):

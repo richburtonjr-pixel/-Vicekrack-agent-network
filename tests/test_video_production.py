@@ -60,7 +60,9 @@ class FakeGrok:
             script = self.status_script.get(request_id)
             status = script.pop(0) if script else "done"
             if status == "done":
-                return {"status": "done", "video": {"url": f"https://vidgen.x.ai/test/{request_id}.mp4"}}
+                # Step 53: the real xAI media URL shape (it contains "xai-video-<uuid>")
+                return {"status": "done", "video": {"url": "https://vidgen.x.ai/xai-vidgen-bucket/xai-video-"
+                                                           f"0d1e2f3a-4b5c-6d7e-8f90-a1b2c3d4e5f6/{request_id}.mp4"}}
             return {"status": status}
         if method == "DOWNLOAD":
             assert not credential, "media downloads must never carry credentials"

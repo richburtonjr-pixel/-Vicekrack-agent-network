@@ -336,3 +336,11 @@ Implemented: looser research, you pick ([docs/step51.md](step51.md)):
 
 Implemented: one approval for all of a video's clips in Video Studio ([docs/step52.md](step52.md)),
 with a total-cost estimate; sending stops at the first problem.
+
+# Step 53 fix: real Grok clips download
+
+The xAI status check returned the finished clip's URL (`https://vidgen.x.ai/xai-vidgen-bucket/xai-video-<id>.mp4`),
+but the job could not be saved: the generic credential check read `xai-video-...` as an xAI key
+(`sensitive_state`), so every real clip stayed "waiting for provider" and never downloaded. The media URL is
+now checked on its own (approved host `vidgen.x.ai`, no active key inside it); everything else in the job
+record keeps the generic check. Tests and the demo now use the real URL shape.

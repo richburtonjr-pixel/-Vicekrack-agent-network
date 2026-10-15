@@ -81,6 +81,19 @@ class VideoJobsTests(unittest.TestCase):
         result = jobs.status(self.id, allow_network=True, transport=Mock(return_value={'status': 'pending'}))
         self.assertEqual(result['status'], 'pending')
 
+    def test_real_xai_media_urls_are_saved(self):
+        """Step 53: an xai-video-<uuid> media URL is not a credential; the status check must save it."""
+        self.submit(Mock(return_value={'request_id': 'request-123'}))
+        uuid = '0d1e2f3a-4b5c-6d7e-8f90-a1b2c3d4e5f6'
+        url = 'https://vidgen.x.ai/xai-vidgen-bucket/xai-video-' + uuid + '.mp4'
+        result = jobs.status(self.id, allow_network=True, transport=Mock(return_value={'status': 'done', 'video': {'url': url}}))
+        self.assertEqual((result['status'], jobs.inspect(self.id)['download_url']), ('done', url))
+        key = 'xai-' + 'A' * 40
+        with patch.dict('os.environ', {'XAI_API_KEY': key}):
+            for bad in ('https://vidgen.x.ai/' + key + '.mp4', 'https://evil.example/xai-video-' + uuid + '.mp4'):
+                with self.assertRaises(NetworkError):
+                    jobs._validate(dict(jobs.inspect(self.id), download_url=bad))
+
     def test_download_credentials_and_probe(self):
         self.submit(Mock(return_value={'request_id': 'request-123'}))
         jobs.status(self.id, allow_network=True, transport=Mock(return_value={
