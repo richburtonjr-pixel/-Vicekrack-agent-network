@@ -246,6 +246,91 @@ class Studio:
                              "error": error.code})
         return {"contract": "hq_studio_productions", "demo": self.demo, "productions": rows}
 
+    def overview(self):
+        """HQ 2.0: what each department has really done, from saved ViceKrack records only.
+
+        Read-only and free: no provider is contacted. Counts come from saved research runs, productions and
+        video workflows; a department without a real data source says "coming_soon". Nothing is estimated.
+        """
+        from ..production import ProductionStore
+        desk = self.desk()
+        jobs = desk.list(limit=50)
+        labels = {}
+        for row in jobs[:20]:
+            try:
+                for card in desk.read(row["job_id"]).get("cards") or []:
+                    labels[card["label"]] = labels.get(card["label"], 0) + 1
+            except NetworkError:
+                continue
+        productions = {}
+        for production_id in ProductionStore(self.root).list_ids()[:200]:
+            try:
+                state = self._production(production_id)
+                productions[production_id] = (state["status"], state.get("updated_at"))
+            except NetworkError:
+                productions[production_id] = ("unreadable", None)
+        flows = [row for row in self.flow().list() if "error" not in row]
+        by_status = {}
+        for row in flows:
+            by_status[row["status"]] = by_status.get(row["status"], 0) + 1
+
+        def count(*names):
+            return sum(by_status.get(name, 0) for name in names)
+
+        research_running = sum(row["status"] in ("submitting", "received") for row in jobs)
+        generating = count("waiting_for_consent", "waiting_for_provider", "uncertain_submission", "running")
+        review = count("waiting_for_review")
+        problems = count("failed", "quality_failed", "blocked")
+        latest_job = jobs[0] if jobs else None
+
+        def dept(agent, state, facts, latest=None, note=None):
+            return {"agent": agent, "state": state, "facts": [{"label": k, "value": v} for k, v in facts],
+                    "latest": latest, "note": note}
+
+        departments = {
+            "executive": dept("ricky", "attention" if review else ("idle" if flows else "empty"),
+                              [("Videos waiting for your review", review),
+                               ("Approved, ready to export", count("ready_to_export")),
+                               ("Exported", count("exported"))]),
+            "research": dept("kiara", "working" if research_running else ("idle" if jobs else "empty"),
+                             [("Research runs", len(jobs)), ("Running now", research_running),
+                              ("Stories found", sum(row.get("stories", 0) for row in jobs))],
+                             {"text": ", ".join(latest_job["topics"]), "status": latest_job["status"],
+                              "at": latest_job["created_at"]} if latest_job else None),
+            "trends": dept("jax", "coming_soon", [], note="No trend or audience data source is connected yet."),
+            "strategy": dept("layla", "idle" if labels else "empty",
+                             [("Ready to make (confirmed / reports / rumor)",
+                               labels.get("CONFIRMED", 0) + labels.get("MULTIPLE REPORTS", 0) + labels.get("RUMOR", 0)),
+                              ("Your call", labels.get("YOUR CALL", 0)), ("On hold", labels.get("ON HOLD", 0))],
+                             note="From the story cards of your 20 most recent research runs."),
+            "risk": dept("ace", "idle" if labels else "empty",
+                         [("Not usable (blocked by checks)", labels.get("NOT USABLE", 0)),
+                          ("Labelled rumor", labels.get("RUMOR", 0)),
+                          ("Unverified site", labels.get("UNVERIFIED SITE", 0))]),
+            "studio": dept("sienna", "working" if generating else ("idle" if productions else "empty"),
+                           [("Stories built", len(productions)), ("Videos in progress", generating),
+                            ("Videos rendered", count("waiting_for_review", "review_rejected", "ready_to_export",
+                                                      "exported"))]),
+            "analytics": dept("kai", "coming_soon", [], note="No published-video performance data exists yet "
+                                                              "(ViceKrack does not publish)."),
+            "operations": dept("nia", "attention" if problems else ("idle" if flows else "empty"),
+                               [("Video workflows", len(flows)), ("Need attention", problems),
+                                ("Exported packages", count("exported"))]),
+        }
+        activity = []
+        for row in jobs[:10]:
+            activity.append({"at": row["created_at"], "agent": "kiara",
+                             "text": f"Research \u201c{', '.join(row['topics'])}\u201d: {row['status']}"})
+        for row in flows:
+            activity.append({"at": row["updated_at"], "agent": "sienna" if row["status"] in (
+                "waiting_for_consent", "waiting_for_provider", "uncertain_submission", "running") else "nia",
+                "text": f"Video workflow {row['workflow_id'][:12]}: {row['status'].replace('_', ' ')}"})
+        activity = sorted((a for a in activity if a["at"]), key=lambda a: a["at"], reverse=True)[:12]
+        return {"contract": "hq_overview", "demo": self.demo, "generated_from": "saved ViceKrack records",
+                "totals": {"research_runs": len(jobs), "productions": len(productions), "workflows": len(flows),
+                           "waiting_for_review": review},
+                "departments": departments, "activity": activity}
+
     def _workflows_by_production(self):
         out = {}
         for row in self.flow().list():

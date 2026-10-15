@@ -11,6 +11,7 @@ Read routes (GET):
   /api/studio/workflow?id=vpw-...     saved progress, prepared requests, quality, review, export, actions
   /api/studio/export?workflow=vpw-...&package=pkg-...   a zip of a verified export package (download)
   /api/studio/research/jobs, /api/studio/research/job?id=rsj-...   Step 50 research runs and story cards
+  /api/studio/overview                HQ 2.0: real counts per department and recent real activity (free)
 
 Action routes (POST, JSON body, every one explicitly user-triggered):
   /api/studio/speech/prepare, /speech/submit, /speech/recover, /captions/prepare,
@@ -273,6 +274,8 @@ def _read(gate, path, query_text):
             doc = dict(studio.session_info(), csrf=gate.csrf)
             cookie = f"{COOKIE}={gate.session}; Path=/api/studio/; HttpOnly; SameSite=Strict"
             return _json(200, doc, {"Set-Cookie": cookie})
+        if path == PREFIX + "overview" and not query:          # HQ 2.0: real counts per department
+            return _json(200, studio.overview())
         if path == PREFIX + "productions" and not query:
             return _json(200, studio.productions())
         if path == PREFIX + "production" and set(query) == {"id"}:

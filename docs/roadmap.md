@@ -344,3 +344,15 @@ but the job could not be saved: the generic credential check read `xai-video-...
 (`sensitive_state`), so every real clip stayed "waiting for provider" and never downloaded. The media URL is
 now checked on its own (approved host `vidgen.x.ai`, no active key inside it); everything else in the job
 record keeps the generic check. Tests and the demo now use the real URL shape.
+
+# HQ 2.0, Phase 1 checkpoint
+
+Implemented: an explorable 3D headquarters ([docs/hq3d.md](hq3d.md)) over the existing app: a two-level
+glass atrium building with nine departments, third-person walking and stairs, real-data department
+panels and in-world screens from the new read-only `GET /api/studio/overview`, eight marked
+workstations ("character pending reference"), and links into the existing Research and Video Studio
+screens. Three.js r169 is vendored and pinned. The app opens on the HQ when the Studio is on; the classic
+house stays available.
+
+Deferred: furniture and materials pass, character models (reference → model → rig → animation),
+gamepad support, any agent movement.

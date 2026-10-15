@@ -1,0 +1,2 @@
+# Vendored third-party files are kept byte-for-byte (their SHA-256 is pinned in tests).
+vicekrack/hq/static/vendor/** -text

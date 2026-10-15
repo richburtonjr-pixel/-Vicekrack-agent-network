@@ -363,7 +363,7 @@ class StaticSafetyTests(unittest.TestCase):
         self.assertEqual(sorted(set(re.findall(r"\"(/api/[a-z/]+)", app))),        # Step 34 adds the results routes
                          ["/api/broker", "/api/content/at", "/api/content/latest", "/api/content/media", "/api/results",
                           "/api/results/at", "/api/results/summary", "/api/scene", "/api/session", "/api/sessions",
-                      "/api/timelines"])                                   # Step 39 adds the read-only session routes
+                          "/api/status", "/api/timelines"])    # Step 39: session routes; HQ 2.0: /api/status picks the first view
         # Step 35: source links open only on an explicit click, in a new tab without opener or referrer.
         self.assertEqual(app.count("window.open("), 1)
         self.assertIn('window.open(href, "_blank", "noopener,noreferrer")', app)

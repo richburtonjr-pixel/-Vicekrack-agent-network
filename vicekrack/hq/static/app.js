@@ -1047,6 +1047,7 @@
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
     var sessions = view === "sessions", broker = view === "broker", studio = view === "studio" || view === "research";
+    var hq3d = view === "hq3d";                          // HQ 2.0: the 3D headquarters lives in hq3d/main.js
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
@@ -1054,10 +1055,12 @@
     $("broker-view").hidden = !broker;
     $("studio-view").hidden = view !== "studio";        // Step 48: the Video Studio lives in studio.js
     $("research-view").hidden = view !== "research";    // Step 50: Research lives in research.js
-    $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio);
+    $("hq3d-view").hidden = !hq3d;
+    $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || hq3d || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio && !hq3d);
     document.body.classList.toggle("results-open", results || content || sessions || broker || studio);
-    document.body.classList.toggle("sessions-open", sessions || broker || studio);   // replay controls belong to the house timeline
+    document.body.classList.toggle("sessions-open", sessions || broker || studio || hq3d);   // replay controls belong to the house timeline
+    document.body.classList.toggle("hq3d-open", hq3d);
     document.body.classList.toggle("studio-open", studio);
     document.dispatchEvent(new CustomEvent("hq:view", { detail: view }));
     setCamera(viewFor(view, S.focusRoom));
@@ -2544,6 +2547,7 @@
     });
     document.addEventListener("keydown", function (e) {
       var tag = (e.target && e.target.tagName) || "";
+      if (S.view === "hq3d") { return; }                    // the 3D headquarters uses the keys to walk
       if (/INPUT|SELECT|TEXTAREA/.test(tag) || e.ctrlKey || e.metaKey || e.altKey) { return; }
       if (e.key === " " && tag !== "BUTTON") { e.preventDefault(); togglePlay(); }
       else if (e.key === "ArrowLeft") { seek(S.replay.index - 1); }
@@ -2575,6 +2579,16 @@
   build();
   wire();
   loadTimelines();
-  loadScene("demo").then(function () { setView("house"); });
+  // HQ 2.0: with the Studio on (the ViceKrack button), open the 3D headquarters first; "#house" or a browser
+  // without 3D graphics keeps the classic house.
+  function firstView() {
+    function gl() {
+      try { var c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (e) { return false; }
+    }
+    if (window.location.hash === "#house") { return Promise.resolve("house"); }
+    if (window.location.hash === "#hq") { return Promise.resolve(gl() ? "hq3d" : "house"); }
+    return getJSON("/api/status").then(function (s) { return s && s.studio_actions && gl() ? "hq3d" : "house"; }, function () { return "house"; });
+  }
+  Promise.all([loadScene("demo"), firstView()]).then(function (r) { setView(r[1]); });
   window.requestAnimationFrame(loop);
 }());
