@@ -35,6 +35,7 @@
         <button type="button" class="view-btn" data-view="sessions" aria-pressed="false"><span class="ico ico-session" aria-hidden="true"></span>Sessions</button>
         <button type="button" class="view-btn" data-view="broker" aria-pressed="false"><span class="ico ico-broker" aria-hidden="true"></span>Paper broker</button>
         <button type="button" class="view-btn" data-view="research" aria-pressed="false"><span class="ico ico-research" aria-hidden="true"></span>Research</button>
+        <button type="button" class="view-btn" data-view="videos" aria-pressed="false"><span class="ico ico-videos" aria-hidden="true"></span>Finished videos</button>
         <button type="button" class="view-btn" data-view="studio" aria-pressed="false"><span class="ico ico-studio" aria-hidden="true"></span>Video Studio</button>
       </nav>
       <section class="bot-list" aria-labelledby="bots-heading">
@@ -199,6 +200,16 @@
         <div id="broker-body"></div>
       </section>
 
+      <section class="results-view studio-view videos-view" id="videos-view" aria-labelledby="videos-heading" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="videos-heading">Finished videos</h2>
+            <p class="results-sub">Every video ViceKrack made for you: watch, download and see how each one was made. Approve once; the agents do the rest.</p>
+          </div>
+          <span class="sim-badge" id="videos-badge">LOADING</span>
+        </div>
+        <div id="videos-body"></div>
+      </section>
       <section class="results-view studio-view research-view" id="research-view" aria-labelledby="research-heading" hidden>
         <div class="results-head">
           <div>
@@ -266,6 +277,7 @@
   <script src="/static/app.js"></script>
   <script src="/static/studio.js"></script>
   <script src="/static/research.js"></script>
+  <script src="/static/videos.js"></script>
   <script type="module" src="/static/hq3d/main.js"></script>
 </body>
 </html>

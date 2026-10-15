@@ -83,7 +83,7 @@ class Studio:
 
     def __init__(self, root=None, *, demo=False, clock=None, video_transport=None, speech_transport=None,
                  renderer=None, prober=None, poster_reader=None, notice=None, research_transport=None,
-                 page_fetcher=None, writer_transport=None):
+                 page_fetcher=None, writer_transport=None, auto_providers=None):
         self.root, self.demo = root, demo
         self.clock = clock
         self.video_transport, self.speech_transport = video_transport, speech_transport
@@ -91,6 +91,132 @@ class Studio:
         self.notice = notice
         # Step 50: Research Desk (Grok research + free page checks) and the Grok script writer.
         self.research_transport, self.page_fetcher, self.writer_transport = research_transport, page_fetcher, writer_transport
+        # Step 54: Auto Studio (one approval -> finished video). Real providers unless the demo/tests pass stand-ins.
+        self._auto_providers = auto_providers
+        self._auto_wake = None
+
+    # ------------------------------------------------------------------ Step 54: Auto Studio
+    def auto_engine(self):
+        from ..autostudio import engine, voice
+        providers = self._auto_providers
+        if providers is None:
+            providers = (engine.Providers(writer="mock", tts=voice.mock_transport(), video=self.video_transport, demo=True)
+                         if self.demo else engine.Providers())
+        return engine.Engine(self.root, providers=providers, clock=self.clock or engine.utc_now)
+
+    def start_auto_worker(self):
+        """One background thread that carries approved videos to the end (and resumes them after a restart)."""
+        import threading
+        if self._auto_wake is not None:
+            return
+        self._auto_wake = threading.Event()
+
+        def loop():
+            from ..autostudio.common import load_config
+            poll = load_config()["limits"]["poll_seconds"]
+            while True:
+                wait = poll
+                try:
+                    eng = self.auto_engine()
+                    for production_id in eng.active():
+                        result = eng.advance(production_id)
+                        if result is not None:
+                            wait = min(wait, max(0.05, result))
+                except Exception:                                # noqa: BLE001 - keep the worker alive
+                    wait = poll
+                self._auto_wake.wait(wait)
+                self._auto_wake.clear()
+        threading.Thread(target=loop, name="vicekrack-auto-studio", daemon=True).start()
+
+    def _wake(self):
+        if self._auto_wake is not None:
+            self._auto_wake.set()
+
+    def auto_options(self):
+        from ..autostudio.common import load_config
+        from ..autostudio.planner import estimate
+        config = load_config()
+        return {"contract": "hq_auto_options", "demo": self.demo, "lengths": config["lengths"],
+                "types": {k: v["label"] for k, v in config["types"].items()},
+                "audio": {k: v["label"] for k, v in config["audio_styles"].items()},
+                "model": config["video"]["model"], "resolution": config["video"]["resolution"],
+                "estimates": {str(n): estimate(config, n, config["video"]["model"], config["video"]["resolution"])
+                              for n in config["lengths"]},
+                "prices_as_of": config["prices"]["as_of"]}
+
+    def auto_list(self):
+        from ..autostudio import engine
+        from ..autostudio.common import list_ids, read_state
+        rows = []
+        for production_id in list_ids(self.root)[:200]:
+            try:
+                state = read_state(production_id, self.root)
+            except NetworkError:
+                continue
+            if state["status"] == "prepared":
+                continue
+            row = engine.summary(state)
+            rows.append({k: row[k] for k in ("production_id", "status", "title", "created_at", "updated_at", "demo",
+                                             "settings", "final", "rumor")} | {"spent_usd": row["cost"]["spent_usd"]})
+        return {"contract": "hq_auto_videos", "demo": self.demo, "videos": rows}
+
+    def auto_video(self, production_id):
+        from ..autostudio import engine
+        from ..autostudio.common import folder, read_state
+        state = read_state(production_id, self.root)
+        doc = engine.summary(state)
+        stills = folder(production_id, self.root) / "scenes"
+        for scene in doc["scenes"]:
+            scene["has_still"] = (stills / f"scene-{scene['index']:03d}.jpg").is_file()
+        doc["has_video"] = (folder(production_id, self.root) / "final.mp4").is_file()
+        doc["contract"] = "hq_auto_video"
+        return doc
+
+    def auto_prepare(self, job_id, story, length, type, audio, music=True):
+        from ..autostudio import engine
+        state = engine.prepare(self.root, self.desk(), job_id, story,
+                               {"length": int(length), "type": type, "audio": audio, "music": music},
+                               demo=self.demo, clock=self.clock or engine.utc_now)
+        return self.auto_video(state["production_id"])
+
+    def auto_approve(self, production_id, consent):
+        from ..autostudio import engine
+        if not self.demo and not credentials_configured():
+            raise NetworkError("missing_xai_credential", "Set XAI_API_KEY in the window that starts ViceKrack.")
+        engine.approve(self.root, production_id, consent, clock=self.clock or engine.utc_now)
+        self._wake()
+        return self.auto_video(production_id)
+
+    def auto_stop(self, production_id):
+        from ..autostudio import engine
+        engine.stop(self.root, production_id, clock=self.clock or engine.utc_now)
+        return self.auto_video(production_id)
+
+    def auto_retry(self, production_id, consent):
+        from ..autostudio import engine
+        if not self.demo and not credentials_configured():
+            raise NetworkError("missing_xai_credential", "Set XAI_API_KEY in the window that starts ViceKrack.")
+        engine.retry(self.root, production_id, consent, clock=self.clock or engine.utc_now)
+        self._wake()
+        return self.auto_video(production_id)
+
+    def auto_file(self, production_id, name):
+        """(path, content type) of one finished file: the video, its thumbnail or a scene still."""
+        import re as _re
+        from ..autostudio.common import folder, read_state
+        read_state(production_id, self.root)
+        base_ = folder(production_id, self.root)
+        if name == "final":
+            path, kind = base_ / "final.mp4", "video/mp4"
+        elif name == "thumb":
+            path, kind = base_ / "thumb.jpg", "image/jpeg"
+        elif _re.fullmatch(r"scene-\d{3}", name or ""):
+            path, kind = base_ / "scenes" / f"{name}.jpg", "image/jpeg"
+        else:
+            raise NetworkError("auto_file_not_found", "No such file.")
+        if not path.is_file():
+            raise NetworkError("auto_file_not_found", "That file is not ready yet.")
+        return path, kind
 
     # ------------------------------------------------------------------ Step 50: research
     def desk(self):
@@ -270,6 +396,17 @@ class Studio:
             except NetworkError:
                 productions[production_id] = ("unreadable", None)
         flows = [row for row in self.flow().list() if "error" not in row]
+        finished = 0                                       # Step 54: finished, verified Auto Studio videos
+        try:
+            from ..autostudio.common import list_ids as auto_ids, read_state as auto_state
+            for pid in auto_ids(self.root)[:200]:
+                try:
+                    state = auto_state(pid, self.root)
+                    finished += state["status"] == "completed" and bool((state.get("final") or {}).get("verified"))
+                except NetworkError:
+                    continue
+        except NetworkError:
+            finished = 0
         by_status = {}
         for row in flows:
             by_status[row["status"]] = by_status.get(row["status"], 0) + 1
@@ -307,8 +444,9 @@ class Studio:
                          [("Not usable (blocked by checks)", labels.get("NOT USABLE", 0)),
                           ("Labelled rumor", labels.get("RUMOR", 0)),
                           ("Unverified site", labels.get("UNVERIFIED SITE", 0))]),
-            "studio": dept("sienna", "working" if generating else ("idle" if productions else "empty"),
-                           [("Stories built", len(productions)), ("Videos in progress", generating),
+            "studio": dept("sienna", "working" if generating else ("idle" if productions or finished else "empty"),
+                           [("Finished videos", finished), ("Stories built", len(productions)),
+                            ("Videos in progress", generating),
                             ("Videos rendered", count("waiting_for_review", "review_rejected", "ready_to_export",
                                                       "exported"))]),
             "analytics": dept("kai", "coming_soon", [], note="No published-video performance data exists yet "

@@ -231,13 +231,19 @@
     });
     var offer = card.make_video;
     if (!offer) { return; }
+    // Step 54: the main button makes a full, finished video in one approval (Auto Studio).
+    if (window.HQVideos && R.openCard !== card.index) {
+      button(el, offer.pick ? "Use anyway: make video" : "Make video", function () {
+        window.HQVideos.openMaker(job, card);
+      }, "go", { "data-action": "auto-make" });
+    }
     if (offer.production_status === "completed") {
       button(el, "Open in Video Studio", function () { openStudio(offer.production_id); }, "approve");
       return;
     }
     if (R.openCard !== card.index) {
-      button(el, offer.production_status ? "Continue making video" : offer.pick ? "Use anyway" : "Make video",
-        function () { R.openCard = card.index; render(); }, "go");
+      button(el, offer.production_status ? "Continue the 15-second draft" : "15-second draft (Video Studio)",
+        function () { R.openCard = card.index; render(); }, "");
       return;
     }
     var lines = [offer.writer + " writes a 15-second script from this story's checked facts. Estimated cost: " +

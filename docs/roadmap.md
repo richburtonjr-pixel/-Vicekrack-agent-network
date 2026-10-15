@@ -356,3 +356,14 @@ house stays available.
 
 Deferred: furniture and materials pass, character models (reference → model → rig → animation),
 gamepad support, any agent movement.
+
+# Step 54 implementation checkpoint
+
+Implemented: Auto Studio ([docs/auto-studio.md](auto-studio.md)): one approval turns a research story into a
+finished, verified MP4 of 15 s, 30 s, 60 s or 2 min. Grok writes a scene-by-scene script for the length,
+type (news, cinematic, social) and audio style (narrator, dialogue, both); xAI text to speech voices every
+line; each xAI scene clip is sized to its voiceover (up to 15 s); a background worker sends, checks,
+downloads and retries clips within the approved spending cap; ViceKrack composes original music; FFmpeg
+assembles intro, scenes, captions, labels, ducked music and outro; the exported file itself is checked
+(length, format, scene order, voices at their times). The new Finished videos library plays, downloads,
+stops and retries videos and keeps them after restarts.

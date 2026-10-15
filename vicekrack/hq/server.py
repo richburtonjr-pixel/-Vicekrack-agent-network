@@ -125,6 +125,8 @@ def main(argv=None, root=None):
             print(json.dumps({"error": {"code": "hq_port_unavailable",
                                         "message": "Choose a free port between 1024 and 65535."}}))
             return 1
+        if studio is not None:
+            studio.start_auto_worker()                   # Step 54: approved videos finish on their own
         print(f"ViceKrack Living HQ ({label}) at http://{HOST}:{server.server_address[1]}/  -  press Ctrl+C to stop")
         try:
             server.serve_forever(poll_interval=0.5)
