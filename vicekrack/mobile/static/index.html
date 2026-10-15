@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ViceKrack">
+<title>ViceKrack Command Center</title>
+<link rel="stylesheet" href="/static/pair.css">
+<script src="/static/pair.js" defer></script>
+</head>
+<body>
+<main class="screen">
+  <header class="top">
+    <div class="logo" aria-hidden="true">VK</div>
+    <div>
+      <h1>Command Center</h1>
+      <p class="muted" id="subtitle">Connecting to your PC…</p>
+    </div>
+  </header>
+
+  <section id="pair" class="card" hidden>
+    <h2>Pair this iPhone</h2>
+    <p class="muted">On your PC, double-click <strong>Pair my iPhone</strong>. Type the 6-digit code it shows.</p>
+    <label for="code">Pairing code</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000">
+    <label for="name">Name for this phone</label>
+    <input id="name" maxlength="40" value="iPhone">
+    <p id="pair-error" class="error" role="alert" hidden></p>
+    <button id="pair-button" class="primary" type="button">Pair</button>
+  </section>
+
+  <section id="status" hidden>
+    <div id="pc" class="banner"></div>
+    <div class="card rows">
+      <div class="row"><span>ViceKrack HQ</span><span id="hq"></span></div>
+      <div class="row"><span>xAI key</span><span id="key"></span></div>
+      <div class="row"><span>Connection</span><span id="via"></span></div>
+      <div class="row"><span>PIN for paid actions</span><span id="pin"></span></div>
+    </div>
+    <div class="card">
+      <div class="row"><span>Phone approvals today</span><span id="spend"></span></div>
+      <div class="meter"><div id="meter"></div></div>
+    </div>
+    <p class="muted note">The full app (Home, Research, Video Studio, Agents, Alerts) arrives in the next update.</p>
+    <button id="refresh" class="primary" type="button">Check status now</button>
+    <button id="unpair" class="danger" type="button">Unpair this phone</button>
+  </section>
+</main>
+</body>
+</html>
