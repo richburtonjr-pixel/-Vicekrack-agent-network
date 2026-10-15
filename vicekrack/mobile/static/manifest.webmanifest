@@ -1,0 +1,15 @@
+{
+  "name": "ViceKrack Command Center",
+  "short_name": "ViceKrack",
+  "start_url": "/#home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/static/icon-180.png", "sizes": "180x180", "type": "image/png"}
+  ]
+}

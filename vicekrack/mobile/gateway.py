@@ -8,7 +8,7 @@ Who may connect
   X-VK-Mobile-CSRF header must match. Bodies are JSON objects of at most 16 KB.
 
 What the phone may do
-- Read: status, its session, and an allowlist of HQ Studio reads.
+- Read: status, its session, the Home and System summaries, and an allowlist of HQ Studio reads.
 - Act: an allowlist of HQ Studio actions, forwarded through HQClient (the HQ's own rules still apply).
 - Paid actions also need the PIN, a cost estimate the HQ itself reports, and room under the daily cap.
   Retrying an uncertain paid request (possible double billing) and narration purchases stay PC-only.
@@ -26,8 +26,13 @@ from . import security
 
 STATIC = Path(__file__).resolve().parent / "static"
 FILES = {"/": ("index.html", "text/html; charset=utf-8"),
-         "/static/pair.js": ("pair.js", "text/javascript; charset=utf-8"),
-         "/static/pair.css": ("pair.css", "text/css; charset=utf-8")}
+         "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
+         "/static/app.css": ("app.css", "text/css; charset=utf-8"),
+         "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
+         "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+         "/static/icon-180.png": ("icon-180.png", "image/png"),
+         "/static/icon-192.png": ("icon-192.png", "image/png"),
+         "/static/icon-512.png": ("icon-512.png", "image/png")}
 MAX_BODY = 16 * 1024
 COOKIE = "vk_mobile"
 CSRF_HEADER = "x-vk-mobile-csrf"
@@ -36,7 +41,7 @@ REQUEST_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 NAME = re.compile(r"^[^\x00-\x1f<>\\`{}]{1,40}$")
 HEADERS = {
     "Content-Security-Policy": ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-                                "media-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; "
+                                "media-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; "
                                 "form-action 'none'; frame-ancestors 'none'"),
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY",
     "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin",
@@ -163,6 +168,13 @@ class Gateway:
                 return 200, {**HEADERS, "Content-Type": content_type}, (STATIC / name).read_bytes()
             if method == "GET" and path == "/m/api/status" and not parts.query:
                 return self._status(headers, settings)
+            if method == "GET" and path in ("/m/api/home", "/m/api/system") and not parts.query:
+                if self._device(headers) is None:
+                    return _error(401, "not_paired", "Pair this phone first.")
+                from . import summary
+                if path == "/m/api/home":
+                    return _json(200, summary.home(self.hq, self.store, self.clock))
+                return _json(200, summary.system(self.store, self.clock))
             if method == "GET" and path == "/m/api/session" and not parts.query:
                 device = self._device(headers)
                 if device is None:

@@ -73,8 +73,13 @@ python -m vicekrack mobile-phones | mobile-unpair-all | mobile-status
 
 ## Roadmap
 
-1. **PR 1 (this)**: separate mobile server, private connection, pairing, PIN, $5 cap, audit log, saved key, auto-start.
-2. PR 2: installable app shell, bottom navigation, Home and System screens.
+1. PR 1 (merged): separate mobile server, private connection, pairing, PIN, $5 cap, audit log, saved key, auto-start.
+2. **PR 2 (this)**: installable app (Add to Home Screen, blue VK icon, opens full-screen), bottom tabs, Home
+   (PC/HQ status, waiting on you with estimates, running/finished/problems counts, live progress, recent
+   activity, refreshes every 20 s) and System (PC, HQ, key, connection, spending, PIN, paired phones, recent
+   phone actions). Research, Studio, Agents and Alerts show what's coming. `GET /m/api/home` and
+   `GET /m/api/system` build these from HQ Studio reads and the mobile records only; when the HQ can't be read
+   the app says so instead of showing numbers. The service worker stores only the app's own files, never data.
 3. PR 3: Research and Video Studio screens (script review, approvals, video playback, downloads).
 4. PR 4: Agents screen (real status only).
 5. PR 5: Alerts: failures and finished projects, in the app and on the lock screen.
