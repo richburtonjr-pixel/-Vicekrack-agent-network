@@ -242,6 +242,42 @@ class ConsentAndDuplicateTests(StudioBase):
             self.assertEqual(error["error"]["code"], "workflow_busy")
 
 
+class OneApprovalTests(StudioBase):
+    """Step 52: one approval sends every prepared clip, one after another, through the same per-job path."""
+
+    def test_one_approval_sends_every_clip(self):
+        doc = self.ok("workflow/start", {"production_id": self.pid, "narration": "silent"})
+        bundle = next(a for a in doc["actions"] if a["action"] == "workflow_submit_all")
+        self.assertEqual(bundle["consent"], "paid-generate-all:" + doc["workflow_id"])
+        self.assertEqual(bundle["scenes"], [s["scene_index"] for s in doc["scenes"]])
+        self.assertEqual(bundle["seconds"], sum(s["request"]["duration"] for s in doc["scenes"]))
+        self.assertGreater(bundle["estimate_usd"], 0)
+        for consent in (None, "paid-generate-all:vpw-" + "0" * 24, doc["scenes"][0]["consent"], "yes"):
+            status, error = self.post("workflow/submit-all", {"workflow_id": doc["workflow_id"], "consent": consent})
+            self.assertIn(status, (400, 409), error)
+        self.assertEqual(self.grok.posts, [])                            # a wrong approval never pays
+        doc = self.ok("workflow/submit-all", {"workflow_id": doc["workflow_id"], "consent": bundle["consent"]})
+        self.assertEqual(len(self.grok.posts), len(doc["scenes"]))
+        self.assertEqual(doc["bundle"], {"sent": bundle["scenes"], "stopped": None})
+        self.assertFalse([a for a in doc["actions"] if a["action"].startswith("workflow_submit")])
+        status, error = self.post("workflow/submit-all", {"workflow_id": doc["workflow_id"], "consent": bundle["consent"]})
+        self.assertEqual(error["error"]["code"], "nothing_to_generate")
+        self.assertEqual(len(self.grok.posts), len(doc["scenes"]))      # a second click cannot pay again
+        doc = self.ok("workflow/resume", {"workflow_id": doc["workflow_id"], "allow_network": True})
+        self.assertEqual(doc["status"], "waiting_for_review")
+
+    def test_sending_stops_at_an_unclear_clip(self):
+        doc = self.ok("workflow/start", {"production_id": self.pid, "narration": "silent"})
+        bundle = next(a for a in doc["actions"] if a["action"] == "workflow_submit_all")
+        self.grok.post_effects = [None, TimeoutError("private provider detail")]
+        doc = self.ok("workflow/submit-all", {"workflow_id": doc["workflow_id"], "consent": bundle["consent"]})
+        self.assertEqual(len(self.grok.posts), 2)                       # scene 3 and 4 were never sent
+        self.assertEqual(doc["bundle"], {"sent": [1, 2], "stopped": {"scene": 2, "code": "video_submit_uncertain"}})
+        self.assertEqual(doc["status"], "uncertain_submission")
+        self.assertNotIn("private provider detail", json.dumps(doc))
+        self.assertFalse([a for a in doc["actions"] if a["action"] == "workflow_submit_all"])
+
+
 class RecoveryTests(StudioBase):
     def test_provider_failure_and_scene_replacement(self):
         doc = self.ok("workflow/start", {"production_id": self.pid, "narration": "silent"})
@@ -500,10 +536,11 @@ class StudioBrowserTests(unittest.TestCase):
                     page.click("#studio-start")
                     page.wait_for_selector("text=Generation progress")
                     self.assertEqual(studio.video_transport.posts, 0)
-                    for _ in range(4):
-                        page.locator(".paid-box input[type=checkbox]").first.check()
-                        page.locator(".paid-box button").first.click()
-                        page.wait_for_selector(idle)
+                    self.assertEqual(page.locator(".paid-box").count(), 1)          # Step 52: one approval
+                    self.assertIn("Generate all 4 clips", page.inner_text("#studio-body"))
+                    page.locator(".paid-box input[type=checkbox]").first.check()
+                    page.locator(".paid-box button").first.click()
+                    page.wait_for_selector(idle)
                     self.assertEqual(studio.video_transport.posts, 4)
                     page.click("button[data-action=resume]")
                     page.wait_for_selector(idle)

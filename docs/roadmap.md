@@ -331,3 +331,8 @@ Implemented: looser research, you pick ([docs/step51.md](step51.md)):
 - page dates read the way news sites actually write them; topic nicknames from Grok (Sixers for 76ers);
 - source pages opened in parallel; the card reason is the deciding one;
 - Make video selects the story again at click time, so yesterday's cards still work.
+
+# Step 52 implementation checkpoint
+
+Implemented: one approval for all of a video's clips in Video Studio ([docs/step52.md](step52.md)),
+with a total-cost estimate; sending stops at the first problem.

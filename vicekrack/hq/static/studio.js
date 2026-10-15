@@ -163,7 +163,7 @@
     return "";
   }
   /* A paid request: the exact request is shown above; nothing is sent until the box is ticked. */
-  function paidBox(parent, title, consent, risk, onSend) {
+  function paidBox(parent, title, consent, risk, onSend, approveText) {
     var box = h("div", { class: "paid-box" + (risk ? " risk" : ""), role: "group", "aria-label": title }, parent);
     h("div", { class: "paid-title" }, box, risk ? "Paid request · may bill twice" : "Paid request");
     h("p", {}, box, title);
@@ -174,7 +174,7 @@
     var id = "c-" + consent.replace(/[^a-z0-9]/gi, "-");
     var row = h("div", { class: "studio-row" }, box);
     var check = h("input", { type: "checkbox", id: id }, row);
-    h("label", { for: id }, row, "I approve this one paid xAI request (" + consent + ")");
+    h("label", { for: id }, row, (approveText || "I approve this one paid xAI request") + " (" + consent + ")");
     var check2 = null;
     if (risk) {
       var row2 = h("div", { class: "studio-row" }, box);
@@ -461,8 +461,21 @@
         " · sound " + (r.generate_audio ? "generated (muted in the preview)" : "none") + " · prompt: " + r.prompt : "not prepared",
         words(s.job_status) + (s.replaced_job_ids.length ? " · replaced " + s.replaced_job_ids.length : "")];
     }));
+    var bundled = w.actions.some(function (a) { return a.action === "workflow_submit_all"; });
+    if (w.bundle && w.bundle.stopped) {
+      h("p", { class: "notice warn" }, box, "Sent scenes " + (w.bundle.sent.join(", ") || "none") + ". Stopped at scene " +
+        w.bundle.stopped.scene + " (" + words(w.bundle.stopped.code) + "), so nothing else was sent.");
+    }
     w.actions.forEach(function (a) {
-      if (a.action === "workflow_submit") {
+      if (a.action === "workflow_submit_all") {
+        paidBox(box, "Generate all " + a.scenes.length + " clips (" + a.seconds + " s of video in total, about $" +
+          a.estimate_usd.toFixed(2) + "). One approval; the clips are sent one after another and sending stops if any " +
+          "of them has a problem.", a.consent, false, function (consent) {
+            act("workflow/submit-all", { workflow_id: w.workflow_id, consent: consent }, function (doc) { ST.workflow = doc; });
+          }, "I approve these " + a.scenes.length + " paid xAI clip requests");
+      } else if (a.action === "workflow_submit" && bundled && !a.retry_uncertain) {
+        return;                                  // covered by the one approval above
+      } else if (a.action === "workflow_submit") {
         var scene = w.scenes[a.scene - 1];
         paidBox(box, "Generate scene " + a.scene + " clip (" + scene.request.duration + " s, " + scene.request.model + ", " +
           scene.request.resolution + "). One paid request.", a.consent, !!a.retry_uncertain, function (consent, risk) {
