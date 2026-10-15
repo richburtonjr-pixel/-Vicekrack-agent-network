@@ -162,7 +162,8 @@ class MockGrok:
             if request_id in self.pending_once and request_id not in self.seen_pending:
                 self.seen_pending.add(request_id)
                 return {"status": "pending"}
-            return {"status": "done", "video": {"url": f"https://vidgen.x.ai/demo/{request_id}.mp4"}}
+            return {"status": "done", "video": {"url": "https://vidgen.x.ai/xai-vidgen-bucket/xai-video-"
+                                                       f"0d1e2f3a-4b5c-6d7e-8f90-a1b2c3d4e5f6/{request_id}.mp4"}}
         if method == "DOWNLOAD":
             self.check_download_url(url)
             if credential:
