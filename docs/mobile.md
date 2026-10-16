@@ -74,13 +74,18 @@ python -m vicekrack mobile-phones | mobile-unpair-all | mobile-status
 ## Roadmap
 
 1. PR 1 (merged): separate mobile server, private connection, pairing, PIN, $5 cap, audit log, saved key, auto-start.
-2. **PR 2 (this)**: installable app (Add to Home Screen, blue VK icon, opens full-screen), bottom tabs, Home
+2. PR 2 (merged): installable app (Add to Home Screen, blue VK icon, opens full-screen), bottom tabs, Home
    (PC/HQ status, waiting on you with estimates, running/finished/problems counts, live progress, recent
    activity, refreshes every 20 s) and System (PC, HQ, key, connection, spending, PIN, paired phones, recent
    phone actions). Research, Studio, Agents and Alerts show what's coming. `GET /m/api/home` and
    `GET /m/api/system` build these from HQ Studio reads and the mobile records only; when the HQ can't be read
    the app says so instead of showing numbers. The service worker stores only the app's own files, never data.
-3. PR 3: Research and Video Studio screens (script review, approvals, video playback, downloads).
+3. **PR 3 (this)**: Research (topics, Grok cost + PIN approval, story cards with labels and sources, Make video)
+   and Video Studio (your videos, read the script, prepare a video with the lite model, approve all clips at once,
+   live progress, play the finished video, review with acknowledgements, export, download the zip). New phone
+   routes: `GET /m/api/options` (Studio options, no session secrets), `GET /m/api/media` (finished video/poster
+   with byte ranges), `GET /m/api/export` (verified export zip). Workflow reads gain a per-clip estimate.
+   Buying new narration and retrying possibly-billed requests stay on the PC.
 4. PR 4: Agents screen (real status only).
 5. PR 5: Alerts: failures and finished projects, in the app and on the lock screen.
 6. PR 6: System Control safe retries.

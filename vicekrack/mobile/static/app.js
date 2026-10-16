@@ -1,4 +1,4 @@
-/* ViceKrack Mobile Command Center app (PR 2: shell, Home, System, pairing).
+/* ViceKrack Mobile Command Center app (shell, pairing, Home, System; Research and Studio live in screens.js).
  * Every screen shows only what the PC reports. All text is inserted as plain text nodes, never parsed as HTML. */
 "use strict";
 
@@ -52,7 +52,7 @@ function ago(iso) {
 }
 function show(...nodes) {
   const main = screen();
-  main.replaceChildren(...nodes);
+  main.replaceChildren(...nodes.flat().filter((n) => n !== null && n !== undefined && n !== false));
 }
 
 /* ---------- talking to the PC ---------- */
@@ -105,7 +105,7 @@ function offline() {
 function tabs(on) {
   const nav = document.getElementById("tabs");
   nav.hidden = !on;
-  const current = (location.hash || "#home").slice(1);
+  const current = (location.hash || "#home").slice(1).split("/")[0];
   for (const link of nav.querySelectorAll("a")) { link.classList.toggle("on", link.dataset.tab === current); }
 }
 
@@ -146,7 +146,8 @@ function pairScreen() {
 const KIND = { research_approval: "Research", clips_approval: "Clips", video_review: "Review" };
 function needsYou(items) {
   if (!items.length) { return null; }
-  const rows = items.slice(0, 4).map((item) => h("div", { class: "item" },
+  const target = (item) => item.kind === "research_approval" ? "#research/" + item.job_id : "#studio/w/" + item.workflow_id;
+  const rows = items.slice(0, 4).map((item) => h("a", { class: "item", href: target(item) },
     h("span", { class: "what" }, (KIND[item.kind] || "") + " · " + item.title +
       (item.kind === "clips_approval" && item.clips ? " (" + item.clips + " clips)" : "")),
     h("span", { class: "cost" }, item.kind === "video_review" ? "Watch" :
@@ -255,10 +256,6 @@ async function unpair() {
 
 /* ---------- screens arriving in later updates ---------- */
 const SOON = {
-  research: ["Research", ["Type up to 5 topics", "See the Grok cost, approve with your PIN", "Story cards with sources and labels",
-    "Make video from any story"]],
-  studio: ["Video Studio", ["Read scripts before paying", "Approve all clips at once with your PIN",
-    "Watch progress and play finished videos", "Approve, request changes, download"]],
   agents: ["Agents", ["All eight agents with real status only", "What each one does and is working on now"]],
   alerts: ["Alerts", ["Only failures and finished projects", "Lock-screen alerts on your iPhone"]],
 };
@@ -270,14 +267,82 @@ function soonScreen(key) {
       h("ul", {}, items.map((t) => h("li", {}, t)))));
 }
 
+/* ---------- actions, the PIN sheet and busy screen (used by screens.js) ---------- */
+const SCREENS = {};
+function newRequestId() {
+  if (window.crypto && crypto.randomUUID) { return "m-" + crypto.randomUUID(); }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return "m-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+/* One action. Reuse the same requestId when retrying the same tap: the PC answers it once, never twice. */
+async function act(action, body, requestId) {
+  return post("/m/api/action/" + action, { ...body, request_id: requestId || newRequestId() });
+}
+function errorText(result) {
+  if (result.status === 0) { return "No answer from your PC. Check the result before trying again."; }
+  return (result.body.error && result.body.error.message) || "That didn't work. Nothing else was changed.";
+}
+function note(text, tone) {
+  return h("p", { class: tone === "bad" ? "error" : "notice", role: tone === "bad" ? "alert" : null }, text);
+}
+let busyLayer = null;
+function busy(message) {
+  if (busyLayer) { busyLayer.remove(); busyLayer = null; }
+  if (!message) { return; }
+  busyLayer = h("div", { class: "layer", role: "status" }, h("div", { class: "busy" },
+    h("div", { class: "spinner", "aria-hidden": "true" }), h("p", {}, message),
+    h("p", { class: "muted" }, "Keep the app open. If you leave, it keeps going on your PC; check back here.")));
+  document.body.append(busyLayer);
+}
+/* The approval sheet for anything paid: what it is, the most it can cost, today's phone spend, your PIN. */
+function paidSheet({ title, lines, estimate, run }) {
+  const spending = (STATE.status && STATE.status.spending) || { today_usd: 0, cap_usd: 5 };
+  const after = spending.today_usd + (estimate || 0);
+  const requestId = newRequestId();
+  const pin = h("input", { type: "password", inputmode: "numeric", autocomplete: "off", maxlength: "8",
+                           class: "code", id: "pin", "aria-label": "Your PIN", placeholder: "PIN" });
+  const error = h("p", { class: "error", role: "alert", hidden: true });
+  const approve = h("button", { class: "orange-btn", type: "button" },
+    "Approve " + (estimate !== null && estimate !== undefined ? "up to " + money(estimate) + " " : "") + "with PIN");
+  const cancel = h("button", { class: "ghost", type: "button" }, "Not now");
+  const sheet = h("div", { class: "layer", role: "dialog", "aria-modal": "true", "aria-label": title },
+    h("div", { class: "sheet" }, h("h2", {}, title),
+      h("div", { class: "lines" }, lines.map((line) => h("p", {}, line))),
+      h("div", { class: "row" }, h("span", {}, "Phone spend today after this"),
+        h("span", { class: "val" }, money(after) + " of " + money(spending.cap_usd))),
+      bar(spending.cap_usd > 0 ? (after / spending.cap_usd) * 100 : 0, "orange"),
+      h("label", { for: "pin" }, "Your PIN"), pin, error, approve, cancel));
+  const close = () => sheet.remove();
+  cancel.addEventListener("click", close);
+  pin.addEventListener("input", () => { error.hidden = true; });
+  approve.addEventListener("click", async () => {
+    if (!/^[0-9]{4,8}$/.test(pin.value)) { error.textContent = "Enter your 4-8 digit PIN."; error.hidden = false; return; }
+    approve.disabled = true;
+    const ok = await run(pin.value, requestId, (message) => { error.textContent = message; error.hidden = false; });
+    approve.disabled = false;
+    if (ok) { close(); }
+  });
+  document.body.append(sheet);
+  pin.focus();
+}
+async function refreshStatus() {
+  const status = await call("/m/api/status");
+  if (status.ok && status.body.paired) { STATE.status = status.body; }
+  return status;
+}
+const words = (text) => String(text || "").replaceAll("_", " ");
+
 /* ---------- router ---------- */
 async function route(force) {
   const name = (location.hash || "#home").slice(1);
   if (!force && name === STATE.route) { return; }
   STATE.route = name;
   clearInterval(STATE.timer);
-  if (name === "system") { await systemScreen(); }
-  else if (SOON[name]) { soonScreen(name); }
+  const [tab, ...rest] = name.split("/");
+  if (tab === "system") { await systemScreen(); }
+  else if (SCREENS[tab]) { tabs(true); await SCREENS[tab](rest); }
+  else if (SOON[tab]) { soonScreen(tab); }
   else { await homeScreen(); STATE.timer = setInterval(() => { if (!document.hidden) { homeScreen(); } }, 20000); }
   screen().focus({ preventScroll: true });
 }
