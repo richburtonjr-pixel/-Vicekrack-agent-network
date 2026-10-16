@@ -57,10 +57,17 @@ ID = {"production": re.compile(r"^prod-[0-9a-f]{24}$"), "workflow": re.compile(r
       "research_consent": re.compile(r"^paid-research:rsj-[0-9a-f]{24}$"),
       "script_consent": re.compile(r"^paid-script:prod-[0-9a-f]{24}$"),
       # Step 52: one approval for all of a workflow's prepared clips
-      "bundle_consent": re.compile(r"^paid-generate-all:vpw-[0-9a-f]{24}$")}
+      "bundle_consent": re.compile(r"^paid-generate-all:vpw-[0-9a-f]{24}$"),
+      # Step 54: Auto Studio videos and their one-time approvals
+      "auto": re.compile(r"^asp-[0-9a-f]{24}$"),
+      "auto_consent": re.compile(r"^paid-auto:asp-[0-9a-f]{24}$"),
+      "auto_retry_consent": re.compile(r"^paid-auto-retry:asp-[0-9a-f]{24}:[1-9][0-9]?$"),
+      "auto_file": re.compile(r"^(final|thumb|scene-[0-9]{3})$")}
 CHOICE = {"timing": ("provider", "estimated"), "narration": ("silent", "speech"),
           "purpose": ("review_copy", "approved_preview"),
           "decision": ("approved_for_preview", "changes_requested", "rejected"),
+          "auto_length": (15, 30, 60, 120), "auto_type": ("news", "cinematic", "social"),
+          "auto_audio": ("narrator", "dialogue", "both"),
           "resolution": ("480p", "720p", "1080p"), "model": ("grok-imagine-video-1.5", "grok-imagine-video-1.5-lite")}
 ACKS = ("needs_review_result", "unavailable_checks", "draft_restrictions", "stale_evidence")
 
@@ -93,6 +100,12 @@ ACTIONS = {
     "research/make-video": ("research_make_video", {"job_id": ("research", True), "story": ("story", True),
                                                     "consent": ("script_consent", True),
                                                     "retry_uncertain": ("bool", False)}),
+    "auto/prepare": ("auto_prepare", {"job_id": ("research", True), "story": ("story", True),
+                                      "length": ("auto_length", True), "type": ("auto_type", True),
+                                      "audio": ("auto_audio", True), "music": ("bool", False)}),
+    "auto/approve": ("auto_approve", {"production_id": ("auto", True), "consent": ("auto_consent", True)}),
+    "auto/stop": ("auto_stop", {"production_id": ("auto", True)}),
+    "auto/retry": ("auto_retry", {"production_id": ("auto", True), "consent": ("auto_retry_consent", True)}),
     "review/record": ("review_record", {"workflow_id": ("workflow", True), "decision": ("decision", True),
                                         "reviewer": ("reviewer", True), "binding": ("digest", True),
                                         "acknowledgments": ("acks", False), "notes": ("notes", False),
@@ -214,7 +227,7 @@ def handle(gate, method, target, headers, body, port):
         return _error(403, "studio_disabled", "The Video Studio is off; start the HQ with --studio or --studio-demo.")
     try:
         if method == "GET":
-            return _read(gate, path, parts.query)
+            return _read(gate, path, parts.query, headers)
         if method != "POST":
             return _error(405, "method_not_allowed", "Studio actions use POST; reads use GET.")
         if not _origin_ok(headers, port):
@@ -259,6 +272,35 @@ def handle(gate, method, target, headers, body, port):
         return _error(500, "studio_error", "The Studio could not handle that request.")
 
 
+def _auto_file(studio, production_id, name, download, headers):
+    """Step 54: a finished video (byte ranges for playback, or the whole file to download), its thumbnail or a
+    scene still. Only files inside that video's own folder, chosen from a fixed list."""
+    from .api import HEADERS, MAX_RANGE_BYTES, RANGE
+    path, kind = studio.auto_file(production_id, name)
+    size = path.stat().st_size
+    disposition = f'attachment; filename="vicekrack-{production_id}.mp4"' if download and name == "final" else "inline"
+    base = {**HEADERS, "Content-Type": kind, "Accept-Ranges": "bytes", "Content-Disposition": disposition}
+    wanted = (headers or {}).get("range")
+    if wanted is None or download:
+        return 200, base, path.read_bytes()
+    match = RANGE.match(wanted.strip())
+    if match is None or match.group(1) == match.group(2) == "":
+        return 416, {**base, "Content-Range": f"bytes */{size}"}, b""
+    first, last = match.groups()
+    if first == "":
+        start, end = max(0, size - int(last)), size - 1
+    else:
+        start, end = int(first), (int(last) if last != "" else size - 1)
+        if start >= size or end < start:
+            return 416, {**base, "Content-Range": f"bytes */{size}"}, b""
+        end = min(end, size - 1)
+    end = min(end, start + MAX_RANGE_BYTES - 1)
+    with open(path, "rb") as handle:
+        handle.seek(start)
+        data = handle.read(end - start + 1)
+    return 206, {**base, "Content-Range": f"bytes {start}-{end}/{size}"}, data
+
+
 def _one(query, key, kind):
     values = query.get(key, [])
     if len(values) != 1 or not ID[kind].match(values[0]):
@@ -266,7 +308,7 @@ def _one(query, key, kind):
     return values[0]
 
 
-def _read(gate, path, query_text):
+def _read(gate, path, query_text, headers=None):
     query = parse_qs(query_text, max_num_fields=3, keep_blank_values=True)
     studio = gate.studio
     try:
@@ -274,6 +316,15 @@ def _read(gate, path, query_text):
             doc = dict(studio.session_info(), csrf=gate.csrf)
             cookie = f"{COOKIE}={gate.session}; Path=/api/studio/; HttpOnly; SameSite=Strict"
             return _json(200, doc, {"Set-Cookie": cookie})
+        if path == PREFIX + "auto/options" and not query:      # Step 54: Auto Studio
+            return _json(200, studio.auto_options())
+        if path == PREFIX + "auto/videos" and not query:
+            return _json(200, studio.auto_list())
+        if path == PREFIX + "auto/video" and set(query) == {"id"}:
+            return _json(200, studio.auto_video(_one(query, "id", "auto")))
+        if path == PREFIX + "auto/file" and set(query) in ({"id", "name"}, {"id", "name", "download"}):
+            return _auto_file(studio, _one(query, "id", "auto"), _one(query, "name", "auto_file"),
+                              "download" in query, headers)
         if path == PREFIX + "overview" and not query:          # HQ 2.0: real counts per department
             return _json(200, studio.overview())
         if path == PREFIX + "productions" and not query:

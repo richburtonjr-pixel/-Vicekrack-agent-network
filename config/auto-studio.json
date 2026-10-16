@@ -1,0 +1,28 @@
+{
+  "config_version": "1.0",
+  "description": "Auto Studio (Step 54): one approval -> Grok script -> xAI voices -> xAI scene clips -> FFmpeg assembly (intro, transitions, captions, music, outro) -> verified MP4 in the Finished videos library. Prices are for estimates and the spending cap only.",
+  "lengths": [15, 30, 60, 120],
+  "types": {
+    "news": {"label": "News report", "music": "steady", "style": "Grounded, clear news report. Short sentences."},
+    "cinematic": {"label": "Cinematic entertainment", "music": "epic", "style": "Cinematic, dramatic storytelling with tension and atmosphere."},
+    "social": {"label": "Social media short", "music": "upbeat", "style": "Punchy, fast, conversational social media short with a strong hook."}
+  },
+  "audio_styles": {
+    "narrator": {"label": "Professional narrator", "speakers": [1, 1], "narrator": true},
+    "dialogue": {"label": "Character dialogue", "speakers": [2, 3], "narrator": false},
+    "both": {"label": "Narration and dialogue", "speakers": [2, 3], "narrator": true}
+  },
+  "voices": {"narrator": "rex", "female": ["eve", "ara"], "male": ["leo", "sal"]},
+  "video": {"model": "grok-imagine-video-1.5-lite", "models": ["grok-imagine-video-1.5-lite", "grok-imagine-video-1.5"],
+            "resolution": "720p", "resolutions": ["480p", "720p"], "native_audio": false},
+  "timing": {"intro_seconds": 1.5, "outro_seconds": 2.0, "transition_seconds": 0.0, "fade_seconds": 0.25, "lead_in_seconds": 0.45,
+             "line_gap_seconds": 0.25, "tail_seconds": 0.5, "min_clip_seconds": 4, "max_clip_seconds": 15,
+             "target_clip_seconds": 9, "words_per_second": 2.45, "speech_fill": 0.86, "length_tolerance": 0.12},
+  "mix": {"loudness_lufs": -14, "true_peak_db": -1.5, "music_db": -21, "music_under_voice_db": -30, "native_audio_db": -26},
+  "prices": {"as_of": "2026-10-13", "source": "https://docs.x.ai/docs/pricing",
+             "video_per_second": {"grok-imagine-video-1.5-lite": {"480p": 0.02, "720p": 0.03},
+                                  "grok-imagine-video-1.5": {"480p": 0.08, "720p": 0.14}},
+             "tts_per_million_characters": 15.0, "script_estimate_usd": 0.01},
+  "limits": {"max_scene_retries": 2, "cap_multiplier": 1.6, "poll_seconds": 8, "max_wait_minutes_per_scene": 20,
+             "max_productions_listed": 200, "ffmpeg_timeout_seconds": 600}
+}

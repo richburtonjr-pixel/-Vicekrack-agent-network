@@ -1046,7 +1046,8 @@
       b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
     });
     var timeline = view === "timeline", results = view === "results", content = view === "content-results";
-    var sessions = view === "sessions", broker = view === "broker", studio = view === "studio" || view === "research";
+    var sessions = view === "sessions", broker = view === "broker";
+    var studio = view === "studio" || view === "research" || view === "videos";   // Step 54: videos.js
     var hq3d = view === "hq3d";                          // HQ 2.0: the 3D headquarters lives in hq3d/main.js
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
@@ -1055,6 +1056,7 @@
     $("broker-view").hidden = !broker;
     $("studio-view").hidden = view !== "studio";        // Step 48: the Video Studio lives in studio.js
     $("research-view").hidden = view !== "research";    // Step 50: Research lives in research.js
+    $("videos-view").hidden = view !== "videos";        // Step 54: Finished videos live in videos.js
     $("hq3d-view").hidden = !hq3d;
     $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || hq3d || S.list;
     $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio && !hq3d);
