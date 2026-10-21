@@ -35,7 +35,12 @@ Approvals made on the PC are not limited by the phone cap.
 
 ## One-time setup (PC)
 
-All of these are double-click files in `scripts/windows/`:
+**Easiest:** double-click **`Setup ViceKrack Mobile.bat`** in the main ViceKrack folder. It checks
+Tailscale, saves your xAI key (hidden; it can reuse the key `ViceKrack.bat` already saved on this PC), sets
+your PIN and daily limit, turns on the private front door, and adds **ViceKrack (PC + Phone)** and **Pair my
+iPhone** shortcuts to your desktop. It is safe to run again.
+
+The individual steps are also double-click files in `scripts/windows/`:
 
 1. Install **Tailscale for Windows** and sign in.
 2. **`1 Set up ViceKrack Mobile.bat`**: saves your xAI key, sets your PIN and daily limit, finds your private
