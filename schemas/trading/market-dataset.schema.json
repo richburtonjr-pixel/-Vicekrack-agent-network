@@ -115,7 +115,10 @@
               "const": "alpaca"
             },
             "endpoint": {
-              "const": "https://data.alpaca.markets/v2/stocks/{symbol}/bars"
+              "enum": [
+                "https://data.alpaca.markets/v2/stocks/{symbol}/bars",
+                "https://data.alpaca.markets/v1beta3/crypto/us/bars"
+              ]
             },
             "historical_only": {
               "const": true
@@ -123,7 +126,8 @@
             "feed": {
               "enum": [
                 "iex",
-                "sip"
+                "sip",
+                "crypto_us"
               ]
             },
             "adjustment": {
@@ -170,7 +174,10 @@
                   "$ref": "#/$defs/timestamp"
                 },
                 "timezone": {
-                  "const": "America/New_York"
+                  "enum": [
+                    "America/New_York",
+                    "UTC"
+                  ]
                 }
               }
             },
@@ -263,6 +270,18 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 10000
+            },
+            "asset_class": {
+              "const": "crypto"
+            },
+            "pair": {
+              "type": "string",
+              "pattern": "^[A-Z]{2,10}/USD$"
+            },
+            "volume_values_truncated": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000
             }
           }
         }

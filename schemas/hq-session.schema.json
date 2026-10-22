@@ -853,7 +853,8 @@
                     "feed": {
                       "enum": [
                         "iex",
-                        "sip"
+                        "sip",
+                        "crypto_us"
                       ]
                     },
                     "adjustment": {

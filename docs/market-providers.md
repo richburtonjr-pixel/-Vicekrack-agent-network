@@ -172,3 +172,38 @@ ID (`mds-…`) changes with the feed, the adjustment, the range or the data.
   `adjustment` setting.
 - **Unchecked content:** the data is still `not_verified` for authenticity, completeness
   and licensing. Licensing and redistribution terms are yours to check.
+
+## Crypto: BTC/USD and ETH/USD (HQ Phase 3a)
+
+The same `market-fetch` command also downloads **crypto** price history from Alpaca's US crypto data
+(`https://data.alpaca.markets/v1beta3/crypto/us/bars`). It uses the same free Alpaca keys and the same
+safety rules: an explicit `--allow-network`, keys only from the environment, a fixed address, size caps,
+no retries, and nothing saved unless the whole download checks out.
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack market-fetch --provider alpaca --symbol BTC/USD --interval 1h --start 2026-09-01 --end 2026-09-30 --allow-network
+.\.venv\Scripts\python.exe -m vicekrack trading-session-start DATASET_ID --record-events
+```
+
+How crypto differs from stocks:
+
+| | Stocks | Crypto |
+|---|---|---|
+| Pairs | any US stock symbol | the pairs in `config/market-providers.json` (`alpaca_crypto.pairs`): BTC/USD, ETH/USD |
+| Stored symbol | `AAPL` | `BTCUSD`, `ETHUSD` (no slash; the pair `BTC/USD` is recorded in provenance) |
+| Hours | market hours; nights and weekends show as gaps | 24/7, so a complete download has no gaps |
+| Time zone | America/New_York | UTC (dates in `--start`/`--end` are UTC days; session VWAP resets at UTC midnight) |
+| Intervals | 1m to 1d | 1m to 1h. **Daily crypto bars are refused** until Alpaca's daily start time is confirmed |
+| `--feed`, `--adjustment` | required | not allowed (there is no such choice); recorded as `crypto_us` and `raw` |
+| Prices | never rounded; over 8 decimal places fails | the same |
+| Volume | never rounded | values with more than 8 decimal places are cut (never rounded up) to 8 and counted in `volume_values_truncated`. Volume is never used for money |
+
+Crypto datasets use the same `alpaca_historical` record type as stocks, so research agents, sessions and
+the Living HQ read them with no other changes. Their provenance adds `asset_class: "crypto"`, the `pair`
+and `volume_values_truncated`, and is checked by `providers/alpaca_crypto.validate_crypto_provider`.
+
+**Not yet:** the offline simulator still trades whole units only. It runs on a crypto dataset without
+errors, but its entries are rejected: the shipped size of 10 whole coins is far above the order and
+position limits (`order_notional_limit`), and a fixed-dollar size rounds down to zero coins
+(`sizing_zero_quantity`). So a crypto simulation today has no fills. Fractional amounts come in Phase 3b. Like Step 40, this
+was tested only with mocked Alpaca responses; no real request was made.
