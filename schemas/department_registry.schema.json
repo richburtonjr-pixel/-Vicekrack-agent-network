@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vicekrack.local/schemas/department_registry.schema.json",
+  "title": "ViceKrack department registry 1.0",
+  "description": "The one list of departments, agents and HQ rooms that every ViceKrack screen reads. Display data only: it grants no permission and changes no limit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "version", "departments", "agents", "rooms"],
+  "properties": {
+    "contract": {"const": "department_registry"},
+    "version": {"const": "1.0"},
+    "departments": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "kind", "status", "purpose"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "name": {"$ref": "#/$defs/label"},
+          "kind": {"enum": ["shared", "department"]},
+          "status": {"enum": ["active", "paper_only", "planned"]},
+          "purpose": {"$ref": "#/$defs/line"}
+        }
+      }
+    },
+    "agents": {
+      "type": "array", "minItems": 1, "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "role", "department", "status", "work"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "name": {"$ref": "#/$defs/label"},
+          "role": {"$ref": "#/$defs/label"},
+          "department": {"$ref": "#/$defs/id"},
+          "status": {"enum": ["active", "coming_soon"]},
+          "work": {"$ref": "#/$defs/line"}
+        }
+      }
+    },
+    "rooms": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "department", "agent"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "name": {"$ref": "#/$defs/label"},
+          "department": {"$ref": "#/$defs/id"},
+          "agent": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$"},
+    "label": {"type": "string", "minLength": 1, "maxLength": 60},
+    "line": {"type": "string", "minLength": 1, "maxLength": 200}
+  }
+}

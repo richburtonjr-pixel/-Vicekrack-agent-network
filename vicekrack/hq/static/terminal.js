@@ -1,20 +1,15 @@
 /* ViceKrack Trading terminal (read-only).
  * Shows the trading sessions the HQ already reads from disk: watchlist, research progress, selected
- * session details and a status bar. It calls only GET /api/sessions.
+ * session details and a status bar. It calls only GET /api/sessions and GET /api/departments (the
+ * trading agents come from the one department registry, config/departments.json).
  * There is no market-data feed here, so no prices or candles are drawn. Nothing here runs, trades or
  * changes a session.
  */
 (function () {
   "use strict";
 
-  var AGENTS = [
-    { id: "market_scout", name: "Market research" },
-    { id: "trend_agent", name: "Technical analysis" },
-    { id: "strategy_agent", name: "Strategy" },
-    { id: "risk_review", name: "Risk review" }
-  ];
   var TOTAL_STAGES = 5;
-  var state = { items: [], selected: null, error: null, loaded: false, generation: 0 };
+  var state = { items: [], agents: [], agentsError: null, selected: null, error: null, loaded: false, generation: 0 };
 
   function $(id) { return document.getElementById(id); }
 
@@ -45,8 +40,23 @@
     });
   }
 
+  /* The trading department's agents, from the registry. On failure the panel says so; nothing is guessed. */
+  function loadAgents(generation) {
+    return getJSON("/api/departments").then(function (data) {
+      if (generation !== state.generation) { return; }
+      var all = Array.isArray(data.agents) ? data.agents : [];
+      state.agents = all.filter(function (a) { return a && a.department === "trading"; });
+      state.agentsError = null;
+    }).catch(function () {
+      if (generation !== state.generation) { return; }
+      state.agents = [];
+      state.agentsError = "The agent list could not be read. Nothing was changed.";
+    });
+  }
+
   function load() {
     var generation = ++state.generation;
+    var agentsLoaded = loadAgents(generation);
     return getJSON("/api/sessions").then(function (data) {
       if (generation !== state.generation) { return; }
       state.items = Array.isArray(data.items) ? data.items : [];
@@ -55,7 +65,8 @@
       if (generation !== state.generation) { return; }
       state.items = [];
       state.error = "The session list could not be read. Nothing was changed.";
-    }).then(function () {
+    }).then(function () { return agentsLoaded; }).then(function () {
+      if (generation !== state.generation) { return; }
       state.loaded = true;
       if (!state.selected || !state.items.some(function (i) { return i.session_id === state.selected; })) {
         state.selected = state.items.length ? state.items[0].session_id : null;
@@ -129,8 +140,9 @@
   function agents(root) {
     var box = el("section", "term-panel term-agents");
     box.appendChild(el("h3", "term-h", "Trading agents"));
+    if (state.agentsError) { box.appendChild(el("p", "term-note bad", state.agentsError)); }
     var list = el("ul", "term-list");
-    AGENTS.forEach(function (a) {
+    state.agents.forEach(function (a) {
       var li = el("li", "term-agent");
       li.appendChild(el("span", "term-dot wait"));
       li.appendChild(el("strong", null, a.name));
