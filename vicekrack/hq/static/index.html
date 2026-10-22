@@ -28,6 +28,7 @@
         <button type="button" class="view-btn" data-view="hq3d" aria-pressed="false"><span class="ico ico-hq3d" aria-hidden="true"></span>Headquarters</button>
         <button type="button" class="view-btn" data-view="house" aria-pressed="true"><span class="ico ico-house" aria-hidden="true"></span>Classic house</button>
         <button type="button" class="view-btn" data-view="trading" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading</button>
+        <button type="button" class="view-btn" data-view="terminal" aria-pressed="false"><span class="ico ico-chart" aria-hidden="true"></span>Trading terminal</button>
         <button type="button" class="view-btn" data-view="results" aria-pressed="false"><span class="ico ico-results" aria-hidden="true"></span>Results</button>
         <button type="button" class="view-btn" data-view="content" aria-pressed="false"><span class="ico ico-play" aria-hidden="true"></span>Content</button>
         <button type="button" class="view-btn" data-view="content-results" aria-pressed="false"><span class="ico ico-film" aria-hidden="true"></span>Content results</button>
@@ -97,6 +98,11 @@
           <p>Turn on hardware acceleration in your browser settings, or use the other screens in the menu:
              Research and Video Studio work the same without 3D.</p>
         </div>
+      </section>
+
+      <section class="terminal-view" id="terminal-view" aria-labelledby="terminal-heading" hidden>
+        <h2 id="terminal-heading" class="sr-only">Trading terminal</h2>
+        <div id="terminal-body"></div>
       </section>
 
       <section class="stage-wrap" id="stage-wrap" aria-label="Headquarters">
@@ -278,6 +284,7 @@
   <script src="/static/studio.js"></script>
   <script src="/static/research.js"></script>
   <script src="/static/videos.js"></script>
+  <script src="/static/terminal.js"></script>
   <script type="module" src="/static/hq3d/main.js"></script>
 </body>
 </html>

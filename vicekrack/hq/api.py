@@ -53,6 +53,7 @@ FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
          "/static/research.js": ("research.js", "text/javascript; charset=utf-8"),
          "/static/videos.js": ("videos.js", "text/javascript; charset=utf-8"),          # Step 54
+         "/static/terminal.js": ("terminal.js", "text/javascript; charset=utf-8"),
          # HQ 2.0: the 3D headquarters (ES modules) and the pinned, vendored Three.js r169 (MIT)
          "/static/hq3d/main.js": ("hq3d/main.js", "text/javascript; charset=utf-8"),
          "/static/hq3d/world.js": ("hq3d/world.js", "text/javascript; charset=utf-8"),
