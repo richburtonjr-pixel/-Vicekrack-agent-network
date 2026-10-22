@@ -175,3 +175,32 @@ To describe a saved run (trades, equity curve, drawdown, attribution), see
 [Simulation analytics](analytics.md) (Step 30). To record or replay its execution events, see
 [Execution events](events.md) (Step 31): `sim-run DATASET_ID --record-events`. To view a saved run's results in the Living HQ, select its Simulator station: see the
 [trading results desk](hq.md#trading-results-desk-step-34) (Step 34).
+
+## Fractional quantities for crypto (HQ Phase 3b)
+
+Crypto can't be bought in whole coins on a small budget, so the simulator now trades **fractions** on crypto
+datasets (those downloaded with Alpaca crypto provenance, `asset_class: "crypto"`). Stocks are unchanged.
+
+| | Stocks (whole units) | Crypto (fractions) |
+|---|---|---|
+| Quantity in records | a whole number, e.g. `10` (exactly as before) | a decimal string with at most 8 places, e.g. `"0.00840482"` |
+| `fixed_notional` sizing | budget ÷ price, rounded down to whole shares | budget ÷ price, rounded down to 8 decimal places |
+| `fixed_quantity` sizing | must be whole (a fraction is refused: `fractional_quantity_not_allowed`) | whole or fractional |
+| Notional | quantity × price (exact) | quantity × price, held at 8 decimal places (cut, never rounded up) |
+| Totals (open quantity, equity curve) | whole numbers | decimal strings (`"0"` when flat) |
+
+Sizing uses the latest close, and the order fills at the next bar's open, so a filled amount can differ slightly
+from the budget, in either direction (for example $500.52 on a $500 entry). The order and position limits are
+checked again at the fill price, exactly as for stocks.
+
+Run a crypto practice simulation with the crypto policy:
+
+```powershell
+.\.venv\Scripts\python.exe -m vicekrack sim-run DATASET_ID --policy config/simulation.crypto.json --save --record-events
+```
+
+`config/simulation.crypto.json`: $500 per entry, 25 bps fee per order (Alpaca's lowest-tier taker rate, checked
+2026-10-22; Alpaca charges it in the asset received, the simulator charges it in USD), 10 bps slippage (an
+assumption, not measured), and the same strategy, exits and limits as the paper policy.
+
+Stock runs, their hashes and their analytics reports are byte-for-byte identical to before this change.

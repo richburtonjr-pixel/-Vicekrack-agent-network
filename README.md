@@ -6,6 +6,8 @@ shared Headquarters roles). The one list of departments, agents and rooms is
 
 **Crypto prices (Phase 3a).** `market-fetch` also downloads BTC/USD and ETH/USD history from Alpaca (UTC,
 24/7, practice data only). See [Crypto](docs/market-providers.md#crypto-btcusd-and-ethusd-hq-phase-3a).
+Practice runs on crypto trade in fractions (Phase 3b): `sim-run DATASET_ID --policy config/simulation.crypto.json`.
+See [Fractional quantities](docs/simulation.md#fractional-quantities-for-crypto-hq-phase-3b).
 
 Step 43 adds explicit Grok video jobs and repairs local image/video assembly.
 See [setup, generation, recovery, and offline demo commands](docs/grok-video.md).

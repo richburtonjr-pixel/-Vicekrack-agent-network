@@ -47,6 +47,7 @@ from jsonschema import Draft202012Validator
 from ..errors import NetworkError
 from ..events.contract import ROOT
 from ..trading.money import fmt, parse
+from ..trading.quantity import notional as quantity_notional, to_decimal
 from ..trading.timeline import SIM_ENGINE, fill_event_fields, order_event_fields
 
 RUN_ID = re.compile(r"^srun-[0-9a-f]{24}$")
@@ -328,7 +329,7 @@ def limitations(run, *, completed=None, analytics=None):
                              "are shares of one run, not independent strategy tests."})
     if completed:
         summary = run["summary"]
-        if summary["open_position_quantity"]:
+        if to_decimal(summary["open_position_quantity"]) > 0:
             rows.append({"area": "simulation", "code": "open_position_at_end",
                          "text": "A position was still open when the data ended; it is marked to the last close, not sold."})
         if summary["orders_pending_at_end"]:
@@ -394,7 +395,7 @@ def position_document(view, run, mapping, support, report, position, demo):
         market_value = unrealized = equity = unavailable(reason)
     else:
         mark = parse(mark_point["close"]) if mark_point else None
-        value = _mul(mark, shares) if position_open else Decimal(0)
+        value = quantity_notional(mark, shares) if position_open else Decimal(0)
         market_value = available(value)
         unrealized = available(value - position_open["cost_basis"]) if position_open else available(Decimal(0))
         equity = available(state["cash"] + value)

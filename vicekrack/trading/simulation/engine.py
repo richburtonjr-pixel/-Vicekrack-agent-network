@@ -20,6 +20,10 @@ One bounded Step 25 replay drives a SimulationConsumer that, for every newly clo
    detected on this bar as entry orders. New orders get not_before_utc = the simulated
    time they were decided, so they fill at the next available bar's open at the earliest.
 
+Quantities (HQ Phase 3b): whole units for stocks (JSON integers, exactly as before); fractions for crypto
+datasets (decimal strings, at most 8 places, sized DOWN so an order never exceeds its budget). Notional =
+quantity x price held at 8 decimal places. See `trading/quantity.py`.
+
 Accounting: buy fees are capitalised into the position's cost basis; realized P&L =
 proceeds - exit fee - cost basis; open positions at the end are marked to the last close
 (unrealized P&L = quantity x last close - cost basis) and NEVER liquidated; orders still
@@ -44,6 +48,7 @@ from ..indicators.engine import IndicatorConsumer, build_settings
 from ..market.bars import from_utc_text, missing_between
 from ..market.replay import drive, plan
 from ..money import fmt, parse
+from ..quantity import is_fractional_dataset, notional as quantity_notional, round_down, to_decimal, to_json
 from ..signals.engine import SignalConsumer, indicator_settings_for, load_strategies, provenance, validate_signal_record
 from ..timeline import EVENT_CODES, SIM_ENGINE, TradingEvents, fill_event_fields, order_event_fields
 
@@ -85,6 +90,8 @@ def validate_policy(policy):
         raise TradingError("invalid_simulation_policy", "initial_cash must be greater than zero.")
     if policy["sizing"]["method"] == "fixed_notional" and parse(policy["sizing"]["notional"], "money") <= 0:
         raise TradingError("invalid_simulation_policy", "Sizing notional must be greater than zero.")
+    if policy["sizing"]["method"] == "fixed_quantity" and to_decimal(policy["sizing"]["quantity"]) <= 0:
+        raise TradingError("invalid_simulation_policy", "Sizing quantity must be greater than zero.")
 
 
 class SimulationConsumer:
@@ -93,6 +100,7 @@ class SimulationConsumer:
     def __init__(self, dataset, policy, strategies, signal_settings, indicator_config, signal_config, kill_switch, run_id,
                  start_utc, events=None):
         self.dataset, self.policy, self.run_id, self.kill_switch = dataset, policy, run_id, kill_switch
+        self.fractional = is_fractional_dataset(dataset)
         self.events = events or TradingEvents()
         self.signals = SignalConsumer(dataset, strategies, signal_settings, indicator_config,
                                       signal_config["limits"]["max_evaluations"])
@@ -199,16 +207,19 @@ class SimulationConsumer:
         reference = fill_price(close, "buy", self.slippage)
         sizing = self.policy["sizing"]
         if sizing["method"] == "fixed_quantity":
-            quantity = sizing["quantity"]
+            quantity = to_json(to_decimal(sizing["quantity"]), self.fractional)
         else:
             with localcontext() as context:
                 _ctx(context)
-                quantity = int((parse(sizing["notional"], "money") / reference).to_integral_value(rounding=ROUND_DOWN))
-            if quantity < 1:
+                budget = parse(sizing["notional"], "money") / reference
+                amount = round_down(budget) if self.fractional else budget.to_integral_value(rounding=ROUND_DOWN)
+            if amount <= 0:
                 reasons.append("sizing_zero_quantity")
                 quantity = None
+            else:
+                quantity = to_json(amount, self.fractional)
         if quantity is not None:
-            notional = reference * quantity
+            notional = quantity_notional(reference, quantity)
             estimate = {"reference_price": fmt(reference), "notional": fmt(notional)}
             if notional > parse(self.limits["max_order_notional"], "money"):
                 reasons.append("order_notional_limit")
@@ -244,7 +255,8 @@ class SimulationConsumer:
         source = {"kind": "exit_rule", "signal_id": None, "strategy": None, "rule": rule,
                   "decision_bar_sequence": bar["sequence"], "decision_at_utc": now}
         self._order("exit", "sell", self.position["quantity"], source, now, None,
-                    {"reference_price": bar["close"], "notional": fmt(parse(bar["close"]) * self.position["quantity"])},
+                    {"reference_price": bar["close"],
+                     "notional": fmt(quantity_notional(parse(bar["close"]), self.position["quantity"]))},
                     "pending", reasons + ["fills_at_next_available_open"])
 
     def _reject(self, order, at, reasons):
@@ -259,7 +271,7 @@ class SimulationConsumer:
         open_price = parse(bar["open"])
         price = fill_price(open_price, order["side"], self.slippage)
         quantity = order["quantity"]
-        notional = price * quantity
+        notional = quantity_notional(price, quantity)
         fee = fee_for(notional, self.costs)
         if order["purpose"] == "entry":
             reasons = []
@@ -326,6 +338,11 @@ class SimulationConsumer:
 def run_simulation(dataset, policy, *, market_config, indicator_config, signal_config, kill_switch, created_at,
                    start=None, end=None, step_seconds=None, events=None):
     validate_policy(policy)
+    sizing = policy["sizing"]
+    if (sizing["method"] == "fixed_quantity" and not is_fractional_dataset(dataset)
+            and to_decimal(sizing["quantity"]) != to_decimal(sizing["quantity"]).to_integral_value()):
+        raise TradingError("fractional_quantity_not_allowed",
+                           "This dataset trades whole units only (stocks); use a whole-number sizing quantity.")
     if dataset["bar_count"] > policy["limits"]["max_bars"]:
         raise TradingError("sim_too_many_bars", "The dataset has more bars than limits.max_bars allows.")
     strategies = load_strategies(policy["entry"]["strategies"], signal_config)
@@ -377,12 +394,12 @@ def _finish(consumer, dataset, policy, window, run_id, policy_sha, strategies, k
     for position in consumer.positions:
         with localcontext() as context:
             _ctx(context)
-            position["average_cost"] = fmt(position["cost_basis"] / position["quantity"])
+            position["average_cost"] = fmt(position["cost_basis"] / to_decimal(position["quantity"]))
         if position["status"] == "open":
             mark = parse(last["close"])
+            value = quantity_notional(mark, position["quantity"])
             position.update(mark_price=last["close"], marked_at_utc=last["available_at_utc"],
-                            market_value=mark * position["quantity"],
-                            unrealized_pnl=mark * position["quantity"] - position["cost_basis"])
+                            market_value=value, unrealized_pnl=value - position["cost_basis"])
             unrealized += position["unrealized_pnl"]
     realized = sum((p["realized_pnl"] for p in consumer.positions if p["realized_pnl"] is not None), Decimal(0))
     market_value = sum((p["market_value"] for p in consumer.positions if p["status"] == "open"), Decimal(0))
@@ -395,7 +412,8 @@ def _finish(consumer, dataset, policy, window, run_id, policy_sha, strategies, k
         "fees_total": fmt(sum((parse(f["fee"]) for f in consumer.fills), Decimal(0))),
         "realized_pnl": fmt(realized), "unrealized_pnl": fmt(unrealized), "ending_cash": fmt(consumer.cash),
         "ending_equity": fmt(consumer.cash + market_value),
-        "open_position_quantity": sum(p["quantity"] for p in consumer.positions if p["status"] == "open"),
+        "open_position_quantity": to_json(sum((to_decimal(p["quantity"]) for p in consumer.positions
+                                               if p["status"] == "open"), Decimal(0)), consumer.fractional),
         "last_close": last["close"] if last else None, "last_bar_close_utc": last["available_at_utc"] if last else None,
     }
     if len(consumer.orders) > 2000:
@@ -448,7 +466,7 @@ def validate_run(run):
         if fill["bar_open_utc"] < order["not_before_utc"]:
             bad("fill before the order could execute")
         price = fill_price(parse(fill["open_price"]), fill["side"], parse(costs["slippage_bps"]))
-        notional = price * fill["quantity"]
+        notional = quantity_notional(price, fill["quantity"])
         fee = fee_for(notional, costs)
         change = (notional - fee) if fill["side"] == "sell" else -(notional + fee)
         if (fmt(price), fmt(notional), fmt(fee), fmt(change)) != (fill["fill_price"], fill["notional"], fill["fee"], fill["cash_change"]):

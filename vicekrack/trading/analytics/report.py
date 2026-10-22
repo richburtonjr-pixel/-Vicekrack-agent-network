@@ -40,6 +40,7 @@ from ..contracts import sha256, validate_schema
 from ..errors import TradingError
 from ..market.replay import drive
 from ..money import fmt, parse
+from ..quantity import notional as quantity_notional, run_is_fractional, to_decimal, to_json
 from ..simulation.engine import validate_run
 
 NOTICE = ("SIMULATED, descriptive analytics of one offline simulation on historical data. Not annualized, not a "
@@ -73,7 +74,7 @@ class EquityConsumer:
         self.by_bar = {}
         for fill in fills:
             self.by_bar.setdefault(fill["bar_sequence"], []).append(fill)
-        self.cash, self.shares, self.last = initial_cash, 0, 0
+        self.cash, self.shares, self.last = initial_cash, Decimal(0), 0
         self.points = [self._point(None, start_utc, None)]
         self.applied = 0
 
@@ -90,7 +91,8 @@ class EquityConsumer:
                 if fill["bar_open_utc"] != bar["timestamp_utc"] or parse(fill["open_price"]) != parse(bar["open"]):
                     raise TradingError("analytics_inconsistent", "A fill does not match the dataset bar it claims.")
                 self.cash += parse(fill["cash_change"], "signed_decimal")
-                self.shares += fill["quantity"] if fill["side"] == "buy" else -fill["quantity"]
+                amount = to_decimal(fill["quantity"])
+                self.shares += amount if fill["side"] == "buy" else -amount
                 if self.shares < 0:
                     raise TradingError("analytics_inconsistent", "Fills imply a short position.")
                 self.applied += 1
@@ -100,8 +102,12 @@ class EquityConsumer:
     def final(self):
         return {}
 
+    def shares_json(self):
+        """The running position as an exact quantity string or int, for the HQ Phase 3b quantity helpers."""
+        return int(self.shares) if self.shares == self.shares.to_integral_value() else format(self.shares, "f")
+
     def _point(self, sequence, at, close):
-        value = (close * self.shares) if close is not None else Decimal(0)
+        value = quantity_notional(close, self.shares_json()) if close is not None else Decimal(0)
         return {"sequence": sequence, "at_utc": at, "close": fmt(close) if close is not None else None,
                 "cash": self.cash, "position_quantity": self.shares, "market_value": value, "equity": self.cash + value}
 
@@ -163,7 +169,7 @@ def build_report(run, dataset, *, market_config, analytics_config, analytics_con
         raise TradingError("analytics_inconsistent", "Open-position marks do not match the run.")
 
     closed = _closed_statistics(trades)
-    curve, drawdown = _curve(equity.points)
+    curve, drawdown = _curve(equity.points, run_is_fractional(run))
     ending_equity = final["equity"]
     net_return = ending_equity - initial
     holding = _holding(trades, open_positions)
@@ -220,7 +226,7 @@ def _closed_statistics(trades):
     }
 
 
-def _curve(points):
+def _curve(points, fractional=False):
     peak = points[0]["equity"]
     curve, max_dollars, max_percent = [], (Decimal(0), points[0]["at_utc"]), (Decimal(0), points[0]["at_utc"])
     for point in points:
@@ -232,7 +238,7 @@ def _curve(points):
         if percent > max_percent[0]:
             max_percent = (percent, point["at_utc"])
         curve.append({"sequence": point["sequence"], "at_utc": point["at_utc"], "close": point["close"],
-                      "cash": fmt(point["cash"]), "position_quantity": point["position_quantity"],
+                      "cash": fmt(point["cash"]), "position_quantity": to_json(point["position_quantity"], fractional),
                       "market_value": fmt(point["market_value"]), "equity": fmt(point["equity"]), "peak_equity": fmt(peak),
                       "drawdown": fmt(drop), "drawdown_percent": fmt(percent)})
     return curve, {"max_dollars": fmt(max_dollars[0]), "max_dollars_at_utc": max_dollars[1],

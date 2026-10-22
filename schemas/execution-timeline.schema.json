@@ -301,6 +301,11 @@
               "maximum": 1000000000
             },
             {
+              "type": "string",
+              "description": "Fractional units (crypto), at most 8 decimal places.",
+              "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+            },
+            {
               "type": "null"
             }
           ]

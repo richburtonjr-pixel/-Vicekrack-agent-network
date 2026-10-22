@@ -300,9 +300,18 @@
                 "$ref": "#/$defs/fill_id"
               },
               "quantity": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 1000000000
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  },
+                  {
+                    "type": "string",
+                    "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+                    "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+                  }
+                ]
               },
               "opened_at_utc": {
                 "$ref": "#/$defs/timestamp"
@@ -379,9 +388,18 @@
             "$ref": "#/$defs/fill_id"
           },
           "quantity": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000000000
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000
+              },
+              {
+                "type": "string",
+                "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+                "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+              }
+            ]
           },
           "opened_at_utc": {
             "$ref": "#/$defs/timestamp"
@@ -455,9 +473,18 @@
             "$ref": "#/$defs/signed_decimal"
           },
           "position_quantity": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1000000000
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              {
+                "type": "string",
+                "description": "Fractional units (crypto), at most 8 decimal places.",
+                "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+              }
+            ]
           },
           "market_value": {
             "$ref": "#/$defs/decimal"
