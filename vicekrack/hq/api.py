@@ -16,6 +16,7 @@ Routes (GET only; everything else is 405):
   /api/session?id=ID                          Step 39: one read-only session summary (ID is demo or tss-...)
   /api/broker-paper                           Step 41: saved Alpaca PAPER broker intents and states (read-only)
   /api/broker-paper/intent?id=bpi-...         Step 41: one paper intent with its sanitized events (read-only)
+  /api/departments                            HQ Phase 1: the department registry (departments, agents, rooms)
   /api/studio/...                             Step 48: Video Studio (studio_api.py). Off unless the server was
                                               started with --studio or --studio-demo; the only routes that act.
 
@@ -38,6 +39,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from ..errors import NetworkError
+from .. import departments as department_registry
 from .demo import demo_scene
 from .content import content_at, content_latest, media_file
 from .results import results_at, results_index, results_summary
@@ -290,6 +292,10 @@ def respond(method, target, headers, *, port, root=None, studio=None, body=b""):
             if len(values) != 1 or set(query) != {"id"} or not BROKER_INTENT.match(values[0]):
                 return _error(400, "invalid_intent_id", "Use a bpi- intent ID.")
             return _json(200, broker_intent(values[0], root))
+        if path == "/api/departments":
+            if parts.query:
+                return _error(400, "invalid_departments_request", "This route takes no parameters.")
+            return _json(200, department_registry.load())
         if path == "/api/sessions":
             if parts.query:
                 return _error(400, "invalid_session_request", "This route takes no parameters.")
@@ -301,6 +307,8 @@ def respond(method, target, headers, *, port, root=None, studio=None, body=b""):
                 return _error(400, "invalid_session_id", "Use demo or a tss- session ID.")
             return _json(200, session_document(values[0], root))
     except NetworkError as error:
+        if error.code == "invalid_department_registry":
+            return _error(500, error.code, "The department list could not be loaded safely.")
         if error.code in SESSION_ERRORS:
             status, message = SESSION_ERRORS[error.code]
             return _error(status, error.code, message)

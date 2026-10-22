@@ -1,5 +1,9 @@
 # Vicekrack Agent Network
 
+**Departments.** ViceKrack is one headquarters with departments (Content Production, Trading, and
+shared Headquarters roles). The one list of departments, agents and rooms is
+[`config/departments.json`](config/departments.json); see [Departments and agents](docs/departments.md).
+
 Step 43 adds explicit Grok video jobs and repairs local image/video assembly.
 See [setup, generation, recovery, and offline demo commands](docs/grok-video.md).
 Paid generation requires deliberate per-job consent. Generated previews can be attached

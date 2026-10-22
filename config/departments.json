@@ -1,0 +1,64 @@
+{
+  "contract": "department_registry",
+  "version": "1.0",
+  "departments": [
+    {
+      "id": "headquarters",
+      "name": "Headquarters",
+      "kind": "shared",
+      "status": "active",
+      "purpose": "Leadership, approvals, operations and analytics that serve every department."
+    },
+    {
+      "id": "content",
+      "name": "Content Production",
+      "kind": "department",
+      "status": "active",
+      "purpose": "Research any topic, verify it, write the script and produce the video."
+    },
+    {
+      "id": "trading",
+      "name": "Trading",
+      "kind": "department",
+      "status": "paper_only",
+      "purpose": "Market research, simulated (paper) trading and results. No real-money orders."
+    }
+  ],
+  "agents": [
+    {"id": "ricky", "name": "Ricky", "role": "Leadership", "department": "headquarters", "status": "active",
+     "work": "Your approvals and reviews"},
+    {"id": "kai", "name": "Kai", "role": "Analytics", "department": "headquarters", "status": "coming_soon",
+     "work": "Coming soon: no published-video performance data yet"},
+    {"id": "nia", "name": "Nia", "role": "Operations", "department": "headquarters", "status": "active",
+     "work": "Workflow progress and exports (no publishing)"},
+    {"id": "kiara", "name": "Kiara", "role": "Research", "department": "content", "status": "active",
+     "work": "Research runs (Grok web search) and the pages ViceKrack opens"},
+    {"id": "jax", "name": "Jax", "role": "Trends", "department": "content", "status": "coming_soon",
+     "work": "Coming soon: no trend or audience data yet"},
+    {"id": "layla", "name": "Layla", "role": "Strategy", "department": "content", "status": "active",
+     "work": "Story selection and angles"},
+    {"id": "ace", "name": "Ace", "role": "Risk Review", "department": "content", "status": "active",
+     "work": "Verification, rumor labels and quality checks"},
+    {"id": "sienna", "name": "Sienna", "role": "Content Creator", "department": "content", "status": "active",
+     "work": "Scripts, clips, narration, captions and rendering"},
+    {"id": "market_scout", "name": "Market research", "role": "Market Scout", "department": "trading",
+     "status": "active", "work": "Summarizes the latest closed price bars and any gaps (fixed rules, no AI)"},
+    {"id": "trend_agent", "name": "Technical analysis", "role": "Trend Agent", "department": "trading",
+     "status": "active", "work": "Describes the trend from indicators: EMA, RSI, VWAP (fixed rules, no AI)"},
+    {"id": "strategy_agent", "name": "Strategy", "role": "Strategy Agent", "department": "trading",
+     "status": "active", "work": "Checks which research rules are active: VWAP reclaim, EMA crossover, breakout (fixed rules, no AI)"},
+    {"id": "risk_review", "name": "Risk review", "role": "Risk Review", "department": "trading",
+     "status": "active", "work": "Checks the research is complete. A research check, not the trading limits"}
+  ],
+  "rooms": [
+    {"id": "command", "name": "Command", "department": "headquarters", "agent": null},
+    {"id": "executive", "name": "Executive office", "department": "headquarters", "agent": "ricky"},
+    {"id": "analytics", "name": "Analytics", "department": "headquarters", "agent": "kai"},
+    {"id": "operations", "name": "Operations", "department": "headquarters", "agent": "nia"},
+    {"id": "research", "name": "Research", "department": "content", "agent": "kiara"},
+    {"id": "trends", "name": "Trends", "department": "content", "agent": "jax"},
+    {"id": "strategy", "name": "Strategy", "department": "content", "agent": "layla"},
+    {"id": "risk", "name": "Risk Review", "department": "content", "agent": "ace"},
+    {"id": "studio", "name": "Video Studio", "department": "content", "agent": "sienna"}
+  ]
+}
