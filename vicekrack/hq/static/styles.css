@@ -605,3 +605,35 @@ code { word-break: break-all; background: #17202a; border: 1px solid #243040; bo
 .auto-scene figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .auto-log { margin: 0; padding-left: 18px; color: #c9d2dc; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
 @media (max-width: 760px) { .auto-detail-grid { grid-template-columns: 1fr; } }
+
+/* ---- Trading terminal (terminal.js): read-only, real session data only ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.terminal-view { margin: 0 12px 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.term-root { display: grid; gap: 10px; }
+.term-status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.term-brand { font-weight: 700; margin-right: 6px; }
+.term-pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); }
+.term-grid { display: grid; gap: 10px; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(200px, 260px); }
+.term-panel { border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; }
+.term-h { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; opacity: .8; }
+.term-note { font-size: 13px; margin: 6px 0; }
+.term-note.bad { color: #ff4d6d; }
+.term-muted { font-size: 12px; opacity: .75; }
+.term-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.term-row { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 10px; padding: 8px; color: inherit; cursor: pointer; }
+.term-row.on, .term-row:focus-visible { border-color: #2fd4e6; }
+.term-row-head { display: flex; justify-content: space-between; gap: 6px; }
+.term-row-foot { font-size: 12px; opacity: .8; margin-top: 4px; }
+.term-bar { height: 8px; border-radius: 999px; background: rgba(127,127,127,.25); overflow: hidden; margin-top: 6px; }
+.term-bar > span { display: block; height: 100%; background: #9aa4b2; }
+.term-bar.done > span { background: #3ddc84; }
+.term-bar.busy > span { background: #f5b942; }
+.term-bar.bad > span { background: #ff4d6d; }
+.term-empty { min-height: 220px; display: grid; place-content: center; text-align: center; gap: 6px; border: 1px dashed var(--line); border-radius: 12px; padding: 16px; }
+.term-agent { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; }
+.term-dot { width: 9px; height: 9px; border-radius: 50%; background: #9aa4b2; }
+.term-dot.wait { background: #9aa4b2; }
+@media (max-width: 900px) {
+  .term-grid { grid-template-columns: 1fr; }
+  .terminal-view { margin: 0 8px 8px; padding: 10px; }
+}
