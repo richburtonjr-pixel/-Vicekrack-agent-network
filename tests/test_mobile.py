@@ -142,6 +142,13 @@ class Pairing(Base):
         for flag in ("HttpOnly", "Secure", "SameSite=Strict"):
             self.assertIn(flag, cookie)
 
+    def test_only_one_phone_can_be_paired(self):
+        first = security.new_pairing_code(self.store, self.now)
+        self.call("POST", "/m/api/pair", {"code": first})
+        second = security.new_pairing_code(self.store, self.now)
+        self.assertEqual(self.call("POST", "/m/api/pair", {"code": second})[0], 200)
+        self.assertEqual(len(security.list_devices(self.store)), 1)
+
     def test_code_used_once(self):
         code = security.new_pairing_code(self.store, self.now)
         self.assertEqual(self.call("POST", "/m/api/pair", {"code": code})[0], 200)
