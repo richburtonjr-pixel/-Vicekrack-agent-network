@@ -117,7 +117,8 @@ def redeem_pairing_code(store, code, name, now=None):
               "expires_at": _iso(now + timedelta(days=DEVICE_DAYS))}
 
     def add(devices):
-        devices.setdefault("devices", []).append(device)
+        # One phone only: pairing a new phone signs out the old one.
+        devices["devices"] = [device]
         return devices, None
 
     store.update("devices.json", {"devices": []}, add)

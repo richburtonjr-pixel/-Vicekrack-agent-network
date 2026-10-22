@@ -22,7 +22,7 @@ A separate phone app for ViceKrack. The desktop Living HQ (and its 3D headquarte
 | Tailscale | Only your own devices can reach the address; traffic is encrypted. |
 | Owner check | Requests through Tailscale must carry your Tailscale login (Serve sets this header itself and removes any copy a client sends). Remote access stays off until setup saves your address and login. |
 | Host / Origin | Only this app's own addresses are accepted (blocks other websites and DNS rebinding). |
-| Pairing | A 6-digit code shown on the PC (10 minutes, 5 tries, works once) pairs a phone. The phone gets an HttpOnly, Secure, SameSite=Strict cookie; only its SHA-256 is saved. Phones expire after 90 days; unpair from the phone or with `mobile-unpair-all`. |
+| Pairing | A 6-digit code shown on the PC (10 minutes, 5 tries, works once) pairs a phone. Only one phone is paired at a time: pairing a new phone signs out the old one. Only your Tailscale account can reach it. The phone gets an HttpOnly, Secure, SameSite=Strict cookie; only its SHA-256 is saved. Phones expire after 90 days; unpair from the phone or with `mobile-unpair-all`. |
 | CSRF | Every phone POST carries a header token derived from the cookie, which other sites cannot read. |
 | PIN | Every paid action needs your PIN (salted scrypt hash on the PC). 5 wrong PINs lock paid actions for 15 minutes. |
 | Daily cap | Paid phone approvals reserve the HQ's own estimate (high end) against a daily limit (default $5, your time zone) **before** anything is sent. A repeated request never counts twice. If the HQ refuses before sending, the amount is given back; if the result is uncertain it stays counted. |
