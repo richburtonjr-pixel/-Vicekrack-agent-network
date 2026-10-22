@@ -1318,6 +1318,13 @@
     if (note) { h("span", { class: "tile-note" }, box, note); }
     return box;
   }
+  /* HQ Phase 3b: whole shares arrive as numbers; crypto fractions as decimal text like "0.00833333". */
+  function hasQuantity(q) { return q !== null && q !== undefined && Number(q) > 0; }
+  function quantityText(q) {
+    if (!hasQuantity(q)) { return "none"; }
+    return typeof q === "string" ? q + " units" : q + " shares";
+  }
+
   function signedTone(text) {
     var value = String(text || "");
     return /^-/.test(value) && /[1-9]/.test(value) ? "neg" : /[1-9]/.test(value) ? "pos" : "";
@@ -1528,8 +1535,8 @@
     tile(tiles, "Realized P&L", C.money(p.realized_pnl, true), null, signedTone(p.realized_pnl));
     metricTile(tiles, "Unrealized P&L", p.unrealized_pnl, true);
     tile(tiles, "Fees so far", C.money(p.fees));
-    tile(tiles, "Open position", p.open_quantity ? p.open_quantity + " shares" : "none",
-      p.open_quantity && p.mark ? "marked at " + C.money(p.mark.price) + " (bar " + p.mark.bar_sequence + " close)" : null);
+    tile(tiles, "Open position", quantityText(p.open_quantity),
+      hasQuantity(p.open_quantity) && p.mark ? "marked at " + C.money(p.mark.price) + " (bar " + p.mark.bar_sequence + " close)" : null);
     var dd = p.drawdown_so_far;
     tile(tiles, "Max drawdown so far", dd.max_percent.status === "available" ? C.percent(dd.max_percent.value) : "Unavailable",
       dd.max_dollars.status === "available" ? C.money(dd.max_dollars.value) : C.reasonText(dd.max_dollars.reason),
@@ -1573,7 +1580,7 @@
     tile(tiles, "Realized P&L", C.money(a.realized_pnl, true), null, signedTone(a.realized_pnl));
     tile(tiles, "Unrealized P&L", C.money(a.unrealized_pnl, true), "no exit costs assumed", signedTone(a.unrealized_pnl));
     tile(tiles, "Fees", C.money(a.fees_total));
-    tile(tiles, "Open at end", a.open_position_quantity ? a.open_position_quantity + " shares" : "none",
+    tile(tiles, "Open at end", quantityText(a.open_position_quantity),
       a.last_close ? "marked at last close " + C.money(a.last_close) : null);
     var report = doc.analytics.report;
     var charts = h("div", { class: "charts" }, body);

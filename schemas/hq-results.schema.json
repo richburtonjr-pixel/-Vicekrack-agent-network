@@ -597,8 +597,18 @@
                   "$ref": "#/$defs/money"
                 },
                 "open_quantity": {
-                  "type": "integer",
-                  "minimum": 0
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000
+                    },
+                    {
+                      "type": "string",
+                      "description": "Fractional units (crypto), at most 8 decimal places.",
+                      "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+                    }
+                  ]
                 },
                 "market_value": {
                   "$ref": "#/$defs/metric"
@@ -682,8 +692,18 @@
                         ]
                       },
                       "quantity": {
-                        "type": "integer",
-                        "minimum": 1
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000000
+                          },
+                          {
+                            "type": "string",
+                            "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+                            "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+                          }
+                        ]
                       },
                       "opened_at_utc": {
                         "$ref": "#/$defs/utc"
@@ -770,8 +790,18 @@
                         ]
                       },
                       "quantity": {
-                        "type": "integer",
-                        "minimum": 1
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000000
+                          },
+                          {
+                            "type": "string",
+                            "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+                            "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+                          }
+                        ]
                       },
                       "opened_at_utc": {
                         "$ref": "#/$defs/utc"
@@ -1159,8 +1189,18 @@
               "$ref": "#/$defs/money"
             },
             "open_position_quantity": {
-              "type": "integer",
-              "minimum": 0
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000
+                },
+                {
+                  "type": "string",
+                  "description": "Fractional units (crypto), at most 8 decimal places.",
+                  "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+                }
+              ]
             },
             "last_close": {
               "anyOf": [
@@ -1505,7 +1545,13 @@
           "anyOf": [
             {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            {
+              "type": "string",
+              "description": "Fractional units (crypto), at most 8 decimal places.",
+              "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
             },
             {
               "type": "null"
@@ -1700,8 +1746,18 @@
           ]
         },
         "quantity": {
-          "type": "integer",
-          "minimum": 1
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            },
+            {
+              "type": "string",
+              "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+              "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+            }
+          ]
         },
         "bar_sequence": {
           "type": "integer",
@@ -1785,8 +1841,18 @@
           "$ref": "#/$defs/money"
         },
         "position_quantity": {
-          "type": "integer",
-          "minimum": 0
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            {
+              "type": "string",
+              "description": "Fractional units (crypto), at most 8 decimal places.",
+              "pattern": "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+            }
+          ]
         },
         "market_value": {
           "$ref": "#/$defs/money"

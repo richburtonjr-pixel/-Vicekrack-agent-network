@@ -531,9 +531,18 @@
       "pattern": "^simacct-[0-9a-f]{24}$"
     },
     "shares": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 1000000000
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        {
+          "type": "string",
+          "description": "Fractional units (crypto), at most 8 decimal places, greater than zero.",
+          "pattern": "^(?!0+(\\.0+)?$)(0|[1-9][0-9]{0,8})(\\.[0-9]{1,8})?$"
+        }
+      ]
     },
     "reasons": {
       "type": "array",
