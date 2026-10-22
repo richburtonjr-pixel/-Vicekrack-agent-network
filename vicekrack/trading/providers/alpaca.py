@@ -336,6 +336,11 @@ def validate_provider(dataset):
     provider = source.get("provider")
     if provider is None:
         raise TradingError("dataset_invalid", "An Alpaca dataset must record its provider provenance.")
+    if provider["endpoint"] != ENDPOINT:                     # HQ Phase 3a: crypto datasets have their own rules
+        from .alpaca_crypto import validate_crypto_provider
+        return validate_crypto_provider(dataset)
+    if any(field in provider for field in ("asset_class", "pair", "volume_values_truncated")):
+        raise TradingError("dataset_invalid", "A stock dataset must not carry crypto provenance fields.")
     coverage, requested = provider["coverage"], provider["requested"]
     first, last = from_utc_text(dataset["first_start_utc"]), from_utc_text(dataset["last_start_utc"])
     start, end_before = from_utc_text(requested["start_utc"]), from_utc_text(requested["end_before_utc"])
@@ -343,6 +348,7 @@ def validate_provider(dataset):
                                     provider["adjustment"], provider["page_limit"])
     checks = (
         dataset["data_label"] == "historical", dataset["timezone"] == TIMEZONE, dataset["currency"] == "USD",
+        provider["feed"] in ("iex", "sip"), requested["timezone"] == TIMEZONE,
         TIMEFRAMES.get(dataset["interval"]) == provider["timeframe"],
         requested["start_utc"] == utc_text(_midnight(date.fromisoformat(requested["start_date"]))),
         requested["end_before_utc"] == utc_text(_midnight(date.fromisoformat(requested["end_date"]) + timedelta(days=1))),

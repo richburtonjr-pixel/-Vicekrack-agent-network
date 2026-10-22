@@ -4,6 +4,9 @@
 shared Headquarters roles). The one list of departments, agents and rooms is
 [`config/departments.json`](config/departments.json); see [Departments and agents](docs/departments.md).
 
+**Crypto prices (Phase 3a).** `market-fetch` also downloads BTC/USD and ETH/USD history from Alpaca (UTC,
+24/7, practice data only). See [Crypto](docs/market-providers.md#crypto-btcusd-and-ethusd-hq-phase-3a).
+
 Step 43 adds explicit Grok video jobs and repairs local image/video assembly.
 See [setup, generation, recovery, and offline demo commands](docs/grok-video.md).
 Paid generation requires deliberate per-job consent. Generated previews can be attached
