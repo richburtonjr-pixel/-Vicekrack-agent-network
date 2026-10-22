@@ -38,25 +38,25 @@ def _api():
     return advapi, CREDENTIAL
 
 
-def save_key(key):
-    key = (key or "").strip()
-    if not key or len(key) > 512 or any(ch.isspace() for ch in key):
-        raise NetworkError("invalid_key", "That does not look like an xAI API key.")
+def save_named(target, value, *, label="key"):
+    """Store one secret under a Credential Manager target name. Values are never returned or printed."""
+    if not target.startswith("ViceKrack/") or not value or len(value) > 512 or any(ch.isspace() for ch in value):
+        raise NetworkError("invalid_key", f"That does not look like a valid {label}.")
     advapi, CREDENTIAL = _api()
-    blob = key.encode("utf-16-le")
+    blob = value.encode("utf-16-le")
     buffer = (ctypes.c_ubyte * len(blob)).from_buffer_copy(blob)
-    credential = CREDENTIAL(Type=CRED_TYPE_GENERIC, TargetName=TARGET, CredentialBlobSize=len(blob),
+    credential = CREDENTIAL(Type=CRED_TYPE_GENERIC, TargetName=target, CredentialBlobSize=len(blob),
                             CredentialBlob=ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)),
                             Persist=CRED_PERSIST_LOCAL_MACHINE, UserName="vicekrack")
     if not advapi.CredWriteW(ctypes.byref(credential), 0):
-        raise NetworkError("key_not_saved", "Windows did not save the key.")
+        raise NetworkError("key_not_saved", f"Windows did not save the {label}.")
 
 
-def load_key():
-    """The saved key, or None if none is saved."""
+def load_named(target):
+    """The stored value for a target, or None if none is saved."""
     advapi, CREDENTIAL = _api()
     pointer = ctypes.POINTER(CREDENTIAL)()
-    if not advapi.CredReadW(TARGET, CRED_TYPE_GENERIC, 0, ctypes.byref(pointer)):
+    if not advapi.CredReadW(target, CRED_TYPE_GENERIC, 0, ctypes.byref(pointer)):
         if ctypes.get_last_error() == ERROR_NOT_FOUND:
             return None
         raise NetworkError("key_not_read", "Windows could not read the saved key.")
@@ -65,6 +65,18 @@ def load_key():
         return ctypes.string_at(pointer.contents.CredentialBlob, size).decode("utf-16-le")
     finally:
         advapi.CredFree(pointer)
+
+
+def save_key(key):
+    key = (key or "").strip()
+    if not key:
+        raise NetworkError("invalid_key", "That does not look like an xAI API key.")
+    save_named(TARGET, key, label="xAI API key")
+
+
+def load_key():
+    """The saved key, or None if none is saved."""
+    return load_named(TARGET)
 
 
 def delete_key():
