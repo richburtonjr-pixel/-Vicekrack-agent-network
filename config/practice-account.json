@@ -1,0 +1,27 @@
+{
+  "config_version": "1.0",
+  "mode": "practice",
+  "description": "Practice account (Trading PR 1): $100 of simulated money. Plain code closes every position and stops the account when equity reaches $80. No leverage, no shorting, no real money, no broker.",
+  "account": {
+    "starting_cash": "100.00",
+    "currency": "USD"
+  },
+  "shutdown": {
+    "equity_floor": "80.00",
+    "action": "close_all_and_halt",
+    "note": "A trigger, not a guarantee: prices can gap below $80 between checks, and closing costs slippage and fees."
+  },
+  "allowed_symbols": ["BTCUSD", "ETHUSD"],
+  "leverage": false,
+  "allow_short": false,
+  "limits": {
+    "max_order_notional": "25.00",
+    "max_open_positions": 2,
+    "max_price_age_seconds": 900
+  },
+  "costs": {
+    "slippage_bps": "10",
+    "fee_per_order": "0.00",
+    "fee_bps": "25"
+  }
+}
