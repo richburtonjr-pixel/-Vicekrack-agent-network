@@ -1,0 +1,15 @@
+{
+  "config_version": "1.0",
+  "description": "24/7 crypto watch loop (Trading PR 2). Free Kraken public prices, no keys. Watches and researches only: it records prices into the practice account (so the $80 guard runs every cycle) and runs the existing research agents. It places no trades in this step.",
+  "provider": "kraken_public",
+  "symbols": {
+    "BTCUSD": "XBTUSD",
+    "ETHUSD": "ETHUSD"
+  },
+  "interval": "5m",
+  "bars_for_research": 120,
+  "cycle_seconds": 300,
+  "wait_after_bar_close_seconds": 20,
+  "keep_pc_awake": true,
+  "max_log_bytes": 5000000
+}

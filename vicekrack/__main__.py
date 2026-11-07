@@ -86,6 +86,10 @@ def main():
         from .trading.analytics.cli import main as analytics_main
         return analytics_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"watch-once", "watch-run", "watch-status"}:
+        from .trading.watch.cli import main as watch_main
+        return watch_main()
+
     if len(sys.argv) > 1 and sys.argv[1].startswith("practice-"):
         from .trading.practice.cli import main as practice_main
         return practice_main()
