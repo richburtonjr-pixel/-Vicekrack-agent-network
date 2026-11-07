@@ -68,7 +68,7 @@ class WatchLoopTests(unittest.TestCase):
     def test_cycle_fetches_researches_and_feeds_the_guard(self):
         self.practice.start(self.practice_config, "2026-11-07T03:00:00Z")
         status = self.cycle(FakeKraken())
-        self.assertFalse(status["trades_placed"])
+        self.assertFalse(status["trades_placed"])                              # no idea passed this cycle
         for coin in status["coins"]:
             self.assertTrue(coin["ok"], coin)
             self.assertEqual(coin["bars"], 120)                                  # trimmed to bars_for_research
@@ -134,13 +134,12 @@ class WatchLoopTests(unittest.TestCase):
         self.assertEqual(len(waits), 2)
         self.assertEqual(seconds_until_next(300, 20, NOW_EPOCH), 300.0)          # 04:00:20 -> 04:05:20
 
-    def test_watch_code_places_no_orders(self):
+    def test_watch_code_never_trades_directly(self):
+        """Only the trade desk's Executor may ask the practice account to buy or sell; never a broker."""
         for name in ("cycle.py", "runner.py", "cli.py"):
-            tree = ast.parse((ROOT / "vicekrack/trading/watch" / name).read_text(encoding="utf-8"))
-            text = ast.dump(tree)
-            for word in ("broker", "alpaca_crypto", "\"buy\"", "'buy'", "\"sell\"", "'sell'"):
+            text = ast.dump(ast.parse((ROOT / "vicekrack/trading/watch" / name).read_text(encoding="utf-8")))
+            for word in ("broker", "alpaca_crypto", "'buy'", "'sell'"):
                 self.assertNotIn(word, text, f"{name} mentions {word}")
-
 
 if __name__ == "__main__":
     unittest.main()

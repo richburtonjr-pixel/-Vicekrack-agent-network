@@ -3,6 +3,7 @@
 python -m vicekrack watch-once       one cycle now (fetch prices, research, run the $80 guard)
 python -m vicekrack watch-run        keep going every 5 minutes until the window is closed
 python -m vicekrack watch-status     the last saved cycle
+python -m vicekrack desk-cases       recent trade desk case files (who approved, who vetoed, why)
 """
 
 import argparse
@@ -10,10 +11,11 @@ import json
 import sys
 
 from ..errors import TradingError
+from ..desk.desk import CaseFiles
 from .cycle import WatchFolder, load_watch_config, run_cycle
 from .runner import run_loop
 
-COMMANDS = {"watch-once", "watch-run", "watch-status"}
+COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases"}
 
 
 def parser():
@@ -23,13 +25,17 @@ def parser():
     commands.add_parser("watch-once", help="Run one watch cycle now")
     commands.add_parser("watch-run", help="Run the watch loop until stopped")
     commands.add_parser("watch-status", help="Show the last saved cycle")
+    cases = commands.add_parser("desk-cases", help="Recent trade desk case files")
+    cases.add_argument("--limit", type=int, default=20)
     return root
 
 
 def main(argv=None, root=None):
     args = parser().parse_args(sys.argv[1:] if argv is None else argv)
     try:
-        if args.command == "watch-status":
+        if args.command == "desk-cases":
+            output = {"cases": CaseFiles(root).recent(max(1, min(args.limit, 200)))}
+        elif args.command == "watch-status":
             output = WatchFolder(root).status() or {"status": "no_cycles_yet"}
         else:
             config = load_watch_config(args.config, **({"root": root} if root is not None else {}))

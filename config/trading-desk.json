@@ -1,0 +1,24 @@
+{
+  "config_version": "1.0",
+  "description": "Trade desk (Trading PR 3): every practice trade idea is a case file the agents sign in turn; any veto stops it. Simulated money only. Set auto_practice_trades to false to have the agents review ideas without placing practice trades.",
+  "auto_practice_trades": true,
+  "order_dollars": "25.00",
+  "min_dollars_above_floor": "10.00",
+  "verifier": {
+    "max_bar_age_seconds": 600,
+    "gap_check_bars": 50,
+    "max_last_bar_move_pct": "3"
+  },
+  "risk": {
+    "max_entries_per_day": 6,
+    "reentry_wait_minutes": 15,
+    "pause_after_losses": 3,
+    "pause_minutes": 120
+  },
+  "monitor": {
+    "stop_loss_pct": "2",
+    "max_hold_minutes": 60,
+    "ema_fast": 3,
+    "ema_slow": 5
+  }
+}
