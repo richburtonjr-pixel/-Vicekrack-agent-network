@@ -17,6 +17,10 @@ Routes (GET only; everything else is 405):
   /api/broker-paper                           Step 41: saved Alpaca PAPER broker intents and states (read-only)
   /api/broker-paper/intent?id=bpi-...         Step 41: one paper intent with its sanitized events (read-only)
   /api/departments                            HQ Phase 1: the department registry (departments, agents, rooms)
+  /api/trading/floor                          Trading Floor: what the Trading Watch saved on this PC (local files only)
+  /api/trading/alpaca                         Trading Floor: Alpaca PAPER connection light + stock candles. The only
+                                              route that goes online: fixed Alpaca paper/market-data hosts, GET
+                                              only, cached (floor.py). It never places, changes or cancels orders.
   /api/studio/...                             Step 48: Video Studio (studio_api.py). Off unless the server was
                                               started with --studio or --studio-demo; the only routes that act.
 
@@ -30,7 +34,7 @@ Boundaries:
   Errors carry fixed codes and messages: never exception text, paths or environment
   values. Every response has a strict Content-Security-Policy and no CORS headers.
 - Nothing here writes, runs agents or simulations, generates analytics, sends messages or places
-  orders. The results routes only load saved, re-validated runs and reports (`results.py`).
+  orders. /api/trading/alpaca only reads the Alpaca PAPER account and stock prices. The results routes only load saved, re-validated runs and reports (`results.py`).
 """
 
 import json
@@ -41,6 +45,7 @@ from urllib.parse import parse_qs, urlsplit
 from ..errors import NetworkError
 from .. import departments as department_registry
 from .demo import demo_scene
+from .floor import AlpacaView, floor_snapshot
 from .content import content_at, content_latest, media_file
 from .results import results_at, results_index, results_summary
 from .broker import broker_index, broker_intent
@@ -55,7 +60,7 @@ FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
          "/static/research.js": ("research.js", "text/javascript; charset=utf-8"),
          "/static/videos.js": ("videos.js", "text/javascript; charset=utf-8"),          # Step 54
-         "/static/terminal.js": ("terminal.js", "text/javascript; charset=utf-8"),
+         "/static/floor.js": ("floor.js", "text/javascript; charset=utf-8"),           # Trading Floor
          # HQ 2.0: the 3D headquarters (ES modules) and the pinned, vendored Three.js r169 (MIT)
          "/static/hq3d/main.js": ("hq3d/main.js", "text/javascript; charset=utf-8"),
          "/static/hq3d/world.js": ("hq3d/world.js", "text/javascript; charset=utf-8"),
@@ -79,6 +84,18 @@ SESSION_ERRORS = {
     "session_checkpoint_corrupt": (409, "The session checkpoint failed validation, so nothing is shown."),
     "invalid_session_summary": (500, "The session summary could not be built safely."),
 }
+_ALPACA_VIEWS = {}                         # one cached Alpaca view per data folder (per server)
+_ALPACA_GUARD = __import__("threading").Lock()
+
+
+def alpaca_view(root):
+    with _ALPACA_GUARD:
+        key = str(root)
+        if key not in _ALPACA_VIEWS:
+            _ALPACA_VIEWS[key] = AlpacaView(root)
+        return _ALPACA_VIEWS[key]
+
+
 MAX_RANGE_BYTES = 4 * 1024 * 1024          # one response never carries more than this
 MAX_FULL_BYTES = 8 * 1024 * 1024           # larger files are only served as byte ranges
 RANGE = re.compile(r"^bytes=(\d{0,15})-(\d{0,15})$")
@@ -296,6 +313,14 @@ def respond(method, target, headers, *, port, root=None, studio=None, body=b""):
             if parts.query:
                 return _error(400, "invalid_departments_request", "This route takes no parameters.")
             return _json(200, department_registry.load())
+        if path == "/api/trading/floor":
+            if parts.query:
+                return _error(400, "invalid_floor_request", "This route takes no parameters.")
+            return _json(200, floor_snapshot(root))
+        if path == "/api/trading/alpaca":
+            if parts.query:
+                return _error(400, "invalid_floor_request", "This route takes no parameters.")
+            return _json(200, alpaca_view(root).snapshot())
         if path == "/api/sessions":
             if parts.query:
                 return _error(400, "invalid_session_request", "This route takes no parameters.")
@@ -307,6 +332,8 @@ def respond(method, target, headers, *, port, root=None, studio=None, body=b""):
                 return _error(400, "invalid_session_id", "Use demo or a tss- session ID.")
             return _json(200, session_document(values[0], root))
     except NetworkError as error:
+        if error.code == "invalid_floor_config":
+            return _error(500, error.code, "The Trading Floor settings could not be loaded safely.")
         if error.code == "invalid_department_registry":
             return _error(500, error.code, "The department list could not be loaded safely.")
         if error.code in SESSION_ERRORS:

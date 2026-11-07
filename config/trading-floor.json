@@ -1,0 +1,10 @@
+{
+  "config_version": "1.0",
+  "description": "Trading Floor screen (desktop HQ). Crypto comes from the Trading Watch files on this PC. Stocks and the Alpaca connection light come from the Alpaca PAPER account (read-only: the screen never places, changes or cancels an order).",
+  "stocks": ["SPY", "AAPL"],
+  "stock_bar_timeframe": "5Min",
+  "chart_bars": 96,
+  "alpaca_refresh_seconds": 60,
+  "watch_stale_after_seconds": 720,
+  "feed_cases": 12
+}

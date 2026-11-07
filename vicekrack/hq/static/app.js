@@ -1049,7 +1049,7 @@
     var sessions = view === "sessions", broker = view === "broker";
     var studio = view === "studio" || view === "research" || view === "videos";   // Step 54: videos.js
     var hq3d = view === "hq3d";                          // HQ 2.0: the 3D headquarters lives in hq3d/main.js
-    var terminal = view === "terminal";                  // Trading terminal: terminal.js (read-only)
+    var floor = view === "floor";                        // Trading Floor: floor.js (read-only)
     $("timeline-view").hidden = !timeline;
     $("results-view").hidden = !results;
     $("content-view").hidden = !content;
@@ -1059,19 +1059,20 @@
     $("research-view").hidden = view !== "research";    // Step 50: Research lives in research.js
     $("videos-view").hidden = view !== "videos";        // Step 54: Finished videos live in videos.js
     $("hq3d-view").hidden = !hq3d;
-    $("terminal-view").hidden = !terminal;
-    $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || hq3d || terminal || S.list;
-    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio && !hq3d && !terminal);
+    $("floor-view").hidden = !floor;
+    $("stage-wrap").hidden = timeline || results || content || sessions || broker || studio || hq3d || floor || S.list;
+    $("list-view").hidden = !(S.list && !timeline && !results && !content && !sessions && !broker && !studio && !hq3d && !floor);
     document.body.classList.toggle("results-open", results || content || sessions || broker || studio);
-    document.body.classList.toggle("sessions-open", sessions || broker || studio || hq3d);   // replay controls belong to the house timeline
+    document.body.classList.toggle("sessions-open", sessions || broker || studio || hq3d || floor);   // replay controls belong to the house timeline
     document.body.classList.toggle("hq3d-open", hq3d);
+    document.body.classList.toggle("floor-open", floor);
     document.body.classList.toggle("studio-open", studio);
     document.dispatchEvent(new CustomEvent("hq:view", { detail: view }));
     setCamera(viewFor(view, S.focusRoom));
     if (timeline) { renderTimelines(); }
     if (sessions) { loadSessions(); }
     if (broker) { loadBroker(); }
-    if (terminal && window.HQTerminal) { window.HQTerminal.load(); }
+    if (window.HQFloor) { if (floor) { window.HQFloor.open(); } else { window.HQFloor.close(); } }
     R.renderedKey = null;
     CT.renderedKey = null;
     renderStatuses(false);
