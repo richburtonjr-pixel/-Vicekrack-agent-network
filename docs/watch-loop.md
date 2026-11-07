@@ -1,11 +1,12 @@
 # 24/7 watch loop (Trading PR 2)
 
-> **Research only. No trades in this step.** Free Kraken public prices (no keys, no account),
-> the existing rule-based research agents, and the practice account's $80 shutdown check.
+> Free Kraken public prices (no keys, no account), the rule-based agents, and the practice
+> account's $80 shutdown check. Since PR 3, approved ideas become **practice trades with
+> simulated money** through the [trade desk](trade-desk.md).
 
 If the practice account is the fuse box, this is the **night watchman**: every 5 minutes it
 walks the floor, writes down the BTC and ETH prices, asks the four research agents what they
-see, and checks the fuse. It doesn't buy or sell anything yet.
+see, and checks the fuse. Then it hands the floor to the [trade desk](trade-desk.md).
 
 ## What happens every 5 minutes
 
@@ -15,7 +16,8 @@ see, and checks the fuse. It doesn't buy or sell anything yet.
 | 2 | Save them as `runtime/trading/watch/bars/<COIN>.csv` and load them through the normal importer, labelled `delayed`, source `kraken-<PAIR>-5m` | local CSV importer and dataset validator (Step 25) |
 | 3 | Market Scout -> Trend -> Strategy -> Risk Review at the last bar close | research agents (Step 28) |
 | 4 | Hand the latest closes to the practice account | practice account and $80 guard (PR #68) |
-| 5 | Save `runtime/trading/watch/status.json` and add a line to `cycles.jsonl` | new |
+| 5 | Trade desk: Position Monitor checks open positions; approved ideas become practice trades | trade desk (PR 3) |
+| 6 | Save `runtime/trading/watch/status.json` and add a line to `cycles.jsonl` | new |
 
 - Cycles start about 20 seconds after each 5-minute bar closes.
 - One coin failing (internet hiccup, Kraken busy) is reported and skipped. Its price gets older,
@@ -45,8 +47,3 @@ Commands, if you ever want them:
 - Prices are closed 5-minute bars, so they are up to about 5 minutes behind the market.
 - Kraken data is free and public, not verified or licensed; treat it as practice data.
 - The guard checks once per cycle. A fast crash between cycles can land the account below $80.
-
-## Next
-
-PR 3: the Verifier and Position Monitor agents, a shared "case file" each trade idea must pass
-(any agent can veto), and only then simulated buys and sells in the practice account.

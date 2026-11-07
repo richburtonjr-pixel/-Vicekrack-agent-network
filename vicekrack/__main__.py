@@ -86,7 +86,7 @@ def main():
         from .trading.analytics.cli import main as analytics_main
         return analytics_main()
 
-    if len(sys.argv) > 1 and sys.argv[1] in {"watch-once", "watch-run", "watch-status"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"watch-once", "watch-run", "watch-status", "desk-cases"}:
         from .trading.watch.cli import main as watch_main
         return watch_main()
 
