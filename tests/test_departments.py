@@ -108,12 +108,10 @@ class DepartmentsRouteTests(unittest.TestCase):
 
 
 class ScreensReadTheRegistryTests(unittest.TestCase):
-    def test_trading_terminal_reads_its_agents_from_the_registry(self):
-        js = (STATIC / "terminal.js").read_text(encoding="utf-8")
-        self.assertIn('"/api/departments"', js)
-        self.assertIn('a.department === "trading"', js)
-        for agent_id in ("market_scout", "trend_agent", "strategy_agent", "risk_review"):
-            self.assertNotIn(agent_id, js, "the terminal must not keep its own copy of the agent list")
+    def test_trading_floor_research_agents_are_in_the_registry(self):
+        from vicekrack.hq.floor import RESEARCH
+        trading = {a["id"] for a in departments.load()["agents"] if a["department"] == "trading"}
+        self.assertTrue(set(RESEARCH) <= trading, "the Trading Floor's research agents must exist in the registry")
 
     @unittest.skipUnless(shutil.which("node"), "Node is not installed")
     def test_3d_headquarters_matches_the_registry(self):

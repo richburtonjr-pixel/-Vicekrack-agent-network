@@ -57,7 +57,7 @@ class StaticFilesTests(unittest.TestCase):
         html = (STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('data-view="hq3d"', html)
         self.assertIn('<script type="module" src="/static/hq3d/main.js"></script>', html)
-        for view in ("house", "trading", "results", "content", "timeline", "sessions", "broker", "research", "studio"):
+        for view in ("house", "floor", "results", "content", "timeline", "sessions", "broker", "research", "studio"):
             self.assertIn(f'data-view="{view}"', html)
 
     def test_the_headquarters_only_reads(self):
