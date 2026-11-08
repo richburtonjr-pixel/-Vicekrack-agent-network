@@ -1,24 +1,20 @@
-"""One watch cycle (Trading PR 2, trade desk added in PR 3). SIMULATED MONEY ONLY.
+"""One watch cycle (whole market since Trading PR 4). SIMULATED MONEY ONLY.
 
-Every cycle, for each watched coin:
-  1. Fetch recent CLOSED 5-minute bars from Kraken's free public endpoint (existing
-     `providers.kraken` adapter; no keys, no account).
-  2. Save them as a local CSV under runtime/trading/watch/bars/ and load that file through the
-     existing local-CSV importer, labelled "delayed" with source name "kraken-<PAIR>-5m". The
-     dataset is checked by the same validator as every other dataset (order, gaps, hashes).
-  3. Run the existing four research agents (Market Scout -> Trend -> Strategy -> Risk Review)
-     on it, at the last bar close.
-Then, once per cycle:
-  4. Hand the latest closing prices to the practice account (`practice.store.apply("mark")`).
-     That runs the $80 guard: at or below the floor it closes everything and stops.
-  5. Run the trade desk (PR 3): open positions are checked by the Position Monitor, and every
-     "sufficient" research verdict becomes a case file the Verifier and Risk Review must also
-     approve before the Executor places a practice trade. See `trading/desk/desk.py`.
-  6. Save a status snapshot (runtime/trading/watch/status.json) and append a short line to the
-     cycle log, for the HQ and the phone.
+Every minute:
+  1. RADAR: one Kraken request prices every USD coin (`kraken_market.tickers`). The prices are added
+     to the tape and the Market Scout ranks coins on a steady climb (`watch/scanner.py`).
+  2. FUSE: every coin the practice account holds is re-priced from that same request, which runs
+     the $80 guard: at or below the floor it closes everything and stops.
+  3. WORKUP: the top streak candidates, plus any coin the agents hold (so the Position Monitor has
+     fresh bars), get recent CLOSED 1-minute bars from Kraken. Those are saved as local CSV, loaded
+     through the normal importer and validator, and run through the four research agents.
+  4. DESK: the Position Monitor checks the agents' positions, and every "sufficient" research verdict
+     becomes a case file the Verifier and Risk Review must also approve before the Executor places a
+     $25 practice buy at Kraken's ask price. See `trading/desk/desk.py`.
+  5. Save a status snapshot (runtime/trading/watch/status.json) and a line in the cycle log.
 
-A coin that fails to fetch is reported and skipped; its price simply gets older, and the guard
-blocks new buys once it is stale. One coin's failure never stops the other or the guard.
+If the whole-market request fails, nothing is guessed: holdings simply aren't re-priced, and the
+guard blocks new buys once prices are over 10 minutes old. One coin failing never stops the others.
 """
 
 import csv
@@ -35,6 +31,7 @@ from ..contracts import ROOT, utc_now
 from ..desk.desk import load_desk_config, run_desk
 from ..errors import TradingError
 from ..indicators.store import load_indicator_config
+from ..providers.kraken_market import Catalog, tickers as fetch_tickers, to_price
 from ..market.adapters import LocalCsvAdapter
 from ..market.bars import build_dataset
 from ..market.store import load_market_config
@@ -43,9 +40,10 @@ from ..practice.store import PracticeStore, load_config as load_practice_config
 from ..providers.alpaca import urllib_transport
 from ..providers.kraken import KrakenPublicOHLCAdapter, interval_minutes
 from ..signals.store import load_signal_config
+from . import scanner
 
-NOTICE = ("WATCH LOOP: free Kraken public prices and rule-based agents. Practice trades use simulated money only, "
-          "after every agent approves. The $80 shutdown is checked every cycle.")
+NOTICE = ("WHOLE-MARKET WATCH: free Kraken public prices and rule-based agents. Practice trades use simulated money "
+          "only, after every agent approves. The $80 shutdown is checked every minute.")
 
 
 def load_watch_config(path="config/watch.json", root=ROOT):
@@ -55,10 +53,7 @@ def load_watch_config(path="config/watch.json", root=ROOT):
         raise TradingError("invalid_watch_config", "The watch settings must stay inside the project.")
     try:
         config = json.loads(target.read_text(encoding="utf-8-sig"))
-        if config["config_version"] != "1.0" or config["provider"] != "kraken_public":
-            raise ValueError
-        symbols = config["symbols"]
-        if not symbols or not all(isinstance(k, str) and isinstance(v, str) for k, v in symbols.items()):
+        if config["config_version"] != "2.0" or config["provider"] != "kraken_public":
             raise ValueError
         interval_minutes(config["interval"])
         for key, low, high in (("bars_for_research", 20, 500), ("cycle_seconds", 60, 3600),
@@ -66,7 +61,17 @@ def load_watch_config(path="config/watch.json", root=ROOT):
             value = config[key]
             if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
                 raise ValueError
-        if not isinstance(config["keep_pc_awake"], bool):
+        if not 0 <= float(config["request_spacing_seconds"]) <= 10 or not isinstance(config["keep_pc_awake"], bool):
+            raise ValueError
+        scan = config["scan"]
+        for key, low, high in (("history_minutes", 16, 240), ("min_up_minutes_of_last_5", 0, 5), ("max_candidates", 0, 30)):
+            value = scan[key]
+            if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+                raise ValueError
+        for key in ("min_volume_24h_usd", "min_rise_5m_pct", "min_rise_15m_pct"):
+            if float(scan[key]) < 0:
+                raise ValueError
+        if not isinstance(scan["skip_bases"], list) or not all(isinstance(b, str) for b in scan["skip_bases"]):
             raise ValueError
     except TradingError:
         raise TradingError("invalid_watch_config", "The watch settings are invalid.") from None
@@ -90,6 +95,7 @@ class WatchFolder:
         self.status_path = self.base / "status.json"
         self.log_path = self.base / "cycles.jsonl"
         self.lock_path = self.base / "watch.lock"
+        self.tape_path = self.base / "tape.json"
 
     def write_atomic(self, target, text):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -173,47 +179,91 @@ def _research(symbol, pair, config, folder, configs, now, transport, clock):
     return report, (dataset if report["ok"] else None)
 
 
-def run_cycle(config, *, root=None, now=None, transport=urllib_transport, clock=None):
+def run_cycle(config, *, root=None, now=None, transport=urllib_transport, clock=None, sleep=None):
     """One full watch cycle. Returns the status snapshot it saved."""
     now = now or utc_now()
     clock = clock or (lambda: _now_epoch(now))
+    now_epoch = int(_now_epoch(now))
     folder = WatchFolder(root)
+    rooted = {"root": root} if root is not None else {}
     configs = {"market": load_market_config(), "agents": load_agent_config()[0],
                "indicators": load_indicator_config()[0], "signals": load_signal_config()[0]}
+
+    # 1. radar: the whole market in one request
+    radar = {"ok": False, "error": None, "candidates": [], "stats": None}
+    market = {}
+    catalog = Catalog(root, transport=transport, clock=clock)
+    try:
+        market = fetch_tickers(catalog, transport)
+        tape = scanner.update_tape(scanner.load_tape(folder.tape_path), market, now_epoch, config["scan"]["history_minutes"])
+        scanner.save_tape(folder.tape_path, tape)
+        candidates, stats = scanner.scan(tape, market, now_epoch, config["scan"])
+        radar.update(ok=True, candidates=candidates, stats=stats)
+    except TradingError as error:
+        radar["error"] = error.code
+
+    practice = {"state": None, "guard": None, "error": None}
+    desk = {"cases": [], "performance": None, "error": None}
     coins, datasets = [], {}
-    for symbol, pair in sorted(config["symbols"].items()):
+    store, practice_config, state = PracticeStore(root), None, None
+    try:
+        practice_config = load_practice_config(**rooted)
+        state = store.load(practice_config)
+        # 2. fuse: re-price every holding from the radar's prices
+        marks = {}
+        for symbol in state["positions"]:
+            row = market.get(symbol)
+            price = to_price(row["last"]) if row else None
+            if price is not None:
+                marks[symbol] = {"price": price, "at": now}
+        if marks:
+            state, _, _ = store.apply(practice_config, "mark", marks, now=now)
+    except TradingError as error:
+        practice["error"] = error.code
+
+    # 3. workup: streak candidates plus the agents' own holdings
+    deep = [c["symbol"] for c in radar["candidates"]]
+    if state is not None:
+        deep += [s for s, p in sorted(state["positions"].items()) if p.get("opened_by", "agents") == "agents" and s not in deep]
+    spacing = float(config["request_spacing_seconds"])
+    for number, symbol in enumerate(deep):
+        if number and sleep is not None and spacing:
+            sleep(spacing)
+        try:
+            pair = catalog.get(symbol)["pair"]
+        except TradingError as error:
+            coins.append({"symbol": symbol, "ok": False, "error": error.code, "research": None, "price": None})
+            continue
         report, dataset = _research(symbol, pair, config, folder, configs, now, transport, clock)
+        row = market.get(symbol) or {}
+        report.update(ask=to_price(row.get("ask")), bid=to_price(row.get("bid")),
+                      radar=next((c for c in radar["candidates"] if c["symbol"] == symbol), None))
         coins.append(report)
         if dataset is not None:
             datasets[symbol] = dataset
 
-    practice = {"state": None, "guard": None, "error": None}
-    desk = {"cases": [], "performance": None, "error": None}
-    prices = {c["symbol"]: {"price": c["price"], "at": c["price_at"]} for c in coins if c["ok"]}
-    try:
-        practice_config = load_practice_config(**({"root": root} if root is not None else {}))
-        store = PracticeStore(root)
-        if prices:
-            state, verdict, _ = store.apply(practice_config, "mark", prices, now=now)
-        else:
-            state = store.load(practice_config)
+    # 4. desk, then the account as it stands
+    if practice_config is not None and state is not None:
         try:
             desk.update(run_desk(coins, datasets, store=store, practice_config=practice_config,
-                                 desk_config=load_desk_config(**({"root": root} if root is not None else {})),
-                                 signal_config=configs["signals"], now=now, root=root))
-            state = store.load(practice_config)
+                                 desk_config=load_desk_config(**rooted), signal_config=configs["signals"],
+                                 now=now, root=root))
         except TradingError as error:
             desk["error"] = error.code
-        summary = practice_book.summary(state, practice_config, now)
-        practice.update(state=summary, guard=summary["guard"])
-    except TradingError as error:
-        practice["error"] = error.code
+        try:
+            state = store.load(practice_config)
+            summary = practice_book.summary(state, practice_config, now)
+            practice.update(state=summary, guard=summary["guard"])
+        except TradingError as error:
+            practice["error"] = error.code
 
-    status = {"contract": "watch_status", "version": "1.0", "notice": NOTICE, "simulated": True,
-              "trades_placed": any(c["outcome"] == "executed" for c in desk["cases"]), "cycle_at": now, "provider": config["provider"], "interval": config["interval"],
-              "coins": [{k: v for k, v in c.items()} for c in coins], "practice": practice, "desk": desk}
+    status = {"contract": "watch_status", "version": "2.0", "notice": NOTICE, "simulated": True,
+              "trades_placed": any(c["outcome"] == "executed" for c in desk["cases"]), "cycle_at": now,
+              "provider": config["provider"], "interval": config["interval"], "cycle_seconds": config["cycle_seconds"],
+              "radar": radar, "coins": coins, "practice": practice, "desk": desk}
     folder.write_atomic(folder.status_path, json.dumps(status, indent=2, ensure_ascii=False, allow_nan=False))
-    folder.append_log({"at": now, "prices": {c["symbol"]: c["price"] for c in coins},
+    folder.append_log({"at": now, "radar_ok": radar["ok"], "radar_error": radar["error"],
+                       "candidates": [c["symbol"] for c in radar["candidates"]],
                        "verdicts": {c["symbol"]: (c["research"] or {}).get("verdict") for c in coins},
                        "errors": {c["symbol"]: c["error"] for c in coins if c["error"]},
                        "guard": practice["guard"], "practice_error": practice["error"],

@@ -1,7 +1,7 @@
 {
   "config_version": "1.0",
   "mode": "practice",
-  "description": "Practice account (Trading PR 1): $100 of simulated money. Plain code closes every position and stops the account when equity reaches $80. No leverage, no shorting, no real money, no broker.",
+  "description": "Practice account: $100 of simulated money for the whole Kraken USD market. Plain code closes every position and stops the account when equity reaches $80. No leverage, no shorting, no real money, no broker. Your own trades may use all your cash; the agents' limits live in config/trading-desk.json.",
   "account": {
     "starting_cash": "100.00",
     "currency": "USD"
@@ -11,13 +11,13 @@
     "action": "close_all_and_halt",
     "note": "A trigger, not a guarantee: prices can gap below $80 between checks, and closing costs slippage and fees."
   },
-  "allowed_symbols": ["BTCUSD", "ETHUSD"],
+  "allowed_symbols": "any_usd",
   "leverage": false,
   "allow_short": false,
   "limits": {
-    "max_order_notional": "25.00",
-    "max_open_positions": 2,
-    "max_price_age_seconds": 900
+    "max_order_notional": "100.00",
+    "max_open_positions": 25,
+    "max_price_age_seconds": 600
   },
   "costs": {
     "slippage_bps": "10",

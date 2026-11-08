@@ -1,15 +1,42 @@
 {
-  "config_version": "1.0",
-  "description": "24/7 crypto watch loop (Trading PR 2). Free Kraken public prices, no keys. Watches and researches only: it records prices into the practice account (so the $80 guard runs every cycle) and runs the existing research agents. It places no trades in this step.",
+  "config_version": "2.0",
+  "description": "Whole-market watch (Trading PR 4). Every minute: one Kraken request prices every USD coin (the radar), the Market Scout ranks coins on a steady climb, the top few get the full agent workup on 1-minute bars, every holding is re-priced so the $80 shutdown is checked, then the trade desk runs. Free public data, no keys. Simulated money only.",
   "provider": "kraken_public",
-  "symbols": {
-    "BTCUSD": "XBTUSD",
-    "ETHUSD": "ETHUSD"
-  },
-  "interval": "5m",
+  "interval": "1m",
   "bars_for_research": 120,
-  "cycle_seconds": 300,
-  "wait_after_bar_close_seconds": 20,
+  "cycle_seconds": 60,
+  "wait_after_bar_close_seconds": 5,
+  "request_spacing_seconds": "1.1",
+  "scan": {
+    "history_minutes": 30,
+    "min_volume_24h_usd": "250000",
+    "min_rise_5m_pct": "0.3",
+    "min_rise_15m_pct": "0.6",
+    "min_up_minutes_of_last_5": 3,
+    "max_candidates": 8,
+    "skip_bases": [
+      "USDT",
+      "USDC",
+      "DAI",
+      "PYUSD",
+      "USDG",
+      "TUSD",
+      "FDUSD",
+      "USDE",
+      "RLUSD",
+      "USDQ",
+      "USDR",
+      "EURT",
+      "EUR",
+      "GBP",
+      "AUD",
+      "CAD",
+      "CHF",
+      "JPY",
+      "TBTC",
+      "WBTC"
+    ]
+  },
   "keep_pc_awake": true,
   "max_log_bytes": 5000000
 }

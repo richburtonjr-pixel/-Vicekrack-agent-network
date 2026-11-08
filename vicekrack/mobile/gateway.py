@@ -14,6 +14,8 @@ What the phone may do
 - Paid actions also need the PIN, a cost estimate the HQ itself reports, and room under the daily cap.
   Retrying an uncertain paid request (possible double billing) and narration purchases stay PC-only.
 - Every action is written to the audit log (no PIN, tokens or free text).
+- Trade tab (Trading PR 4, `trade_api.py`): market prices, practice account, and practice orders with
+  SIMULATED money. Orders are priced on the PC from a fresh Kraken request and are audited.
 """
 
 import hmac
@@ -30,6 +32,7 @@ FILES = {"/": ("index.html", "text/html; charset=utf-8"),
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
          "/static/app.css": ("app.css", "text/css; charset=utf-8"),
          "/static/screens.js": ("screens.js", "text/javascript; charset=utf-8"),
+         "/static/trade.js": ("trade.js", "text/javascript; charset=utf-8"),
          "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
          "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
          "/static/icon-180.png": ("icon-180.png", "image/png"),
@@ -98,9 +101,13 @@ def _cookie(headers):
 
 
 class Gateway:
-    def __init__(self, store, hq, port=8770, clock=None):
+    def __init__(self, store, hq, port=8770, clock=None, trade=None):
         self.store, self.hq, self.port = store, hq, port
         self.clock = clock or security.utcnow
+        if trade is None:
+            from .trade_api import TradeApi
+            trade = TradeApi()
+        self.trade = trade
 
     # ------------------------------------------------------------ who is asking
     def _hosts(self, settings):
@@ -212,6 +219,8 @@ class Gateway:
                     return _json(200, {"unpaired": True},
                                  {"Set-Cookie": f"{COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"})
                 return self._action(device, path[len("/m/api/action/"):], self._body(headers, body))
+            if path.startswith("/m/api/trade/") and method in ("GET", "POST"):
+                return self._trade(method, path[len("/m/api/trade/"):], parts.query, headers, body)
             if method not in ("GET", "POST"):
                 return _error(405, "method_not_allowed", "Use GET or POST.")
             return _error(404, "not_found", "No such page.")
@@ -379,6 +388,41 @@ class Gateway:
             security.settle(self.store, request_id, "released" if give_back else "kept")
         self._audit(device, action, refs, estimate, code or "ok")
         return _json(status if status in STATUS_TEXT else 502, answer)
+
+    def _trade(self, method, name, query, headers, body):
+        device = self._device(headers)
+        if device is None:
+            return _error(401, "not_paired", "Pair this phone first.")
+        if method == "GET":
+            if name == "markets" and not query:
+                return _json(200, self.trade.markets())
+            if name == "account" and not query:
+                return _json(200, self.trade.account())
+            if name == "coin" and len(query) <= 120:
+                return _json(200, self.trade.coin(query))
+            return _error(404, "not_found", "No such page.")
+        if name not in ("order", "restart"):
+            return _error(404, "not_found", "No such page.")
+        if not self._csrf_ok(headers):
+            return _error(403, "session_invalid", "Reload the app and try again.")
+        document = self._body(headers, body)
+        try:
+            result = self.trade.order(document) if name == "order" else self.trade.restart(document)
+        except NetworkError as error:
+            self._audit(device, "trade/" + name, self._trade_refs(document), None, error.code)
+            raise
+        outcome = "ok" if result.get("ok", True) else (result.get("refused") or {}).get("code", "refused")
+        self._audit(device, "trade/" + name, self._trade_refs(document), None, outcome)
+        return _json(200, result)
+
+    @staticmethod
+    def _trade_refs(document):
+        refs = {}
+        for key in ("symbol", "side", "amount"):
+            value = document.get(key)
+            if isinstance(value, str) and re.match(r"^[A-Za-z0-9.]{1,16}$", value):
+                refs[key] = value
+        return refs
 
     def _audit(self, device, action, refs, estimate, outcome):
         self.store.append_audit({"at": security._iso(self.clock()), "device_id": device["device_id"],

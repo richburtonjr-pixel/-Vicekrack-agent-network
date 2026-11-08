@@ -40,7 +40,8 @@ def main(argv=None, root=None):
         else:
             config = load_watch_config(args.config, **({"root": root} if root is not None else {}))
             if args.command == "watch-once":
-                output = run_cycle(config, root=root)
+                import time
+                output = run_cycle(config, root=root, sleep=time.sleep)
             else:
                 try:
                     run_loop(config, root=root)
