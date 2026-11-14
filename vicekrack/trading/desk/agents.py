@@ -46,6 +46,9 @@ def risk_manager(symbol, research_verdict, practice, history, now, config):
         reasons.append("too_close_to_floor")
     if symbol in practice["positions"]:
         reasons.append("already_holding")
+    agent_held = sum(1 for p in practice["positions"].values() if p.get("opened_by", "agents") == "agents")
+    if agent_held >= config["max_agent_positions"]:
+        reasons.append("agent_position_limit")
     if history["entries_today"] >= config["max_entries_per_day"]:
         reasons.append("daily_entry_limit")
     last_exit = history["last_exit_at"].get(symbol)

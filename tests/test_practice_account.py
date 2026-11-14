@@ -59,14 +59,56 @@ class PracticeAccountTests(unittest.TestCase):
 
     def test_order_and_position_limits(self):
         self.started()
-        _, _, refusal = self.store.apply(self.config, "buy", "BTCUSD", "25.01", "90000.00", now=T0)
+        _, _, refusal = self.store.apply(self.config, "buy", "BTCUSD", "100.01", "90000.00", now=T0)
         self.assertEqual(refusal.code, "order_too_large")
         self.store.apply(self.config, "buy", "BTCUSD", "25.00", "90000.00", now=T0)
         _, _, refusal = self.store.apply(self.config, "buy", "BTCUSD", "10.00", "90000.00", now=T0)
-        self.assertEqual(refusal.code, "position_already_open")
-        with self.assertRaises(TradingError) as caught:
-            self.store.apply(self.config, "buy", "DOGEUSD", "10.00", "1.00", now=T0)
-        self.assertEqual(caught.exception.code, "symbol_not_allowed")
+        self.assertEqual(refusal.code, "position_already_open")                  # agents never add to a position
+        _, _, refusal = self.store.apply(self.config, "buy", "BTCUSD", "10.00", "90000.00", now=T0, by="you")
+        self.assertEqual(refusal.code, "position_already_open")                  # nor you to the agents' position
+        for symbol in ("DOGEEUR", "btcusd", "BTC/USD"):
+            with self.assertRaises(TradingError) as caught:
+                self.store.apply(self.config, "buy", symbol, "10.00", "1.00", now=T0)
+            self.assertEqual(caught.exception.code, "symbol_not_allowed")
+
+    # ------------------------------------------------------------------ whole market, your own trades (PR 4)
+    def test_any_kraken_usd_coin_and_buying_more_of_your_own(self):
+        self.started()
+        _, _, refusal = self.store.apply(self.config, "buy", "SOLUSD", "20.00", "150.00", now=T0, by="you")
+        self.assertIsNone(refusal)
+        state, _, refusal = self.store.apply(self.config, "buy", "SOLUSD", "10.00", "160.00", now=T0, by="you")
+        self.assertIsNone(refusal)
+        position = state["positions"]["SOLUSD"]
+        self.assertEqual(position["opened_by"], "you")
+        self.assertAlmostEqual(float(position["cost_basis"]), 30.07, delta=0.02)          # both buys plus fees
+        self.assertEqual([l["by"] for l in self.store.ledger() if l["kind"] == "fill"], ["you", "you"])
+
+    def test_buy_with_all_your_cash_never_borrows(self):
+        self.started()
+        state, _, refusal = self.store.apply(self.config, "buy", "ETHUSD", "all", "3000.00", now=T0, by="you")
+        self.assertIsNone(refusal)
+        self.assertGreaterEqual(Decimal(state["cash"]), 0)
+        self.assertLess(Decimal(state["cash"]), Decimal("0.05"))
+        _, _, refusal = book.buy(book.new_state(self.config, T0), self.config, "ETHUSD", "all", "3000.00", T0)
+        self.assertEqual(refusal.code, "order_too_large")                        # "all" is for you, not the agents
+
+    def test_partial_and_full_sells(self):
+        self.started()
+        self.store.apply(self.config, "buy", "SOLUSD", "40.00", "100.00", now=T0, by="you")
+        state, _, _ = self.store.apply(self.config, "sell", "SOLUSD", "110.00", now=T1, by="you", dollars="11.00")
+        left = state["positions"]["SOLUSD"]
+        self.assertAlmostEqual(float(left["quantity"]), 0.29946, places=4)
+        sell = [l for l in self.store.ledger() if l["kind"] == "fill"][-1]
+        self.assertGreater(Decimal(sell["realized_pnl"]), 0)
+        state, _, _ = self.store.apply(self.config, "sell", "SOLUSD", "110.00", now=T1, by="you", dollars="all")
+        self.assertNotIn("SOLUSD", state["positions"])
+
+    def test_the_guard_closes_your_coins_too(self):
+        self.started()
+        self.store.apply(self.config, "buy", "SOLUSD", "all", "100.00", now=T0, by="you")
+        state, verdict, _ = self.store.apply(self.config, "mark", {"SOLUSD": {"price": "75.00", "at": T1}}, now=T1)
+        self.assertEqual((verdict["verdict"], state["status"], state["positions"]), ("shutdown", "halted", {}))
+        self.assertEqual([l["by"] for l in self.store.ledger() if l["kind"] == "fill"][-1], "guard")
 
     def test_no_leverage_when_cash_is_short(self):
         config = deepcopy(self.config)

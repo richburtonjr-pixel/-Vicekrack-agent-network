@@ -75,6 +75,23 @@ def seconds_until_next(cycle_seconds, wait_after, now_epoch):
     return max(1.0, next_boundary + wait_after - now_epoch)
 
 
+def summary_line(status):
+    """One readable line per cycle for the watch window."""
+    radar = status.get("radar") or {}
+    if radar.get("ok"):
+        stats = radar.get("stats") or {}
+        picks = ", ".join(c["base"] + " +" + c["rise_15m_pct"] + "%" for c in radar.get("candidates", [])) or "none yet"
+        scanned = f"scanned {stats.get('coins_priced', 0)} coins | streaks: {picks}"
+    else:
+        scanned = f"market scan failed: {radar.get('error')}"
+    practice = status.get("practice") or {}
+    account = practice.get("state") or {}
+    money = f"equity ${account['equity']}" if account.get("equity") else "equity unverified"
+    guard = practice.get("guard") or practice.get("error")
+    trades = [f"{c['kind']} {c['symbol']} {c['outcome']}" for c in (status.get("desk") or {}).get("cases", [])]
+    return f"{scanned} | {money} | guard: {guard}" + (f" | {'; '.join(trades)}" if trades else "")
+
+
 def run_loop(config, *, root=None, max_cycles=None, sleep=time.sleep, clock=time.time, report=print, cycle=run_cycle):
     folder = WatchFolder(root)
     done = 0
@@ -83,10 +100,8 @@ def run_loop(config, *, root=None, max_cycles=None, sleep=time.sleep, clock=time
         while max_cycles is None or done < max_cycles:
             started = utc_now()
             try:
-                status = cycle(config, root=root, now=started)
-                prices = ", ".join(f"{c['symbol']} {c['price'] or c['error']}" for c in status["coins"])
-                guard = status["practice"]["guard"] or status["practice"]["error"]
-                report(f"{started}  {prices}  |  guard: {guard}")
+                status = cycle(config, root=root, now=started, sleep=sleep)
+                report(f"{started}  {summary_line(status)}")
             except TradingError as error:
                 report(f"{started}  cycle failed: {error.code}")
             except Exception:                                    # never let one bad cycle end the night

@@ -1,4 +1,4 @@
-"""Trading PR 3: the trade desk, where every practice trade idea is a case file the agents sign in turn."""
+"""Trading PR 3 (whole market since PR 4): the trade desk, where every agent trade idea is a case file signed in turn."""
 
 import ast
 import json
@@ -10,7 +10,8 @@ from copy import deepcopy
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from desk_market import BASE_EPOCH, SeriesKraken, now_text  # noqa: E402
+from desk_market import FakeKraken, epoch, now_text  # noqa: E402
+from test_watch_loop import seed_tape  # noqa: E402
 
 from vicekrack.trading.desk import agents  # noqa: E402
 from vicekrack.trading.desk.desk import CaseFiles, load_desk_config  # noqa: E402
@@ -20,7 +21,7 @@ from vicekrack.trading.signals.store import load_signal_config  # noqa: E402
 from vicekrack.trading.watch.cycle import load_watch_config, run_cycle  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-ENTRY, EXIT = 141, 142          # in the seeded fake market: ETH entry approved at 141, trend turns down at 142
+ENTRY, EXIT = 600, 651          # fake market: SOL's streak is approved at minute 600; its trend turns down by 651
 
 
 class TradeDeskTests(unittest.TestCase):
@@ -29,7 +30,7 @@ class TradeDeskTests(unittest.TestCase):
         shutil.copytree(ROOT / "config", self.root / "config")
         self.practice_config = load_practice_config(root=self.root)
         self.store = PracticeStore(self.root)
-        self.store.start(self.practice_config, "2026-11-12T00:00:00Z")
+        self.store.start(self.practice_config, now_text(0))
         self.desk_config = load_desk_config(root=self.root)
         self.signals = load_signal_config()[0]
 
@@ -37,8 +38,10 @@ class TradeDeskTests(unittest.TestCase):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def cycle(self, index, **kraken):
+        if index == ENTRY:
+            seed_tape(self.root, ENTRY)
         return run_cycle(load_watch_config(root=self.root), root=self.root, now=now_text(index),
-                         transport=SeriesKraken(index, **kraken), clock=lambda: BASE_EPOCH + 300 * index + 20)
+                         transport=FakeKraken(index, **kraken), clock=lambda: epoch(index))
 
     def cases(self, index):
         return CaseFiles(self.root).read_day(now_text(index))
@@ -48,13 +51,17 @@ class TradeDeskTests(unittest.TestCase):
         status = self.cycle(ENTRY)
         self.assertTrue(status["trades_placed"])
         case = self.cases(ENTRY)[-1]
-        self.assertEqual((case["kind"], case["symbol"], case["outcome"]), ("entry", "ETHUSD", "executed"))
+        self.assertEqual((case["kind"], case["symbol"], case["outcome"]), ("entry", "SOLUSD", "executed"))
         order = [(s["agent"], s.get("stage")) for s in case["signatures"]]
         self.assertEqual(order, [("market_scout", None), ("trend_agent", None), ("strategy_agent", None),
                                  ("risk_review", None), ("verifier", None), ("risk_review", "account_check"),
                                  ("executor", None)])
         self.assertTrue(all(s["decision"] == "approve" for s in case["signatures"][:-1]))
-        self.assertIn("ETHUSD", self.store.load(self.practice_config)["positions"])
+        position = self.store.load(self.practice_config)["positions"]["SOLUSD"]
+        self.assertEqual(position["opened_by"], "agents")
+        fill = [l for l in self.store.ledger() if l["kind"] == "fill"][-1]
+        self.assertEqual((fill["by"], fill["notional"] <= "25"), ("agents", True))
+        self.assertGreater(float(fill["price"]), float(next(c for c in status["coins"] if c["symbol"] == "SOLUSD")["bid"]))
 
     def test_position_monitor_closes_and_performance_reviewer_reports(self):
         self.cycle(ENTRY)
@@ -67,6 +74,15 @@ class TradeDeskTests(unittest.TestCase):
         performance = status["desk"]["performance"]
         self.assertEqual(performance["closed_trades"], 1)
         self.assertEqual(performance["wins"] + performance["losses"], 1)
+
+    def test_position_monitor_never_sells_your_own_coins(self):
+        self.cycle(ENTRY)
+        state = self.store.load(self.practice_config)
+        state["positions"]["SOLUSD"]["opened_by"] = "you"
+        self.store.state_path.write_text(json.dumps(state))
+        self.cycle(EXIT)
+        self.assertIn("SOLUSD", self.store.load(self.practice_config)["positions"])
+        self.assertFalse([c for c in self.cases(EXIT) if c["kind"] == "exit"])
 
     def test_switching_auto_trades_off_reviews_without_trading(self):
         path = self.root / "config/trading-desk.json"
@@ -164,7 +180,8 @@ class TradeDeskTests(unittest.TestCase):
             (dict(practice=self.practice(status="halted", guard="halted")), "account_stopped"),
             (dict(practice=self.practice(dollars_above_floor="9.99")), "too_close_to_floor"),
             (dict(practice=self.practice(positions={"BTCUSD": {}})), "already_holding"),
-            (dict(history=self.history(entries_today=6)), "daily_entry_limit"),
+            (dict(practice=self.practice(positions={"ETHUSD": {}, "SOLUSD": {"opened_by": "agents"}})), "agent_position_limit"),
+            (dict(history=self.history(entries_today=10)), "daily_entry_limit"),
             (dict(history=self.history(last_exit_at={"BTCUSD": "2026-11-12T04:50:00Z"})), "reentry_wait"),
             (dict(history=self.history(losing_streak=3, last_loss_at="2026-11-12T04:00:00Z")), "losing_streak_pause"),
             (dict(verdict="insufficient_for_future_paper_evaluation"), "research_incomplete"),

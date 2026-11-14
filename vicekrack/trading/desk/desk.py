@@ -12,7 +12,7 @@ Every trade idea becomes a CASE FILE that each agent signs in order. Any veto st
                        earlier signature is "approve". The account's own $80 guard still runs
                        first and can still refuse.
 
-  Exit case (a possible sell), every cycle for every open position:
+  Exit case (a possible sell), every cycle for every position THE AGENTS opened (yours are yours):
     7 Position Monitor stop-loss, held too long, or trend turned down -> asks to close
     6 Executor         closes the whole position. Exits need no approval: they reduce risk.
 
@@ -49,8 +49,8 @@ def load_desk_config(path="config/trading-desk.json", root=ROOT):
         parse(config["order_dollars"], "money")
         parse(config["min_dollars_above_floor"], "money")
         for section, keys in (("verifier", ("max_bar_age_seconds", "gap_check_bars")),
-                              ("risk", ("max_entries_per_day", "reentry_wait_minutes", "pause_after_losses",
-                                        "pause_minutes")),
+                              ("risk", ("max_agent_positions", "max_entries_per_day", "reentry_wait_minutes",
+                                        "pause_after_losses", "pause_minutes")),
                               ("monitor", ("max_hold_minutes", "ema_fast", "ema_slow"))):
             for key in keys:
                 value = config[section][key]
@@ -122,9 +122,9 @@ def _history(cases_today, ledger, account_id, now):
 
 
 def _execute(store, practice_config, case, operation, args, now):
-    """The Executor: the only place a desk case reaches the practice account."""
+    """The Executor: the only place a desk case reaches the practice account. Always trades as "agents"."""
     try:
-        state, _, refusal = store.apply(practice_config, operation, *args, now=now)
+        state, _, refusal = store.apply(practice_config, operation, *args, now=now, by="agents")
     except TradingError as error:
         refusal = error
         state = None
@@ -159,6 +159,8 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
 
     # ---- exits first: the Position Monitor checks every open position
     for symbol, position in sorted(summary["positions"].items()):
+        if position.get("opened_by", "agents") != "agents":
+            continue                                   # the Position Monitor never sells your own trades
         coin = by_symbol.get(symbol)
         dataset = datasets.get(symbol)
         reasons = agents.position_monitor(symbol, position, dataset["bars"] if dataset else [],
@@ -173,7 +175,7 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
                                        "summary": "No fresh price this cycle; will try again next cycle."})
             case["outcome"] = "waiting"
         else:
-            state = _execute(store, practice_config, case, "sell", (symbol, coin["price"]), now) or state
+            state = _execute(store, practice_config, case, "sell", (symbol, coin.get("bid") or coin["price"]), now) or state
             if case["outcome"] == "executed":
                 history["last_exit_at"][symbol] = now
         cases.append(case)
@@ -211,7 +213,7 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
                                        "summary": "Every agent approved, but automatic practice trades are switched off."})
             case["outcome"] = "approved_not_executed"
         else:
-            _execute(store, practice_config, case, "buy", (symbol, desk_config["order_dollars"], coin["price"]), now)
+            _execute(store, practice_config, case, "buy", (symbol, desk_config["order_dollars"], coin.get("ask") or coin["price"]), now)
             if case["outcome"] == "executed":
                 history["entries_today"] += 1
                 state = store.load(practice_config)

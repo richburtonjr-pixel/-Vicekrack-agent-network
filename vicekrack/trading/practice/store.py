@@ -164,7 +164,7 @@ class PracticeStore:
             self._save(state)
             return state
 
-    def apply(self, config, operation, *args, now=None):
+    def apply(self, config, operation, *args, now=None, **options):
         """Run one account operation ('mark', 'buy' or 'sell') under the lock. Always saves the guard's outcome."""
         now = now or utc_now()
         with self.lock():
@@ -173,9 +173,9 @@ class PracticeStore:
             if operation == "mark":
                 verdict, records = book.mark(state, config, *args, now)
             elif operation == "buy":
-                verdict, records, refusal = book.buy(state, config, *args, now)
+                verdict, records, refusal = book.buy(state, config, *args, now, **options)
             elif operation == "sell":
-                verdict, records, refusal = book.sell(state, config, *args, now)
+                verdict, records, refusal = book.sell(state, config, *args, now, **options)
             else:
                 raise TradingError("unknown_operation", "Unknown practice account operation.")
             if refusal is not None:
