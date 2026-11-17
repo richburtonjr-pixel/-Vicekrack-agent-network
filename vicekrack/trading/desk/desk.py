@@ -31,6 +31,7 @@ from ..money import parse
 from ..practice import account as practice_book
 from ..providers.kraken import interval_minutes
 from . import agents
+from . import safety
 from .verifier import verify
 
 GOOD = {"market_scout": "data_available", "trend_agent": "trend_assessed",
@@ -59,6 +60,11 @@ def load_desk_config(path="config/trading-desk.json", root=ROOT):
         parse(config["verifier"]["max_last_bar_move_pct"])
         stop = parse(config["monitor"]["stop_loss_pct"])
         if not 0 < stop < 50 or config["monitor"]["ema_fast"] >= config["monitor"]["ema_slow"]:
+            raise ValueError
+        for key in ("take_profit_pct", "trailing_stop_pct"):     # optional; leave out to switch off
+            if key in config["monitor"] and not 0 < parse(config["monitor"][key]) < 100:
+                raise ValueError
+        if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
             raise ValueError
     except (OSError, ValueError, UnicodeError, KeyError, TypeError, AttributeError, TradingError):
         raise TradingError("invalid_desk_config", "The trade desk settings are invalid.") from None
@@ -104,6 +110,7 @@ class CaseFiles:
 
 
 def _history(cases_today, ledger, account_id, now):
+    """What the Risk Manager needs to know about today. The day is the UTC day, like the case files."""
     entries = sum(1 for c in cases_today if c["kind"] == "entry" and c["outcome"] == "executed"
                   and c.get("account_id") == account_id)
     last_exit = {}
@@ -118,7 +125,12 @@ def _history(cases_today, ledger, account_id, now):
             streak, last_loss = streak + 1, line["at"]
         else:
             streak = 0
-    return {"entries_today": entries, "last_exit_at": last_exit, "losing_streak": streak, "last_loss_at": last_loss}
+    pnl_today = sum((parse(l["realized_pnl"], "signed_decimal") for l in ledger
+                     if l.get("account_id") == account_id and l.get("kind") == "fill" and l.get("by") == "agents"
+                     and l.get("realized_pnl") is not None and str(l.get("at", ""))[:10] == now[:10]),
+                    parse("0", "signed_decimal"))
+    return {"entries_today": entries, "last_exit_at": last_exit, "losing_streak": streak, "last_loss_at": last_loss,
+            "agents_pnl_today": format(pnl_today, "f")}
 
 
 def _execute(store, practice_config, case, operation, args, now):
@@ -146,6 +158,9 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
     account_id = state["account_id"]
     summary = practice_book.summary(state, practice_config, now)
     history = _history(files.read_day(now), store.ledger(500), account_id, now)
+    emergency = safety.EmergencySwitch(root).state()
+    history["emergency"] = emergency["engaged"]
+    peaks = safety.Peaks(root).update(account_id, summary["positions"], state["marks"])
     by_symbol = {c["symbol"]: c for c in coins}
     cases = []
 
@@ -164,7 +179,8 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
         coin = by_symbol.get(symbol)
         dataset = datasets.get(symbol)
         reasons = agents.position_monitor(symbol, position, dataset["bars"] if dataset else [],
-                                          state["marks"].get(symbol), now, desk_config["monitor"])
+                                          state["marks"].get(symbol), now, desk_config["monitor"],
+                                          peak=peaks.get(symbol), emergency=emergency["engaged"])
         if not reasons:
             continue
         case = new_case("exit", symbol, coin)
@@ -223,7 +239,8 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
 
     state = store.load(practice_config)
     summary = practice_book.summary(state, practice_config, now)
-    return {"auto_practice_trades": desk_config["auto_practice_trades"],
+    return {"auto_practice_trades": desk_config["auto_practice_trades"], "emergency_stop": emergency,
+            "agents_pnl_today": history["agents_pnl_today"],
             "cases": [{"case_id": c["case_id"], "kind": c["kind"], "symbol": c["symbol"], "outcome": c["outcome"],
                        "vetoed_by": [s["agent"] for s in c["signatures"] if s["decision"] == "veto"],
                        "reasons": [r for s in c["signatures"] if s["decision"] in ("veto", "refused", "close")

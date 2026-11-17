@@ -5,8 +5,10 @@ Risk Manager   signs or vetoes a trade idea using the research Risk Review's ver
                floor, no position already in that coin, daily and losing-streak limits, and a short
                wait after closing a coin before buying it again.
 Position Monitor  checks every open position every cycle and asks to close it when: the price
-               falls to the stop-loss, the position has been held too long, or the coin's own short
-               EMA drops below its long EMA (the uptrend that justified the buy is gone).
+               falls to the stop-loss, rises to the take-profit, falls back from its highest price
+               by the trailing stop, the position has been held too long, the coin's own short EMA
+               drops below its long EMA (the uptrend that justified the buy is gone), or the
+               Emergency Stop is on.
 Performance Reviewer  reads the practice ledger and reports closed trades, wins, losses and P&L.
 
 The $80 guard itself stays in `practice/guard.py`; nothing here can loosen it.
@@ -33,8 +35,10 @@ def _minutes_between(earlier, later):
 
 def risk_manager(symbol, research_verdict, practice, history, now, config):
     """practice: the practice account summary. history: {"entries_today", "last_exit_at", "losing_streak",
-    "last_loss_at"} for the current account."""
+    "last_loss_at", "agents_pnl_today", "emergency"} for the current account."""
     reasons = []
+    if history.get("emergency"):
+        reasons.append("emergency_stop")
     if research_verdict != "sufficient_for_future_paper_evaluation":
         reasons.append("research_incomplete")
     if practice["status"] != "active":
@@ -54,6 +58,9 @@ def risk_manager(symbol, research_verdict, practice, history, now, config):
     last_exit = history["last_exit_at"].get(symbol)
     if last_exit and _minutes_between(last_exit, now) < config["reentry_wait_minutes"]:
         reasons.append("reentry_wait")
+    limit = config.get("max_daily_loss_dollars")
+    if limit is not None and Decimal(history.get("agents_pnl_today") or "0") <= -Decimal(limit):
+        reasons.append("daily_loss_limit")
     if history["losing_streak"] >= config["pause_after_losses"] and history["last_loss_at"] \
             and _minutes_between(history["last_loss_at"], now) < config["pause_minutes"]:
         reasons.append("losing_streak_pause")
@@ -64,16 +71,26 @@ def risk_manager(symbol, research_verdict, practice, history, now, config):
             "summary": f"Research complete; guard ok with ${fmt(Decimal(room))} above the floor; limits respected."}
 
 
-def position_monitor(symbol, position, bars, mark, now, config):
-    """Return exit reasons for one open position ([] = keep holding)."""
-    reasons = []
+def position_monitor(symbol, position, bars, mark, now, config, peak=None, emergency=False):
+    """Return exit reasons for one open position ([] = keep holding). `peak`: highest price seen since buying."""
+    reasons = ["emergency_stop"] if emergency else []
     with localcontext() as context:
         _ctx(context)
         quantity = Decimal(position["quantity"])
         cost_each = Decimal(position["cost_basis"]) / quantity
         stop = cost_each * (1 - Decimal(config["stop_loss_pct"]) / 100)
-        if mark is not None and Decimal(mark["price"]) <= stop:
+        price = Decimal(mark["price"]) if mark is not None else None
+        if price is not None and price <= stop:
             reasons.append("stop_loss")
+        take = config.get("take_profit_pct")
+        if take is not None and price is not None and price >= cost_each * (1 + Decimal(take) / 100):
+            reasons.append("take_profit")
+        trail = config.get("trailing_stop_pct")
+        if trail is not None and price is not None and peak is not None:
+            high = Decimal(peak)
+            # Only once the coin has been above what we paid, so the trailing stop never fires before the stop-loss.
+            if high > cost_each and price <= high * (1 - Decimal(trail) / 100):
+                reasons.append("trailing_stop")
         if _minutes_between(position["opened_at"], now) >= config["max_hold_minutes"]:
             reasons.append("held_too_long")
         if bars:

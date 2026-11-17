@@ -410,13 +410,14 @@ class Gateway:
             if name == "coin" and len(query) <= 120:
                 return _json(200, self.trade.coin(query))
             return _error(404, "not_found", "No such page.")
-        if name not in ("order", "restart"):
+        if name not in ("order", "restart", "emergency"):
             return _error(404, "not_found", "No such page.")
         if not self._csrf_ok(headers):
             return _error(403, "session_invalid", "Reload the app and try again.")
         document = self._body(headers, body)
         try:
-            result = self.trade.order(document) if name == "order" else self.trade.restart(document)
+            result = (self.trade.order(document) if name == "order" else self.trade.restart(document) if name == "restart"
+                      else self.trade.emergency(document))
         except NetworkError as error:
             self._audit(device, "trade/" + name, self._trade_refs(document), None, error.code)
             raise
@@ -427,6 +428,8 @@ class Gateway:
     @staticmethod
     def _trade_refs(document):
         refs = {}
+        if isinstance(document.get("engaged"), bool):
+            refs["engaged"] = document["engaged"]
         for key in ("symbol", "side", "amount"):
             value = document.get(key)
             if isinstance(value, str) and re.match(r"^[A-Za-z0-9.]{1,16}$", value):
