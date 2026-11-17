@@ -31,7 +31,7 @@ from ..money import parse
 from ..practice import account as practice_book
 from ..providers.kraken import interval_minutes
 from . import agents
-from . import safety
+from . import profit_trail, safety
 from .verifier import verify
 
 GOOD = {"market_scout": "data_available", "trend_agent": "trend_assessed",
@@ -61,9 +61,10 @@ def load_desk_config(path="config/trading-desk.json", root=ROOT):
         stop = parse(config["monitor"]["stop_loss_pct"])
         if not 0 < stop < 50 or config["monitor"]["ema_fast"] >= config["monitor"]["ema_slow"]:
             raise ValueError
-        for key in ("take_profit_pct", "trailing_stop_pct"):     # optional; leave out to switch off
-            if key in config["monitor"] and not 0 < parse(config["monitor"][key]) < 100:
-                raise ValueError
+        if "take_profit_pct" in config["monitor"] or "trailing_stop_pct" in config["monitor"]:
+            raise ValueError                                    # replaced by profit_trail (no fixed take-profit)
+        if "profit_trail" in config["monitor"]:                 # optional; leave out to switch it off
+            profit_trail.validate(config["monitor"]["profit_trail"])
         if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
             raise ValueError
     except (OSError, ValueError, UnicodeError, KeyError, TypeError, AttributeError, TradingError):
@@ -160,7 +161,10 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
     history = _history(files.read_day(now), store.ledger(500), account_id, now)
     emergency = safety.EmergencySwitch(root).state()
     history["emergency"] = emergency["engaged"]
-    peaks = safety.Peaks(root).update(account_id, summary["positions"], state["marks"])
+    peaks = safety.Peaks(root).update(account_id, summary["positions"], state["marks"], now)
+    costs = practice_config["costs"]
+    # Profit % is measured after the estimated cost of selling (slippage + fee), so "+14%" means about +14% kept.
+    monitor = {**desk_config["monitor"], "exit_cost_bps": format(parse(costs["slippage_bps"]) + parse(costs["fee_bps"]), "f")}
     by_symbol = {c["symbol"]: c for c in coins}
     cases = []
 
@@ -179,7 +183,7 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
         coin = by_symbol.get(symbol)
         dataset = datasets.get(symbol)
         reasons = agents.position_monitor(symbol, position, dataset["bars"] if dataset else [],
-                                          state["marks"].get(symbol), now, desk_config["monitor"],
+                                          state["marks"].get(symbol), now, monitor,
                                           peak=peaks.get(symbol), emergency=emergency["engaged"])
         if not reasons:
             continue
