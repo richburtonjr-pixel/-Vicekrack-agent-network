@@ -226,7 +226,7 @@ a.vt-ghost, a.vt-primary { display: flex; align-items: center; justify-content: 
 .vt-who .vt-row { font-size: 14px; }
 @media (min-width: 640px) { .vt-stats6 { grid-template-columns: repeat(3, 1fr); } }
 
-/* ---------- bottom tabs ---------- */
+/* ---------- navigation: bottom tabs on phones, a sidebar on wide screens ---------- */
 .vt-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: space-around;
   padding: 8px 6px calc(env(safe-area-inset-bottom) + 8px); background: rgba(255, 255, 255, 0.92);
   -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); border-top: 1px solid var(--line); }
@@ -234,19 +234,37 @@ a.vt-ghost, a.vt-primary { display: flex; align-items: center; justify-content: 
   color: #8A919C; font: 600 11.5px var(--sans); border-radius: 14px; }
 .vt-tabs a.on { color: var(--blue); }
 .vt-tabs svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vt-tabs .vt-extra, .vt-navlabel { display: none; }
+
+/* ---------- content screens (Research, Video Studio, Devices): the Command Center inside the app ---------- */
+.vt-frame { width: 100%; border: none; border-radius: var(--radius); background: #FFF; min-height: calc(100vh - 210px); display: block; }
+.vt-menu a { display: flex; align-items: center; gap: 14px; padding: 14px 20px; min-height: 60px; color: var(--text);
+  border-top: 1px solid var(--line); font-weight: 600; }
+.vt-menu a:first-of-type { border-top: none; }
+.vt-menu svg { width: 24px; height: 24px; fill: none; stroke: var(--blue); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vt-menu .muted { font-weight: 400; display: block; }
 
 /* ---------- wide screens ---------- */
 @media (min-width: 900px) {
   .vt-top { padding-left: 32px; padding-right: 32px; }
-  .vt-screen { max-width: 1120px; padding: 28px 32px 130px; }
-  .vt-cols { display: grid; flex-direction: initial; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .vt-screen { max-width: 1120px; padding: 28px 32px 60px; margin-left: max(248px, calc((100vw - 1120px + 248px) / 2)); margin-right: auto; }
+  .vt-cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .vt-cols > div { display: flex; flex-direction: column; gap: 16px; }
   .vt-big { font-size: 56px; }
   .vt-chart { height: 280px; }
   .vt-chart-empty { height: 280px; }
   .vt-movers { grid-auto-flow: row; grid-template-columns: 1fr 1fr; overflow: visible; margin: 0; padding: 0; }
-  .vt-tabs { left: 50%; right: auto; transform: translateX(-50%); bottom: 18px; width: 560px; border: 1px solid var(--line);
-    border-radius: 24px; box-shadow: 0 12px 36px rgba(11, 13, 18, 0.10); padding: 8px; }
-  .vt-tradebar { bottom: 96px; }
+  .vt-tabs { top: 61px; bottom: 0; right: auto; width: 232px; flex-direction: column; justify-content: flex-start; gap: 2px;
+    padding: 18px 14px; border-top: none; border-right: 1px solid var(--line); overflow-y: auto; }
+  .vt-tabs a { flex: none; max-width: none; flex-direction: row; gap: 12px; padding: 10px 12px; font-size: 15px; color: var(--soft); }
+  .vt-tabs a:hover { background: var(--card); }
+  .vt-tabs a.on { background: var(--blue-tint); color: var(--blue-dark); }
+  .vt-tabs svg { width: 21px; height: 21px; }
+  .vt-tabs .vt-extra { display: flex; }
+  .vt-tabs .vt-more { display: none; }
+  .vt-navlabel { display: block; margin: 14px 12px 4px; font: 700 11.5px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: #9AA1AC; }
+  .vt-navlabel:first-child { margin-top: 0; }
+  .vt-tradebar { bottom: 16px; left: 248px; }
+  .vt-frame { min-height: calc(100vh - 150px); }
 }
 @media (prefers-reduced-motion: reduce) { .vt-sheet { animation: none; } }

@@ -131,6 +131,7 @@ function pairScreen() {
       return;
     }
     STATE.csrf = result.body.csrf;
+    if (location.pathname === "/command") { location.replace("/#home"); return; }   // paired: on to the app
     location.hash = "#home";
     route(true);
   });
@@ -350,6 +351,8 @@ async function route(force) {
 window.addEventListener("hashchange", () => route(false));
 document.addEventListener("visibilitychange", () => { if (!document.hidden && STATE.route === "home") { homeScreen(); } });
 document.addEventListener("DOMContentLoaded", () => {
+  // Inside the ViceKrack app (Research, Video Studio, Devices): the app shows its own header and navigation.
+  if (location.pathname === "/command/embed") { document.body.classList.add("embed"); }
   route(true);
   if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js").catch(() => {}); }
 });

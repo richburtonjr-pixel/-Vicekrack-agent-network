@@ -142,12 +142,16 @@ class Pairing(Base):
         for flag in ("HttpOnly", "Secure", "SameSite=Strict"):
             self.assertIn(flag, cookie)
 
-    def test_only_one_phone_can_be_paired(self):
-        first = security.new_pairing_code(self.store, self.now)
-        self.call("POST", "/m/api/pair", {"code": first})
-        second = security.new_pairing_code(self.store, self.now)
-        self.assertEqual(self.call("POST", "/m/api/pair", {"code": second})[0], 200)
-        self.assertEqual(len(security.list_devices(self.store)), 1)
+    def test_up_to_three_devices_then_the_oldest_is_signed_out(self):
+        tokens = []
+        for minute in range(4):
+            code = security.new_pairing_code(self.store, self.now)
+            self.assertEqual(self.call("POST", "/m/api/pair", {"code": code})[0], 200)
+            tokens.append(security.list_devices(self.store)[-1]["device_id"])
+            self.now = self.now + timedelta(minutes=1)
+        devices = security.list_devices(self.store)
+        self.assertEqual(len(devices), security.MAX_DEVICES)
+        self.assertNotIn(tokens[0], [d["device_id"] for d in devices])        # the oldest was signed out
 
     def test_code_used_once(self):
         code = security.new_pairing_code(self.store, self.now)

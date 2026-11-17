@@ -28,7 +28,9 @@ from ..errors import NetworkError
 from . import security
 
 STATIC = Path(__file__).resolve().parent / "static"
-FILES = {"/": ("index.html", "text/html; charset=utf-8"),
+FILES = {"/": ("trading.html", "text/html; charset=utf-8"),        # the ViceKrack app (trading + content)
+         "/command": ("index.html", "text/html; charset=utf-8"),     # the original Command Center
+         "/command/embed": ("index.html", "text/html; charset=utf-8"),  # same, shown inside the app (Research, Studio)
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
          "/static/app.css": ("app.css", "text/css; charset=utf-8"),
          "/static/screens.js": ("screens.js", "text/javascript; charset=utf-8"),
@@ -61,6 +63,16 @@ HEADERS = {
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY",
     "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+# Only the Command Center's embed page may be shown in a frame, and only inside this same site; only the
+# app's own pages may show it. Everything else keeps frame-ancestors 'none' / DENY.
+_APP_CSP = HEADERS["Content-Security-Policy"] + "; frame-src 'self'"
+PAGE_HEADERS = {
+    "/": {"Content-Security-Policy": _APP_CSP},
+    "/trading": {"Content-Security-Policy": _APP_CSP},
+    "/command/embed": {"Content-Security-Policy": HEADERS["Content-Security-Policy"].replace("frame-ancestors 'none'",
+                                                                                             "frame-ancestors 'self'"),
+                       "X-Frame-Options": "SAMEORIGIN"},
 }
 STATUS_TEXT = {200: "OK", 206: "Partial Content", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
                405: "Method Not Allowed", 409: "Conflict", 413: "Content Too Large", 422: "Unprocessable Content",
@@ -184,7 +196,7 @@ class Gateway:
             path = parts.path
             if method == "GET" and path in FILES and not parts.query:
                 name, content_type = FILES[path]
-                return 200, {**HEADERS, "Content-Type": content_type}, (STATIC / name).read_bytes()
+                return 200, {**HEADERS, "Content-Type": content_type, **PAGE_HEADERS.get(path, {})}, (STATIC / name).read_bytes()
             if method == "GET" and path == "/m/api/status" and not parts.query:
                 return self._status(headers, settings)
             if method == "GET" and path in ("/m/api/home", "/m/api/system") and not parts.query:

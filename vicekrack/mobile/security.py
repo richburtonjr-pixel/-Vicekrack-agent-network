@@ -94,6 +94,9 @@ def csrf_for(token):
     return hmac.new(token.encode(), b"vicekrack-mobile-csrf-v1", hashlib.sha256).hexdigest()
 
 
+MAX_DEVICES = 3
+
+
 def redeem_pairing_code(store, code, name, now=None):
     """(token, device) for a right code; the code is then used up. Wrong codes use up tries."""
     now = now or utcnow()
@@ -117,8 +120,9 @@ def redeem_pairing_code(store, code, name, now=None):
               "expires_at": _iso(now + timedelta(days=DEVICE_DAYS))}
 
     def add(devices):
-        # One phone only: pairing a new phone signs out the old one.
-        devices["devices"] = [device]
+        # Up to MAX_DEVICES (your phone, your PC, one spare): pairing one more signs out the oldest.
+        kept = sorted(devices.get("devices", []), key=lambda d: d.get("created_at", ""))[-(MAX_DEVICES - 1):]
+        devices["devices"] = kept + [device]
         return devices, None
 
     store.update("devices.json", {"devices": []}, add)

@@ -38,10 +38,12 @@ function s(tag, attrs) {
   return node;
 }
 function show(...nodes) { $screen().replaceChildren(...nodes.flat().filter((n) => n !== null && n !== undefined && n !== false)); }
+const UNDER_MORE = new Set(["performance", "research", "studio", "system", "more"]);
 function tabs() {
-  const current = (location.hash || "#home").slice(1).split("/")[0];
+  const current = (location.hash || "#home").slice(1).split("/")[0] || "home";
+  const phone = !window.matchMedia("(min-width: 900px)").matches;
   for (const link of document.querySelectorAll("#vt-tabs a")) {
-    const on = link.dataset.tab === current;
+    const on = link.dataset.tab === current || (phone && link.dataset.tab === "more" && UNDER_MORE.has(current));
     link.classList.toggle("on", on);
     if (on) { link.setAttribute("aria-current", "page"); } else { link.removeAttribute("aria-current"); }
   }
@@ -124,8 +126,8 @@ function problem(result) {
 function notPaired() {
   show(h("h1", { class: "vt-title" }, "Pair first"),
     h("section", { class: "vt-card" },
-      h("p", {}, "This phone isn't paired with your PC yet. Pair it once in the Command Center, then come back here."),
-      h("a", { class: "vt-primary", href: "/#home", role: "button" }, "Open Command Center to pair")));
+      h("p", {}, "This device isn't paired with your PC yet. On the PC, double-click “Pair my iPhone” to get a 6-digit code, then enter it on the next screen."),
+      h("a", { class: "vt-primary", href: "/command#home", role: "button" }, "Pair this device")));
 }
 function offline(text) {
   show(h("section", { class: "vt-banner bad" }, h("span", { class: "dot" }),
@@ -920,6 +922,44 @@ async function resultsScreen() {
         h("p", { class: "muted small" }, "Practice results on pretend money. They don't predict real trading."))));
 }
 
+/* ---------- content and system screens (the Command Center's own screens, inside the app) ---------- */
+const CONTENT = { research: ["Research", "Find stories on any topic, then turn them into videos."],
+                  studio: ["Video Studio", "Your productions, approvals and finished videos."],
+                  system: ["Devices & PC", "Paired devices, the PC's status and recent actions."] };
+function contentScreen(tab, rest) {
+  const [title, text] = CONTENT[tab];
+  const target = "#" + [tab, ...rest].join("/");
+  let frame = document.getElementById("vt-frame");
+  if (!frame || VT.frameTab !== tab) {
+    frame = h("iframe", { id: "vt-frame", class: "vt-frame", title, src: "/command/embed" + target });
+    VT.frameTab = tab;
+    show(h("div", { class: "vt-head" }, h("h1", { class: "vt-title" }, title)), h("p", { class: "muted" }, text), frame);
+  }
+  const resize = () => {
+    try { const doc = frame.contentDocument; if (doc && doc.body) { frame.style.height = Math.max(600, doc.body.scrollHeight + 40) + "px"; } }
+    catch (_) { /* same site only; ignore */ }
+  };
+  frame.addEventListener("load", () => {
+    resize();
+    try { new MutationObserver(resize).observe(frame.contentDocument.body, { childList: true, subtree: true }); } catch (_) {}
+  });
+}
+function moreScreen() {
+  const item = (href, icon, label, text) => {
+    const link = h("a", { href }, h("span", { "aria-hidden": "true" }), h("span", {}, label, h("span", { class: "muted small" }, text)));
+    const svg = document.querySelector('#vt-tabs a[data-tab="' + icon + '"] svg');
+    if (svg) { link.firstChild.replaceWith(svg.cloneNode(true)); }
+    return link;
+  };
+  show(h("h1", { class: "vt-title" }, "More"),
+    h("section", { class: "vt-card flush vt-menu" },
+      item("#performance", "performance", "Results", "Scoreboard, balance over time, early-or-late"),
+      item("#research", "research", "Research", "Find stories for videos"),
+      item("#studio", "studio", "Video Studio", "Productions and finished videos"),
+      item("#system", "system", "Devices & PC", "Paired devices and the PC's status")),
+    h("p", { class: "muted small" }, "On the PC, the old 3D headquarters is still at 127.0.0.1:8765/classic."));
+}
+
 /* ---------- router ---------- */
 function quiet() { return document.hidden || document.querySelector(".vt-layer, details[open]") || (document.activeElement && document.activeElement.type === "search"); }
 async function route(force) {
@@ -930,7 +970,12 @@ async function route(force) {
   clearInterval(VT.timer);
   tabs();
   const [tab, ...rest] = name.split("/");
-  if (tab === "market" && rest[0] === "coin" && rest[1]) {
+  if (tab !== "research" && tab !== "studio" && tab !== "system") { VT.frameTab = null; }
+  if (CONTENT[tab]) {
+    contentScreen(tab, rest);
+  } else if (tab === "more") {
+    moreScreen();
+  } else if (tab === "market" && rest[0] === "coin" && rest[1]) {
     await coinScreen(rest[1]);
     VT.timer = setInterval(() => { if (!quiet()) { coinScreen(rest[1]); } }, 15000);
   } else if (tab === "market") {
@@ -953,4 +998,8 @@ async function route(force) {
 }
 window.addEventListener("hashchange", () => { for (const layer of document.querySelectorAll(".vt-layer")) { layer.remove(); } route(false); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { route(true); } });
-document.addEventListener("DOMContentLoaded", () => route(true));
+document.addEventListener("DOMContentLoaded", () => {
+  route(true);
+  if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js").catch(() => {}); }
+});
+window.addEventListener("resize", tabs);

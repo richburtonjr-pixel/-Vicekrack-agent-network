@@ -216,3 +216,8 @@ a.primary, a.ghost { display: flex; align-items: center; justify-content: center
 .signatures { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--soft); }
 .signatures li.veto, .signatures li.refused { color: var(--red); } .signatures li.executed { color: var(--green); }
 .row .val.up { color: var(--green); font-weight: 600; } .row .val.down { color: var(--red); font-weight: 600; }
+
+/* Shown inside the ViceKrack app (/command/embed): no own header or tab bar, white like the app. */
+body.embed { background: #FFFFFF; }
+body.embed header.top, body.embed #tabs { display: none !important; }
+body.embed .screen { padding-top: 8px; padding-bottom: 24px; }
