@@ -71,6 +71,9 @@ def load_watch_config(path="config/watch.json", root=ROOT):
         for key in ("min_volume_24h_usd", "min_rise_5m_pct", "min_rise_15m_pct"):
             if float(scan[key]) < 0:
                 raise ValueError
+        for key in ("max_spread_pct", "max_change_today_pct", "min_volume_spike", "early_min_rise_5m_pct"):
+            if key in scan and not 0 <= float(scan[key]) <= 100000:   # optional (leave out = gate off)
+                raise ValueError
         if not isinstance(scan["skip_bases"], list) or not all(isinstance(b, str) for b in scan["skip_bases"]):
             raise ValueError
     except TradingError:

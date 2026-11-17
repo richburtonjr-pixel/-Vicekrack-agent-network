@@ -198,6 +198,28 @@ function drawChart(points, readout, sub, last, restSub) {
   return svg;
 }
 
+/* ---------- ranked opportunities (autonomous step 2: the smarter scanner) ---------- */
+const SIGNAL = { streak: "Steady climb", volume_spike: "Volume spike", accelerating: "Speeding up" };
+function opportunitiesCard(radar, limit) {
+  radar = radar || {};
+  const list = (radar.candidates || []).slice(0, limit || 8);
+  const st = radar.stats || {};
+  return h("section", { class: "vt-card flush" },
+    h("div", { class: "pad vt-head" }, h("h2", {}, "Opportunities right now"), h("span", { class: "muted small" }, "ranked by the scanner")),
+    list.length ? h("div", {}, list.map((c, i) => h("a", { class: "vt-coin", href: "#market/coin/" + c.symbol },
+      h("span", { class: "vt-rank", "aria-label": "Rank " + (i + 1) }, String(i + 1)), badge(c.base),
+      h("span", { class: "who" }, h("strong", {}, c.base),
+        h("span", { class: "vt-sigs" }, (c.signals || ["streak"]).map((s) => h("span", { class: "vt-tag " + (s === "volume_spike" ? "amber" : s === "accelerating" ? "green" : "blue") },
+          SIGNAL[s] || words(s) + (s === "volume_spike" && c.volume_spike_x ? " " + c.volume_spike_x + "×" : ""))))),
+      h("span", { class: "num" }, h("strong", { class: "up" }, "+" + c.rise_15m_pct + "%"), h("span", { class: "muted small" }, "15 min · score " + (c.score || "—"))))))
+      : h("p", { class: "muted pad" }, radar.ok === false ? "The last market scan failed; it retries every minute."
+        : "Nothing qualifies right now. Quiet is normal: most minutes no coin is climbing cleanly."),
+    radar.ok && st.coins_priced ? h("p", { class: "muted small pad" }, st.coins_priced + " coins scanned · " + st.liquid + " trade enough"
+      + (st.volume_spikes ? " · " + st.volume_spikes + " volume spikes" : "")
+      + (st.skipped_already_pumped ? " · " + st.skipped_already_pumped + " skipped (already up big today)" : "")
+      + (st.skipped_wide_spread ? " · " + st.skipped_wide_spread + " skipped (wide spread)" : "")) : null);
+}
+
 /* ---------- Home dashboard ---------- */
 function todayClosed(trades) {
   const today = new Date().toDateString();
@@ -252,7 +274,8 @@ function startCard(body) {
 }
 function movers() {
   if (!VT.markets) { return null; }
-  const liquid = VT.markets.coins.filter((c) => Number(c.volume_24h_usd) >= MOVER_MIN_VOLUME && c.change_today_pct !== null);
+  const stable = new Set(["USDT", "USDC", "DAI", "PYUSD", "USDG", "TUSD", "FDUSD", "USDE", "RLUSD", "USDQ", "USDR", "EURT", "EUR", "GBP"]);
+  const liquid = VT.markets.coins.filter((c) => Number(c.volume_24h_usd) >= MOVER_MIN_VOLUME && c.change_today_pct !== null && !stable.has(c.base));
   const sorted = [...liquid].sort((a, b) => Number(b.change_today_pct) - Number(a.change_today_pct));
   const pick = sorted.slice(0, 4).concat(sorted.slice(-2).reverse()).filter((c, i, list) => list.indexOf(c) === i);
   if (!pick.length) { return null; }
@@ -274,10 +297,6 @@ function activityCard(body) {
   });
   return h("section", { class: "vt-card" },
     h("div", { class: "vt-head" }, h("h2", {}, "AI agent activity"), h("a", { href: "#desk" }, "AI Desk")),
-    radar.ok && stats ? h("p", { class: "muted" }, "Last scan: " + stats.coins_priced + " coins priced · " + stats.liquid + " trade enough · "
-      + stats.candidates + " on a streak") : null,
-    (radar.candidates || []).length ? h("div", { class: "vt-chips" }, radar.candidates.slice(0, 6).map((c) =>
-      h("a", { class: "vt-chip", href: "#market/coin/" + c.symbol }, c.base + " " + (Number(c.rise_15m_pct) >= 0 ? "+" : "") + c.rise_15m_pct + "%"))) : null,
     items.length ? h("div", { class: "vt-feed" }, items)
       : h("p", { class: "muted" }, "No trade ideas yet. An idea only opens when research says a coin looks good, so quiet is normal."));
 }
@@ -300,7 +319,7 @@ async function homeScreen() {
   const right = [];
   if (body.needs_start || !body.account) { left.push(startCard(body)); } else { left.push(...balanceHero(body)); }
   left.push(chart, movers());
-  right.push(activityCard(body));
+  right.push(opportunitiesCard((body.watch || {}).radar, 5), activityCard(body));
   if (!markets.ok) { right.push(note("Kraken prices couldn't load right now. They refresh by themselves.")); }
   show(flashNote(), emergencyBanner(body.emergency_stop), watchBanner(body), h("div", { class: "vt-cols" }, h("div", {}, left), h("div", {}, right)));
 }
@@ -688,6 +707,7 @@ async function deskScreen() {
     h("div", { class: "vt-cols" },
       h("div", {},
         emergencyCard(d.emergency_stop),
+        opportunitiesCard(VT.account && VT.account.watch && VT.account.watch.radar),
         flowStrip(),
         h("section", {}, h("div", { class: "vt-head" }, h("h2", {}, "The eight agents"), h("span", { class: "muted" }, "live from your PC")),
           h("div", { class: "vt-agents" }, (d.agents || []).map(agentCard)))),

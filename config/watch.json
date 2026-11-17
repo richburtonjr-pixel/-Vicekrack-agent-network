@@ -1,6 +1,6 @@
 {
   "config_version": "2.0",
-  "description": "Whole-market watch (Trading PR 4). Every minute: one Kraken request prices every USD coin (the radar), the Market Scout ranks coins on a steady climb, the top few get the full agent workup on 1-minute bars, every holding is re-priced so the $80 shutdown is checked, then the trade desk runs. Free public data, no keys. Simulated money only.",
+  "description": "Whole-market watch (Trading PR 4). Every minute: one Kraken request prices every USD coin (the radar), the Market Scout ranks coins on a steady climb, the top few get the full agent workup on 1-minute bars, every holding is re-priced so the $80 shutdown is checked, then the trade desk runs. Free public data, no keys. Simulated money only. Scanner (autonomous step 2): gates out wide spreads (max_spread_pct) and coins already up max_change_today_pct today; adds EARLY candidates on a volume spike (min_volume_spike x normal 5-minute volume with at least early_min_rise_5m_pct rise) and ranks by an early-momentum score with acceleration.",
   "provider": "kraken_public",
   "interval": "1m",
   "bars_for_research": 120,
@@ -35,7 +35,11 @@
       "JPY",
       "TBTC",
       "WBTC"
-    ]
+    ],
+    "max_spread_pct": "0.5",
+    "max_change_today_pct": "30",
+    "min_volume_spike": "3",
+    "early_min_rise_5m_pct": "0.3"
   },
   "keep_pc_awake": true,
   "max_log_bytes": 5000000

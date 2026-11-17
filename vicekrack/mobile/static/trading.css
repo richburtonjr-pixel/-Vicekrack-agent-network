@@ -200,6 +200,11 @@ a.vt-ghost, a.vt-primary { display: flex; align-items: center; justify-content: 
 .vt-stepline .what { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14.5px; }
 @media (min-width: 640px) { .vt-agents { grid-template-columns: 1fr 1fr; } }
 
+/* ---------- opportunities ---------- */
+.vt-rank { width: 22px; flex: none; text-align: center; font: 800 15px var(--display); color: var(--muted); }
+.vt-sigs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.vt-sigs .vt-tag { font-size: 11px; padding: 2px 7px; }
+
 /* ---------- emergency stop ---------- */
 .vt-stop { min-height: 56px; border-radius: 18px; background: var(--down); color: #FFF; font-size: 18px; font-weight: 800; letter-spacing: 0.01em; }
 .vt-stopcard { background: var(--down-tint); }
