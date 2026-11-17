@@ -129,8 +129,12 @@ class TradeApi:
         from ..trading.desk.safety import EmergencySwitch
         try:
             desk_config = load_desk_config(**({"root": self.root} if self.root is not None else {}))
+            from ..trading.desk import settings as desk_settings
             limits = {"order_dollars": desk_config["order_dollars"], **desk_config["risk"], **desk_config["monitor"],
-                      "auto_practice_trades": desk_config["auto_practice_trades"]}
+                      "auto_practice_trades": desk_config["auto_practice_trades"],
+                      "editable": desk_settings.current(desk_config),
+                      "changed_in_app": sorted(desk_config.get("_dashboard_overrides", {})),
+                      "app_changes_ignored": bool(desk_config.get("_dashboard_overrides_ignored"))}
         except TradingError:
             limits = None
         try:
@@ -217,6 +221,22 @@ class TradeApi:
         with self._lock:
             self._market = (0.0, self._market[1])        # next market read is fresh
         return result
+
+    def settings(self, document):
+        """Change trading limits from the app, each within its hard cap (see trading/desk/settings.py)."""
+        from ..trading.desk import settings as desk_settings
+        from ..trading.desk.desk import load_desk_config
+        changes = document.get("changes")
+        if set(document) - {"changes"} or not isinstance(changes, dict):
+            raise NetworkError("invalid_request", "Send the changes only.")
+        try:
+            desk_settings.save(self.root, changes, "phone")
+        except ValueError as error:
+            raise TradingError("invalid_setting", f"That value is outside the allowed range: {error}.") from None
+        config = load_desk_config(**({"root": self.root} if self.root is not None else {}))
+        if config.get("_dashboard_overrides_ignored"):
+            raise TradingError("settings_conflict", "Those values don't work together; the previous settings stay in use.")
+        return {"contract": "trade_settings", "simulated": True, "editable": desk_settings.current(config)}
 
     def emergency(self, document):
         """Turn the agents' Emergency Stop on or off. On: the agents buy nothing and, on the next watch cycle,

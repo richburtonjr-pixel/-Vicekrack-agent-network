@@ -622,7 +622,63 @@ function limitsCard(l) {
     row("Longest hold", l.max_hold_minutes + " min, unless the profit trail is on"),
     row("After " + l.pause_after_losses + " losses in a row", "pause " + Math.round(l.pause_minutes / 60) + " hr"),
     l.profit_trail ? h("p", { class: "muted small" }, profitExample(l.profit_trail)) : null,
-    h("p", { class: "muted small" }, "Plus the $80 shutdown on the whole account. Change these in config/trading-desk.json on the PC."));
+    l.app_changes_ignored ? note("Your app changes didn't fit together, so the PC is using its file settings. Open Change limits to fix them.", "bad") : null,
+    l.editable ? h("button", { type: "button", class: "vt-ghost", onclick: () => limitsSheet(l.editable) }, "Change limits") : null,
+    h("p", { class: "muted small" }, "Plus the $80 shutdown on the whole account. Each limit has a hard cap the app can't go past, and the agents can't change any of them."));
+}
+const LIMIT_LABELS = {
+  auto_practice_trades: ["Agents place practice trades", ""],
+  order_dollars: ["Per agent trade", "$"],
+  max_agent_positions: ["Coins held at once", "coins"],
+  max_entries_per_day: ["Buys per day", "buys"],
+  max_daily_loss_dollars: ["Daily loss stop", "$"],
+  stop_loss_pct: ["Stop-loss", "% below the buy price"],
+  trail_start_pct: ["Profit trail starts at", "% profit"],
+  trail_giveback_points: ["Profit trail give-back", "points"],
+};
+function limitsSheet(editable) {
+  const inputs = {};
+  const error = h("p", { class: "vt-error", role: "alert", hidden: true });
+  const rows = Object.entries(LIMIT_LABELS).filter(([key]) => editable[key]).map(([key, [label, unit]]) => {
+    const f = editable[key];
+    if (f.kind === "bool") {
+      const box = h("input", { type: "checkbox", id: "lim-" + key, checked: f.value ? true : null });
+      inputs[key] = box;
+      return h("label", { class: "vt-field vt-toggle", for: "lim-" + key }, h("span", {}, label), box);
+    }
+    const box = h("input", { type: "text", inputmode: f.kind === "int" ? "numeric" : "decimal", id: "lim-" + key, value: String(f.value) });
+    inputs[key] = box;
+    return h("label", { class: "vt-field", for: "lim-" + key }, h("span", {}, label, h("small", { class: "muted" }, " " + f.min + "–" + f.max + " " + unit)), box);
+  });
+  const saveButton = h("button", { class: "vt-primary", type: "button" }, "Save limits");
+  const cancel = h("button", { class: "vt-ghost", type: "button" }, "Cancel");
+  const sheet = h("div", { class: "vt-layer", role: "dialog", "aria-modal": "true", "aria-label": "Change limits" },
+    h("div", { class: "vt-sheet" }, h("div", { class: "vt-head" }, h("h2", {}, "Change limits"), h("span", { class: "vt-practice" }, h("i", { "aria-hidden": "true" }), "PRACTICE")),
+      h("p", { class: "muted small" }, "Takes effect on the agents' next check (about a minute). Profit trail: e.g. 6 and 6 = from +6%, sell after giving back 6 points (best +20% → +14%)."),
+      h("div", { class: "vt-fields" }, rows), error, saveButton, cancel));
+  const close = () => sheet.remove();
+  cancel.addEventListener("click", close);
+  sheet.addEventListener("click", (e) => { if (e.target === sheet) { close(); } });
+  saveButton.addEventListener("click", async () => {
+    const changes = {};
+    for (const [key, box] of Object.entries(inputs)) {
+      const f = editable[key];
+      if (f.kind === "bool") { if (box.checked !== f.value) { changes[key] = box.checked; } continue; }
+      const text = box.value.trim();
+      if (text === String(f.value)) { continue; }
+      if (!/^\d+(\.\d+)?$/.test(text)) { error.textContent = LIMIT_LABELS[key][0] + ": enter a number."; error.hidden = false; return; }
+      changes[key] = f.kind === "int" ? Number(text) : text;
+    }
+    if (!Object.keys(changes).length) { close(); return; }
+    saveButton.disabled = true;
+    const r = await post("/m/api/trade/settings", { changes });
+    saveButton.disabled = false;
+    if (!r.ok) { error.textContent = problem(r); error.hidden = false; return; }
+    close();
+    VT.flash = "Limits saved. The agents use them from their next check.";
+    route(true);
+  });
+  document.body.append(sheet);
 }
 function profitExample(trail) {
   const pts = (best) => { let g = null; for (const t of trail.tiers) { if (best >= Number(t.from_profit_pct)) { g = Number(t.giveback_points); } } return g; };

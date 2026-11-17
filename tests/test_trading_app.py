@@ -56,7 +56,8 @@ class TradingAppScript(unittest.TestCase):
         paths = set(re.findall(r'"(/m/api/[a-z/]+)', self.script))
         self.assertEqual(paths, {"/m/api/session", "/m/api/trade/account", "/m/api/trade/markets",
                                  "/m/api/trade/coin", "/m/api/trade/order", "/m/api/trade/restart",
-                                 "/m/api/trade/desk", "/m/api/trade/results", "/m/api/trade/emergency"})
+                                 "/m/api/trade/desk", "/m/api/trade/results", "/m/api/trade/emergency",
+                                 "/m/api/trade/settings"})
         code = self.script.replace('"http://www.w3.org/2000/svg"', "")   # the SVG namespace is not a request
         for outside in ("kraken.com", "alpaca.markets", "http://", "https://"):
             self.assertNotIn(outside, code)            # never talks to a broker or exchange directly
@@ -157,6 +158,14 @@ class EmergencyButton(TradingDesk):
         with self.assertRaises(NetworkError):
             self.api.emergency({"engaged": "yes"})
 
+    def test_change_limits_from_the_app(self):
+        from vicekrack.trading.errors import TradingError
+        result = self.api.settings({"changes": {"max_daily_loss_dollars": "8"}})
+        self.assertEqual(result["editable"]["max_daily_loss_dollars"]["value"], "8.00")
+        self.assertEqual(self.api.desk()["limits"]["changed_in_app"], ["max_daily_loss_dollars"])
+        with self.assertRaises(TradingError):
+            self.api.settings({"changes": {"order_dollars": "500"}})
+
     def test_desk_shows_the_safety_limits(self):
         limits = self.api.desk()["limits"]
         self.assertEqual(limits["max_daily_loss_dollars"], "5.00")
@@ -174,8 +183,9 @@ class TradingDeskGateway(MobileBase):
         for path in ("/m/api/trade/desk", "/m/api/trade/results"):
             status, _, body = self.gw.respond("GET", path, self.remote())
             self.assertEqual(status, 401, path)
-        status, _, _ = self.gw.respond("POST", "/m/api/trade/emergency", self.remote(), b'{"engaged": true}')
-        self.assertIn(status, (401, 403))                     # refused before anything is switched
+        for path, body in (("/m/api/trade/emergency", b'{"engaged": true}'), ("/m/api/trade/settings", b'{"changes": {}}')):
+            status, _, _ = self.gw.respond("POST", path, self.remote(), body)
+            self.assertIn(status, (401, 403))                     # refused before anything is switched
 
 
 if __name__ == "__main__":
