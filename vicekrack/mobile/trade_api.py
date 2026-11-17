@@ -133,7 +133,12 @@ class TradeApi:
                       "auto_practice_trades": desk_config["auto_practice_trades"]}
         except TradingError:
             limits = None
-        return {"contract": "trade_desk", "simulated": True, "notice": book.NOTICE, "watch": snap["watch"],
+        try:
+            from ..trading.watch.cli import trail_test
+            trail = trail_test(self.root)
+        except (TradingError, OSError, ValueError):
+            trail = None
+        return {"contract": "trade_desk", "trail_test": trail, "simulated": True, "notice": book.NOTICE, "watch": snap["watch"],
                 "emergency_stop": EmergencySwitch(self.root).state(), "limits": limits,
                 "agents": snap["agents"], "decisions": snap["decisions"], "researched": researched,
                 "performance": snap["performance"]}

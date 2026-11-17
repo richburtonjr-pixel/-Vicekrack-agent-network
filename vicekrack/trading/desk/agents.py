@@ -5,10 +5,12 @@ Risk Manager   signs or vetoes a trade idea using the research Risk Review's ver
                floor, no position already in that coin, daily and losing-streak limits, and a short
                wait after closing a coin before buying it again.
 Position Monitor  checks every open position every cycle and asks to close it when: the price
-               falls to the stop-loss, rises to the take-profit, falls back from its highest price
-               by the trailing stop, the position has been held too long, the coin's own short EMA
-               drops below its long EMA (the uptrend that justified the buy is gone), or the
-               Emergency Stop is on.
+               falls to the stop-loss; the PROFIT TRAIL is hit (profit fell a set number of points
+               from the best profit reached; see profit_trail.py; there is no fixed take-profit); the
+               Emergency Stop is on; or, only while the profit trail isn't active yet, the position
+               has been held too long or the coin's own short EMA drops below its long EMA. Once the
+               trail is active (and let_winners_run is on) a winner is never sold for time or a
+               wiggle in the trend: only the trail, the stop-loss or the Emergency Stop close it.
 Performance Reviewer  reads the practice ledger and reports closed trades, wins, losses and P&L.
 
 The $80 guard itself stays in `practice/guard.py`; nothing here can loosen it.
@@ -18,6 +20,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 
 from ..money import fmt
+from . import profit_trail
 from .verifier import ema_series
 
 
@@ -82,18 +85,18 @@ def position_monitor(symbol, position, bars, mark, now, config, peak=None, emerg
         price = Decimal(mark["price"]) if mark is not None else None
         if price is not None and price <= stop:
             reasons.append("stop_loss")
-        take = config.get("take_profit_pct")
-        if take is not None and price is not None and price >= cost_each * (1 + Decimal(take) / 100):
-            reasons.append("take_profit")
-        trail = config.get("trailing_stop_pct")
-        if trail is not None and price is not None and peak is not None:
-            high = Decimal(peak)
-            # Only once the coin has been above what we paid, so the trailing stop never fires before the stop-loss.
-            if high > cost_each and price <= high * (1 - Decimal(trail) / 100):
-                reasons.append("trailing_stop")
-        if _minutes_between(position["opened_at"], now) >= config["max_hold_minutes"]:
+        trail = config.get("profit_trail")
+        trail_active = False
+        if trail is not None and price is not None:
+            state = profit_trail.check(cost_each, price, peak if peak is not None else price, trail,
+                                       config.get("exit_cost_bps", "0"))
+            trail_active = state["active"]
+            if state["sell"]:
+                reasons.append("profit_trail")
+        winners_run = trail_active and trail.get("let_winners_run", True)
+        if not winners_run and _minutes_between(position["opened_at"], now) >= config["max_hold_minutes"]:
             reasons.append("held_too_long")
-        if bars:
+        if bars and not winners_run:
             closes = [Decimal(b["close"]) for b in bars]
             fast, slow = ema_series(closes, config["ema_fast"]), ema_series(closes, config["ema_slow"])
             if fast[-1] is not None and slow[-1] is not None and fast[-1] < slow[-1]:

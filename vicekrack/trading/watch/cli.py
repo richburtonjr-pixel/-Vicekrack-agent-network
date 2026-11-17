@@ -5,6 +5,7 @@ python -m vicekrack watch-run        keep going every 5 minutes until the window
 python -m vicekrack watch-status     the last saved cycle
 python -m vicekrack desk-cases       recent trade desk case files (who approved, who vetoed, why)
 python -m vicekrack desk-emergency status|engage|release   the agents' Emergency Stop
+python -m vicekrack desk-trail-test  replay closed agent trades under other profit-trail settings
 """
 
 import argparse
@@ -16,7 +17,7 @@ from ..desk.desk import CaseFiles
 from .cycle import WatchFolder, load_watch_config, run_cycle
 from .runner import run_loop  # noqa: E402
 
-COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases", "desk-emergency"}
+COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases", "desk-emergency", "desk-trail-test"}
 
 
 def parser():
@@ -31,7 +32,25 @@ def parser():
     emergency = commands.add_parser("desk-emergency", help="Show, engage or release the agents' Emergency Stop")
     emergency.add_argument("action", choices=["status", "engage", "release"])
     emergency.add_argument("--reason", default=None)
+    commands.add_parser("desk-trail-test", help="Replay closed agent trades under other profit-trail settings")
     return root
+
+
+def trail_test(root=None):
+    """Paper evidence for tuning the profit trail: every closed agent position, replayed per setting."""
+    from ..desk import profit_trail
+    from ..desk.desk import load_desk_config
+    from ..desk.safety import Peaks
+    from ..practice.store import load_config
+    from ..money import parse
+    kwargs = {"root": root} if root is not None else {}
+    desk, practice = load_desk_config(**kwargs), load_config(**kwargs)
+    costs = format(parse(practice["costs"]["slippage_bps"]) + parse(practice["costs"]["fee_bps"]), "f")
+    records = Peaks(root).history()
+    return {"contract": "trail_test", "simulated": True, "closed_positions": len(records),
+            "note": "Replays recorded paper prices; a small sample proves nothing. Fills and gaps can differ.",
+            "results": profit_trail.compare(records, desk["monitor"].get("profit_trail"),
+                                            desk["monitor"]["stop_loss_pct"], costs)}
 
 
 def main(argv=None, root=None):
@@ -41,6 +60,8 @@ def main(argv=None, root=None):
             from ..desk.safety import EmergencySwitch
             switch = EmergencySwitch(root)
             output = switch.state() if args.action == "status" else switch.set(args.action == "engage", "pc", args.reason)
+        elif args.command == "desk-trail-test":
+            output = trail_test(root)
         elif args.command == "desk-cases":
             output = {"cases": CaseFiles(root).recent(max(1, min(args.limit, 200)))}
         elif args.command == "watch-status":
