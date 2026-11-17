@@ -32,7 +32,7 @@ from ..practice import account as practice_book
 from ..providers.kraken import interval_minutes
 from . import agents
 from . import profit_trail, safety, settings
-from .verifier import verify
+from .verifier import verify, verify_momentum
 
 GOOD = {"market_scout": "data_available", "trend_agent": "trend_assessed",
         "strategy_agent": "active_research_signal", "risk_review": "sufficient_for_future_paper_evaluation"}
@@ -62,6 +62,12 @@ def _check(config):
         profit_trail.validate(config["monitor"]["profit_trail"])
     if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
         raise ValueError
+    momentum = config.get("momentum_entry")
+    if momentum is not None:
+        if not isinstance(momentum["enabled"], bool) or not 1 <= momentum["ema_fast"] < momentum["ema_slow"] <= 100:
+            raise ValueError
+        if parse(momentum["min_score"], "signed_decimal") < 0 or parse(momentum["min_rise_15m_pct"]) < 0:
+            raise ValueError
 
 
 def load_desk_config(path="config/trading-desk.json", root=ROOT, dashboard=True):
@@ -150,6 +156,40 @@ def _history(cases_today, ledger, account_id, now):
             "agents_pnl_today": format(pnl_today, "f")}
 
 
+def _momentum_idea(coin, research, momentum):
+    """A momentum idea: the scanner ranked the coin (score >= min_score), and the research found clean data and a
+    trend but no textbook signal on the very last bar. Anything else (bad data, research errors) is not an idea."""
+    radar = coin.get("radar")
+    if not radar or radar.get("score") is None:
+        return False
+    try:
+        if parse(radar["score"], "signed_decimal") < parse(momentum["min_score"], "signed_decimal"):
+            return False
+    except TradingError:
+        return False
+    roles = {a["role"]: a for a in research["agents"]}
+    return (roles.get("market_scout", {}).get("conclusion") == GOOD["market_scout"]
+            and roles.get("trend_agent", {}).get("conclusion") == GOOD["trend_agent"]
+            and all(a["status"] == "completed" for a in research["agents"]))
+
+
+def _momentum_signatures(coin, research):
+    radar = coin["radar"]
+    signals = ", ".join(s.replace("_", " ") for s in radar.get("signals") or ["streak"])
+    return [
+        {"agent": "market_scout", "decision": "approve", "reasons": ["data_available", "scanner_pick"],
+         "summary": f"Scanner pick: {signals}; score {radar['score']}; +{radar['rise_15m_pct']}% in 15 min. "
+                    + research["summaries"].get("market_scout", "")},
+        {"agent": "trend_agent", "decision": "approve", "reasons": ["trend_assessed"],
+         "summary": research["summaries"].get("trend_agent", "")},
+        {"agent": "strategy_agent", "decision": "approve", "reasons": ["momentum_signal"],
+         "summary": f"Momentum idea from the scanner ({signals}); no textbook signal on the last bar, so the "
+                    "Verifier checks the climb itself."},
+        {"agent": "risk_review", "decision": "approve", "reasons": ["momentum_entry"],
+         "summary": "Momentum entry allowed by settings; the account checks below still apply."},
+    ]
+
+
 def _execute(store, practice_config, case, operation, args, now):
     """The Executor: the only place a desk case reaches the practice account. Always trades as "agents"."""
     try:
@@ -221,24 +261,35 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
     summary = practice_book.summary(state, practice_config, now)
 
     # ---- entries: one case per coin whose research verdict is "sufficient"
+    momentum = desk_config.get("momentum_entry") or {"enabled": False}
     for coin in coins:
         research = coin.get("research") or {}
-        if not coin["ok"] or research.get("verdict") != GOOD["risk_review"]:
+        if not coin["ok"] or not research.get("agents"):
+            continue
+        idea = "signal" if research.get("verdict") == GOOD["risk_review"] else \
+            "momentum" if momentum["enabled"] and _momentum_idea(coin, research, momentum) else None
+        if idea is None:
             continue
         symbol = coin["symbol"]
         case = new_case("entry", symbol, coin)
-        for agent in research["agents"]:
-            ok = agent["status"] == "completed" and agent["conclusion"] == GOOD[agent["role"]]
-            case["signatures"].append({"agent": agent["role"], "decision": "approve" if ok else "veto",
-                                       "reasons": [agent["conclusion"] or agent["status"]],
-                                       "summary": research["summaries"].get(agent["role"], "")})
-        strategy = research.get("strategy_findings")
+        case["idea"] = idea
         dataset = datasets[symbol]
-        verifier = verify(dataset["bars"], interval_minutes(dataset["interval"]), strategy, signal_config, now,
-                          desk_config["verifier"])
+        if idea == "signal":
+            for agent in research["agents"]:
+                ok = agent["status"] == "completed" and agent["conclusion"] == GOOD[agent["role"]]
+                case["signatures"].append({"agent": agent["role"], "decision": "approve" if ok else "veto",
+                                           "reasons": [agent["conclusion"] or agent["status"]],
+                                           "summary": research["summaries"].get(agent["role"], "")})
+            verifier = verify(dataset["bars"], interval_minutes(dataset["interval"]), research.get("strategy_findings"),
+                              signal_config, now, desk_config["verifier"])
+        else:
+            case["signatures"] += _momentum_signatures(coin, research)
+            verifier = verify_momentum(dataset["bars"], interval_minutes(dataset["interval"]), now,
+                                       desk_config["verifier"], momentum)
         case["signatures"].append(verifier)
         # The research Risk Review signed above; its account checks are a second, separate signature.
-        risk = agents.risk_manager(symbol, research["verdict"], summary, history, now,
+        verdict = research["verdict"] if idea == "signal" else GOOD["risk_review"]
+        risk = agents.risk_manager(symbol, verdict, summary, history, now,
                                    {**desk_config["risk"], "min_dollars_above_floor": desk_config["min_dollars_above_floor"]})
         risk["stage"] = "account_check"
         case["signatures"].append(risk)

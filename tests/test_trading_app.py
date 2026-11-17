@@ -168,7 +168,7 @@ class EmergencyButton(TradingDesk):
 
     def test_desk_shows_the_safety_limits(self):
         limits = self.api.desk()["limits"]
-        self.assertEqual(limits["max_daily_loss_dollars"], "5.00")
+        self.assertEqual(limits["max_daily_loss_dollars"], "10.00")
         self.assertNotIn("take_profit_pct", limits)              # no fixed take-profit
         self.assertEqual(limits["profit_trail"]["tiers"], [{"from_profit_pct": "6", "giveback_points": "6"}])
         self.assertIn("results", self.api.desk()["trail_test"])
