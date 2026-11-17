@@ -55,7 +55,8 @@ class TradingAppScript(unittest.TestCase):
     def test_uses_only_existing_pc_requests(self):
         paths = set(re.findall(r'"(/m/api/[a-z/]+)', self.script))
         self.assertEqual(paths, {"/m/api/session", "/m/api/trade/account", "/m/api/trade/markets",
-                                 "/m/api/trade/coin", "/m/api/trade/order", "/m/api/trade/restart"})
+                                 "/m/api/trade/coin", "/m/api/trade/order", "/m/api/trade/restart",
+                                 "/m/api/trade/desk"})
         code = self.script.replace('"http://www.w3.org/2000/svg"', "")   # the SVG namespace is not a request
         for outside in ("kraken.com", "alpaca.markets", "http://", "https://"):
             self.assertNotIn(outside, code)            # never talks to a broker or exchange directly
@@ -72,6 +73,53 @@ class TradingAppScript(unittest.TestCase):
 
     def test_no_made_up_numbers(self):
         self.assertNotIn("Math.random", self.script)
+
+
+class TradingDesk(unittest.TestCase):
+    """GET /m/api/trade/desk: the HQ's eight-agent board and case files, read from disk. No network, no trading."""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from desk_market import epoch, now_text
+        from test_watch_loop import seed_tape
+        from vicekrack.mobile.trade_api import TradeApi
+        from vicekrack.trading.practice.store import PracticeStore, load_config
+        from vicekrack.trading.watch.cycle import load_watch_config, run_cycle
+        from desk_market import FakeKraken
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root, True)
+        shutil.copytree(ROOT / "config", self.root / "config")
+        PracticeStore(self.root).start(load_config(root=self.root), now_text(0))
+        seed_tape(self.root, 600)
+        run_cycle(load_watch_config(root=self.root), root=self.root, now=now_text(600),
+                  transport=FakeKraken(600), clock=lambda: epoch(600))
+
+        def no_network(*_args, **_kwargs):
+            raise AssertionError("the desk must not use the network")
+        self.api = TradeApi(self.root, transport=no_network, clock=lambda: epoch(601))
+
+    def test_eight_agents_decisions_and_researched_coins(self):
+        desk = self.api.desk()
+        self.assertEqual(desk["contract"], "trade_desk")
+        self.assertTrue(desk["simulated"])
+        self.assertEqual(len(desk["agents"]), 8)
+        self.assertTrue(desk["decisions"])                   # the fake market's SOL streak opens a case
+        self.assertTrue(all(step["agent"] for c in desk["decisions"] for step in c["steps"]))
+        self.assertTrue(desk["researched"])
+        self.assertNotIn("candles", desk["researched"][0])   # light: no chart data
+
+    def test_reading_the_desk_never_trades(self):
+        from vicekrack.trading.practice.store import PracticeStore, load_config
+        before = PracticeStore(self.root).load(load_config(root=self.root))
+        self.api.desk()
+        self.assertEqual(PracticeStore(self.root).load(load_config(root=self.root)), before)
+
+
+class TradingDeskGateway(MobileBase):
+    def test_needs_a_paired_phone(self):
+        status, _, body = self.gw.respond("GET", "/m/api/trade/desk", self.remote())
+        self.assertEqual(status, 401)
 
 
 if __name__ == "__main__":

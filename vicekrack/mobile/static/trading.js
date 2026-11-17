@@ -559,10 +559,108 @@ async function portfolioScreen() {
       h("div", {}, shutdownCard(a), historyCard(trades))));
 }
 
+/* ---------- AI Trading Desk (stage 3) ---------- */
+const FLOW = ["market_scout", "trend_agent", "strategy_agent", "risk_review", "verifier", "executor"];
+const SHORT = { market_scout: "Scout", trend_agent: "Trend", strategy_agent: "Strategy", risk_review: "Risk", verifier: "Verifier",
+  executor: "Executor", position_monitor: "Monitor", performance_reviewer: "Scorer" };
+const HUE = { market_scout: "#166FE5", trend_agent: "#0891B2", strategy_agent: "#7C3AED", verifier: "#DB2777", risk_review: "#EA580C",
+  executor: "#0A9D58", position_monitor: "#65A30D", performance_reviewer: "#B45309" };
+const DECISION = { approve: ["Approved", "green"], veto: ["Said no", "red"], executed: ["Traded", "green"], refused: ["Refused", "red"],
+  close: ["Wants to sell", "amber"], waiting: ["Waiting", "amber"], paused: ["Paused", "blue"] };
+function avatar(id, small) {
+  const node = h("span", { class: "vt-avatar" + (small ? " sm" : ""), "aria-hidden": "true" }, (SHORT[id] || "?").slice(0, 2));
+  node.style.background = HUE[id] || "#6B7280";
+  return node;
+}
+function flowStrip() {
+  const steps = [];
+  FLOW.forEach((id, i) => {
+    if (i) { steps.push(h("span", { class: "vt-arrow", "aria-hidden": "true" }, "›")); }
+    steps.push(h("span", { class: "vt-step" }, avatar(id, true), SHORT[id]));
+  });
+  return h("section", { class: "vt-card" }, h("h2", {}, "How a trade happens"),
+    h("div", { class: "vt-flow", role: "list", "aria-label": "Scout, Trend, Strategy and Risk research; Verifier double-checks; Executor trades" }, steps),
+    h("p", { class: "muted" }, "Every few minutes the first four research each coin. A practice trade only happens when they all approve, the Verifier re-checks the math, and Risk Review clears the account. Then the Executor places it."));
+}
+function agentCard(a) {
+  const worked = a.state === "worked";
+  const d = a.last_decision;
+  const tag = d && DECISION[d.decision];
+  return h("article", { class: "vt-agent" },
+    h("div", { class: "vt-agent-top" }, avatar(a.id),
+      h("div", { class: "who" }, h("strong", {}, a.name), h("span", { class: "muted small" }, a.job)),
+      h("span", { class: "vt-dot " + (worked ? "on" : ""), title: worked ? "Has worked" : "Idle" })),
+    h("p", { class: "vt-agent-line" }, a.headline || ""),
+    (a.now || []).length > 1 ? h("ul", { class: "vt-agent-now" }, a.now.slice(0, 5).map((n) => h("li", {}, h("b", {}, baseOf(n.symbol)), " " + (n.text || words(n.status))))) : null,
+    h("div", { class: "vt-agent-foot muted small" }, h("span", {}, a.at ? ago(a.at) : "Not yet"),
+      tag ? h("span", { class: "vt-tag " + tag[1] }, "Last: " + tag[0]) : null));
+}
+function decisionCard(c) {
+  const [label, tone] = OUTCOME[c.outcome] || [c.outcome_text || words(c.outcome), ""];
+  const body = h("div", { class: "vt-steps" }, (c.steps || []).map((s) => {
+    const tag = DECISION[s.decision] || [words(s.decision), ""];
+    return h("div", { class: "vt-stepline" }, avatar(s.agent, true),
+      h("div", { class: "what" }, h("strong", {}, NAMES[s.agent] || words(s.agent)),
+        s.summary ? h("span", { class: "muted" }, s.summary) : null,
+        (s.reasons || []).length ? h("span", { class: "muted small" }, "Why: " + s.reasons.join(", ")) : null),
+      h("span", { class: "vt-tag " + tag[1] }, tag[0]));
+  }));
+  return h("details", { class: "vt-case" },
+    h("summary", {}, badge(baseOf(c.symbol), true),
+      h("span", { class: "what" }, h("strong", {}, (c.kind === "exit" ? "Sell idea · " : "Buy idea · ") + baseOf(c.symbol)),
+        h("span", { class: "muted small" }, ago(c.at) + (c.price ? " · at " + usd(c.price) : "") + " · " + (c.steps || []).length + " agents")),
+      h("span", { class: "vt-tag " + tone }, label)), body);
+}
+async function deskScreen() {
+  const [r, account] = await Promise.all([call("/m/api/trade/desk"), call("/m/api/trade/account")]);
+  if (r.status === 401) { notPaired(); return; }
+  if (!r.ok) { offline(problem(r)); return; }
+  if (account.ok) { VT.account = account.body; }
+  const d = r.body, w = d.watch || {};
+  const agentTrades = ((account.ok && account.body.trades) || []).filter((x) => x.kind === "fill" && x.by === "agents");
+  const counts = { approved: 0, vetoed: 0, executed: 0 };
+  for (const c of d.decisions || []) {
+    if (c.outcome === "executed") { counts.executed += 1; }
+    if (c.outcome === "vetoed" || c.outcome === "refused") { counts.vetoed += 1; }
+    if (c.outcome === "executed" || c.outcome === "approved_not_executed") { counts.approved += 1; }
+  }
+  const researched = (d.researched || []).map((m) => {
+    const good = m.verdict === "sufficient_for_future_paper_evaluation";
+    return h("a", { class: "vt-coin", href: "#market/coin/" + m.symbol }, badge(baseOf(m.symbol)),
+      h("span", { class: "who" }, h("strong", {}, baseOf(m.symbol)), h("span", { class: "muted" }, m.error ? "Price problem" : m.verdict_text || "Not researched yet")),
+      h("span", { class: "num" }, h("strong", {}, usd(m.price)), h("span", { class: "vt-tag " + (good ? "green" : "") }, good ? "Looks good" : "Wait")));
+  });
+  show(h("div", { class: "vt-head" }, h("h1", { class: "vt-title" }, "AI Desk"),
+      h("span", { class: "vt-tag " + (w.auto_practice_trades ? "green" : "blue") }, w.auto_practice_trades ? "Auto trades on" : "Auto trades off")),
+    VT.account ? watchBanner(VT.account) : null,
+    w.desk_error ? note("The desk had a problem last cycle: " + words(w.desk_error)) : null,
+    h("div", { class: "vt-stats" },
+      h("div", { class: "vt-stat" }, h("b", {}, String(counts.approved)), h("span", {}, "Ideas approved")),
+      h("div", { class: "vt-stat" }, h("b", {}, String(counts.vetoed)), h("span", {}, "Stopped")),
+      h("div", { class: "vt-stat" }, h("b", { class: counts.executed ? "up" : "" }, String(counts.executed)), h("span", {}, "Trades placed"))),
+    h("p", { class: "muted small" }, "Counts cover the recent ideas shown below (today and yesterday)."),
+    h("div", { class: "vt-cols" },
+      h("div", {},
+        flowStrip(),
+        h("section", {}, h("div", { class: "vt-head" }, h("h2", {}, "The eight agents"), h("span", { class: "muted" }, "live from your PC")),
+          h("div", { class: "vt-agents" }, (d.agents || []).map(agentCard)))),
+      h("div", {},
+        h("section", { class: "vt-card" }, h("div", { class: "vt-head" }, h("h2", {}, "Decisions"), h("span", { class: "muted" }, "tap to see why")),
+          (d.decisions || []).length ? h("div", { class: "vt-cases" }, d.decisions.map(decisionCard))
+            : h("p", { class: "muted" }, "No trade ideas today or yesterday. An idea only opens when research says a coin looks good.")),
+        h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "Coins researched"), h("span", { class: "muted" }, w.last_cycle_at ? ago(w.last_cycle_at) : "")),
+          researched.length ? h("div", {}, researched) : h("p", { class: "muted pad" }, "Nothing researched yet. The agents start when the watch runs.")),
+        h("section", { class: "vt-card" }, h("h2", {}, "Trades the agents placed"),
+          agentTrades.length ? h("div", { class: "vt-feed" }, agentTrades.slice(0, 10).map((x) => {
+            const pnl = x.realized_pnl === null || x.realized_pnl === undefined ? null : Number(x.realized_pnl);
+            return h("div", { class: "vt-trade" }, h("span", { class: "vt-side " + (x.side === "buy" ? "green" : "dark") }, x.side === "buy" ? "B" : "S"),
+              h("span", { class: "who" }, h("strong", {}, (x.side === "buy" ? "Bought " : "Sold ") + baseOf(x.symbol)), h("span", { class: "muted" }, ago(x.at) + " · " + words(x.reason))),
+              h("span", { class: "num" }, h("strong", {}, usd(x.notional)), pnl === null ? null : h("span", { class: "small " + (pnl >= 0 ? "up" : "down") }, signed(pnl))));
+          })) : h("p", { class: "muted" }, "The agents haven't placed a practice trade on this account yet.")))));
+}
+
 /* ---------- sections arriving in the next stages ---------- */
 const SOON = {
-  desk: ["AI Trading Desk", "Stage 3", ["All eight agents and what each did last", "Coins they researched", "Approvals, vetoes and why", "Simulated trades they placed"],
-    "#trade/desk", "Until then, the agents' case files are in the Command Center's Agent desk."],
   performance: ["Results", "Stage 4", ["Balance over time (equity chart)", "Win rate, drawdown and fees", "You vs the agents"],
     "#trade/desk", "Until then, the scoreboard is in the Command Center's Agent desk."],
 };
@@ -575,7 +673,7 @@ function soonScreen(key) {
 }
 
 /* ---------- router ---------- */
-function quiet() { return document.hidden || document.querySelector(".vt-layer") || (document.activeElement && document.activeElement.type === "search"); }
+function quiet() { return document.hidden || document.querySelector(".vt-layer, details[open]") || (document.activeElement && document.activeElement.type === "search"); }
 async function route(force) {
   const name = (location.hash || "#home").slice(1) || "home";
   if (!force && name === VT.route) { return; }
@@ -590,6 +688,9 @@ async function route(force) {
   } else if (tab === "market") {
     await marketScreen(rest[0] || "all");
     VT.timer = setInterval(() => { if (!quiet()) { marketScreen(); } }, 20000);
+  } else if (tab === "desk") {
+    await deskScreen();
+    VT.timer = setInterval(() => { if (!quiet()) { deskScreen(); } }, 30000);
   } else if (tab === "portfolio") {
     await portfolioScreen();
     VT.timer = setInterval(() => { if (!quiet()) { portfolioScreen(); } }, 20000);
