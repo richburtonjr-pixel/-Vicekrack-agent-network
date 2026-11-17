@@ -51,7 +51,9 @@ async function tradeHome() {
   if (!account.ok) { show(h("h1", { class: "page" }, "Trade"), note(tradeError(account), "bad")); return; }
   TRADE.account = account.body;
   if (markets.ok) { TRADE.markets = markets.body; }
-  const nodes = [h("div", { class: "trade-top" }, h("h1", { class: "page" }, "Trade"), practicePill())];
+  const nodes = [h("div", { class: "trade-top" }, h("h1", { class: "page" }, "Trade"), practicePill()),
+    h("a", { class: "link-card", href: "/trading#home" }, h("strong", {}, "Open ViceKrack Trading 2.0"),
+      h("span", { class: "muted" }, "The new trading app (preview)"))];
   if (account.body.needs_start || !account.body.account) {
     nodes.push(startCard(account.body));
   } else {
