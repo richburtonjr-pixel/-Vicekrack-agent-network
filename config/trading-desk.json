@@ -1,6 +1,6 @@
 {
   "config_version": "1.0",
-  "description": "Trade desk: every agent trade idea is a case file the agents sign in turn; any veto stops it. The agents may hold at most max_agent_positions coins at a time, $25 each. Your own trades from the Trade tab skip the desk (you are the decision-maker) but never the $80 shutdown. Simulated money only. Set auto_practice_trades to false to have the agents review ideas without placing practice trades. Safety (step 1): the agents stop buying for the rest of the UTC day once their closed trades lose max_daily_loss_dollars. There is NO fixed take-profit: monitor.profit_trail lets winners run and sells when the profit falls tiers' giveback_points (percentage POINTS of return, after estimated selling costs) below the best profit reached; e.g. best +20% with 6 points -> sell at +14%; the lock rises as the best profit rises, and once active it never locks below min_lock_profit_pct. The trail starts once the best profit reaches the first tier's from_profit_pct; before that the stop-loss, max hold and trend exits apply. The Emergency Stop switch (phone app or `python -m vicekrack desk-emergency engage`) halts the agents and sells what they hold. Momentum entry: besides a textbook signal on the last bar, the agents may buy a scanner pick (score >= min_score) when the research found clean data and a trend; the Verifier then recomputes the climb (min_rise_15m_pct over 15 bars and EMA(ema_fast) above EMA(ema_slow)) from raw bars, and every account limit still applies. Set enabled to false to go back to signals only.",
+  "description": "Trade desk: every agent trade idea is a case file the agents sign in turn; any veto stops it. The agents may hold at most max_agent_positions coins at a time, $25 each. Your own trades from the Trade tab skip the desk (you are the decision-maker) but never the $80 shutdown. Simulated money only. Set auto_practice_trades to false to have the agents review ideas without placing practice trades. Safety (step 1): the agents stop buying for the rest of the UTC day once their closed trades lose max_daily_loss_dollars. There is NO fixed take-profit: monitor.profit_trail lets winners run and sells when the profit falls tiers' giveback_points (percentage POINTS of return, after estimated selling costs) below the best profit reached; e.g. best +20% with 6 points -> sell at +14%; the lock rises as the best profit rises, and once active it never locks below min_lock_profit_pct. The trail starts once the best profit reaches the first tier's from_profit_pct; before that the stop-loss, max hold and trend exits apply. The Emergency Stop switch (phone app or `python -m vicekrack desk-emergency engage`) halts the agents and sells what they hold. Momentum entry: besides a textbook signal on the last bar, the agents may buy a scanner pick (score >= min_score) when the research found clean data and a trend; the Verifier then recomputes the climb (min_rise_15m_pct over 15 bars and EMA(ema_fast) above EMA(ema_slow)) from raw bars, and every account limit still applies. Set enabled to false to go back to signals only. Trade plans (sizing + monitor): each agent trade is sized so hitting its stop loses about risk_per_trade_pct of equity (stop = atr_multiple x the coin's normal 1-minute wiggle, kept between min_stop_pct and max_stop_pct); the stop moves to break-even at breakeven_at_r times the risk, partial_fraction is sold at partial_at_r, the trend exit waits min_hold_minutes and reads trend_bar_minutes bars, and the time stop only closes trades below time_stop_min_r. loss_cooldown_minutes keeps the agents off a coin that just lost. momentum_entry.max_stretch_pct skips coins already far above their trend line. order_dollars stays the per-trade ceiling: risk sizing can trade less, never more.",
   "auto_practice_trades": true,
   "order_dollars": "25.00",
   "min_dollars_above_floor": "10.00",
@@ -12,14 +12,15 @@
   "risk": {
     "max_agent_positions": 3,
     "max_entries_per_day": 20,
-    "reentry_wait_minutes": 15,
+    "reentry_wait_minutes": 60,
     "pause_after_losses": 3,
     "pause_minutes": 60,
-    "max_daily_loss_dollars": "10.00"
+    "max_daily_loss_dollars": "10.00",
+    "loss_cooldown_minutes": 180
   },
   "monitor": {
     "stop_loss_pct": "4",
-    "max_hold_minutes": 180,
+    "max_hold_minutes": 240,
     "ema_fast": 9,
     "ema_slow": 21,
     "profit_trail": {
@@ -31,13 +32,31 @@
       ],
       "min_lock_profit_pct": "0.5",
       "let_winners_run": true
-    }
+    },
+    "min_hold_minutes": 30,
+    "trend_bar_minutes": 5,
+    "time_stop_min_r": "0.5",
+    "breakeven_at_r": "1",
+    "partial_at_r": "2",
+    "partial_fraction": "0.5"
   },
   "momentum_entry": {
     "enabled": true,
     "min_score": "1.0",
     "min_rise_15m_pct": "0.6",
     "ema_fast": 9,
-    "ema_slow": 21
+    "ema_slow": 21,
+    "max_stretch_pct": "3"
+  },
+  "sizing": {
+    "mode": "risk",
+    "risk_per_trade_pct": "0.5",
+    "max_position_pct": "35",
+    "max_order_dollars": "25.00",
+    "min_order_dollars": "10.00",
+    "atr_bars": 30,
+    "atr_multiple": "3",
+    "min_stop_pct": "1.5",
+    "max_stop_pct": "6"
   }
 }

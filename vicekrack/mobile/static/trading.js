@@ -521,15 +521,17 @@ function holdingRows(holdings) {
   return h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "Holdings"), h("span", { class: "muted" }, holdings.length + " coin" + (holdings.length === 1 ? "" : "s"))),
     h("div", {}, holdings.map((x) => {
       const value = Number(x.value), cost = Number(x.cost_basis);
-      const pnl = isFinite(value) ? value - cost : null;
+      // Net = what you'd keep if sold now, after the estimated selling fee and slippage.
+      const pnl = x.net_unrealized_pnl != null ? Number(x.net_unrealized_pnl) : isFinite(value) ? value - cost : null;
+      const plan = x.plan ? " · stop " + usd(x.plan.stop_price) + (x.plan.breakeven_done ? " (break-even)" : "") : "";
       return h("a", { class: "vt-coin", href: "#market/coin/" + x.symbol }, badge(baseOf(x.symbol)),
         h("span", { class: "who" }, h("strong", {}, baseOf(x.symbol)),
-          h("span", { class: "muted" }, (x.opened_by === "you" ? "You" : "Agents") + " · " + ago(x.opened_at))),
+          h("span", { class: "muted" }, (x.opened_by === "you" ? "You" : "Agents") + " · " + ago(x.opened_at) + plan)),
         h("span", { class: "num" }, h("strong", {}, usd(x.value)),
           pnl === null ? h("span", { class: "muted small" }, "no price yet")
             : h("span", { class: "vt-chg " + (pnl > 0 ? "up" : pnl < 0 ? "down" : "flat") }, signed(pnl) + " · " + (cost ? ((pnl >= 0 ? "+" : "−") + Math.abs((pnl / cost) * 100).toFixed(1) + "%") : ""))));
     })),
-    h("p", { class: "muted small pad" }, "Values use the last price your PC recorded. Tap a coin for the live price."));
+    h("p", { class: "muted small pad" }, "Values use the last price your PC recorded. Profit/loss is net: after the estimated fee and slippage to sell. Tap a coin for the live price."));
 }
 function historyCard(trades) {
   const who = VT.history || "all";

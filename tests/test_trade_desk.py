@@ -68,6 +68,8 @@ class TradeDeskTests(unittest.TestCase):
         config = json.loads(path.read_text(encoding="utf-8"))
         config["monitor"].pop("profit_trail", None)
         config["monitor"].update(ema_fast=3, ema_slow=5)            # the quick trend exit these fake-market tests use
+        for key in ("partial_at_r", "partial_fraction", "min_hold_minutes", "trend_bar_minutes", "breakeven_at_r"):
+            config["monitor"].pop(key, None)                         # plan extras off: just the plain trend exit
         path.write_text(json.dumps(config), encoding="utf-8")
 
     def test_a_big_winner_is_kept_when_its_trend_wiggles(self):
@@ -88,6 +90,18 @@ class TradeDeskTests(unittest.TestCase):
         performance = status["desk"]["performance"]
         self.assertEqual(performance["closed_trades"], 1)
         self.assertEqual(performance["wins"] + performance["losses"], 1)
+
+    def test_every_agent_buy_gets_a_saved_plan_with_its_own_risk(self):
+        self.cycle(ENTRY)
+        case = [c for c in self.cases(ENTRY) if c["kind"] == "entry" and c["outcome"] == "executed"][-1]
+        plan = case["plan"]
+        saved = json.loads((self.root / "runtime/trading/desk/plans.json").read_text())
+        self.assertEqual(list(saved.values())[0]["SOLUSD"]["stop_price"], plan["stop_price"])
+        self.assertLess(float(plan["stop_price"]), float(plan["cost_each"]))
+        self.assertLessEqual(float(plan["risk_dollars"]), 0.5 + 0.01)        # 0.5% of a $100 account
+        fill = [l for l in self.store.ledger() if l["kind"] == "fill"][-1]
+        self.assertLessEqual(float(fill["notional"]), 25.0)                  # never above the per-trade limit
+        self.assertIn("Plan: stop", case["signatures"][-2]["summary"])
 
     def test_position_monitor_never_sells_your_own_coins(self):
         self.cycle(ENTRY)

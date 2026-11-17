@@ -99,14 +99,30 @@ class TradeApi:
                     "problem": error.as_dict()}
         now = utc_now()
         summary = book.summary(state, config, now)
+        from ..trading.desk.plans import Plans
+        position_plans = Plans(self.root).load(state["account_id"])
+        costs = config["costs"]
+        sell_cost = (book.parse(costs["slippage_bps"]) + book.parse(costs["fee_bps"])) / 10000
         holdings = []
         for symbol, position in sorted(summary["positions"].items()):
             mark = summary["latest_prices"].get(symbol)
-            value = None
+            value = net_value = net_pnl = None
             if mark:
-                value = book.fmt(book.to_decimal(position["quantity"]) * book.parse(mark["price"]))
+                gross = book.to_decimal(position["quantity"]) * book.parse(mark["price"])
+                value = book.fmt(gross)
+                # What you would actually keep if sold now: price minus estimated selling slippage + fee, minus cost.
+                net_value = gross * (1 - sell_cost)
+                net_pnl = book.fmt(net_value - book.to_decimal(position["cost_basis"]))
+                net_value = book.fmt(net_value)
+            plan = position_plans.get(symbol)
+            if plan is not None and plan.get("opened_at") != position.get("opened_at"):
+                plan = None
             holdings.append({"symbol": symbol, **position, "price": (mark or {}).get("price"),
-                             "price_at": (mark or {}).get("at"), "value": value})
+                             "price_at": (mark or {}).get("at"), "value": value,
+                             "net_value_if_sold": net_value, "net_unrealized_pnl": net_pnl,
+                             "plan": None if plan is None else {k: plan.get(k) for k in (
+                                 "stop_price", "stop_pct", "risk_dollars", "breakeven_done", "partial_done",
+                                 "partial_at_r", "idea", "entry_case_id")}})
         ledger = store.ledger(300)
         mine = [line for line in ledger if line.get("account_id") == state["account_id"]]
         trades = [line for line in mine if line.get("kind") in ("fill", "halt")][-60:]

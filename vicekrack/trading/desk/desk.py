@@ -31,7 +31,7 @@ from ..money import parse
 from ..practice import account as practice_book
 from ..providers.kraken import interval_minutes
 from . import agents
-from . import profit_trail, safety, settings
+from . import plans, profit_trail, safety, settings
 from .verifier import verify, verify_momentum
 
 GOOD = {"market_scout": "data_available", "trend_agent": "trend_assessed",
@@ -62,7 +62,33 @@ def _check(config):
         profit_trail.validate(config["monitor"]["profit_trail"])
     if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
         raise ValueError
+    sizing = config.get("sizing")
+    if sizing is not None:
+        if sizing.get("mode", "risk") not in ("risk", "fixed") or not 2 <= sizing["atr_bars"] <= 200:
+            raise ValueError
+        for key, low, high in (("risk_per_trade_pct", "0.05", "5"), ("max_position_pct", "1", "100"),
+                               ("atr_multiple", "0.5", "10"), ("min_stop_pct", "0.2", "20"), ("max_stop_pct", "0.5", "30")):
+            if not parse(low) <= parse(sizing[key]) <= parse(high):
+                raise ValueError
+        if parse(sizing["min_stop_pct"]) > parse(sizing["max_stop_pct"]):
+            raise ValueError
+        if not parse(sizing["min_order_dollars"], "money") <= parse(sizing["max_order_dollars"], "money"):
+            raise ValueError
+    exits = config["monitor"]
+    for key in ("breakeven_at_r", "partial_at_r", "time_stop_min_r"):
+        if key in exits and not parse("0") < parse(exits[key]) <= parse("20"):
+            raise ValueError
+    if "partial_fraction" in exits and not parse("0") < parse(exits["partial_fraction"]) < parse("1"):
+        raise ValueError
+    for key in ("min_hold_minutes", "trend_bar_minutes"):
+        if key in exits and (not isinstance(exits[key], int) or isinstance(exits[key], bool) or exits[key] < 0):
+            raise ValueError
+    cooldown = config["risk"].get("loss_cooldown_minutes", 0)
+    if not isinstance(cooldown, int) or isinstance(cooldown, bool) or cooldown < 0:
+        raise ValueError
     momentum = config.get("momentum_entry")
+    if momentum is not None and "max_stretch_pct" in momentum and not parse("0") < parse(momentum["max_stretch_pct"]) <= parse("50"):
+        raise ValueError
     if momentum is not None:
         if not isinstance(momentum["enabled"], bool) or not 1 <= momentum["ema_fast"] < momentum["ema_slow"] <= 100:
             raise ValueError
@@ -140,12 +166,14 @@ def _history(cases_today, ledger, account_id, now):
     for case in cases_today:
         if case["kind"] == "exit" and case["outcome"] == "executed" and case.get("account_id") == account_id:
             last_exit[case["symbol"]] = case["opened_at"]
-    streak, last_loss = 0, None
+    streak, last_loss, loss_by_symbol = 0, None, {}
     for line in ledger:
         if line.get("account_id") != account_id or line.get("kind") != "fill" or line.get("side") != "sell":
             continue
         if line.get("realized_pnl") is not None and parse(line["realized_pnl"], "signed_decimal") < 0:
             streak, last_loss = streak + 1, line["at"]
+            if line.get("by") == "agents":
+                loss_by_symbol[line["symbol"]] = line["at"]
         else:
             streak = 0
     pnl_today = sum((parse(l["realized_pnl"], "signed_decimal") for l in ledger
@@ -153,7 +181,7 @@ def _history(cases_today, ledger, account_id, now):
                      and l.get("realized_pnl") is not None and str(l.get("at", ""))[:10] == now[:10]),
                     parse("0", "signed_decimal"))
     return {"entries_today": entries, "last_exit_at": last_exit, "losing_streak": streak, "last_loss_at": last_loss,
-            "agents_pnl_today": format(pnl_today, "f")}
+            "last_loss_at_by_symbol": loss_by_symbol, "agents_pnl_today": format(pnl_today, "f")}
 
 
 def _momentum_idea(coin, research, momentum):
@@ -190,10 +218,10 @@ def _momentum_signatures(coin, research):
     ]
 
 
-def _execute(store, practice_config, case, operation, args, now):
+def _execute(store, practice_config, case, operation, args, now, **options):
     """The Executor: the only place a desk case reaches the practice account. Always trades as "agents"."""
     try:
-        state, _, refusal = store.apply(practice_config, operation, *args, now=now, by="agents")
+        state, _, refusal = store.apply(practice_config, operation, *args, now=now, by="agents", **options)
     except TradingError as error:
         refusal = error
         state = None
@@ -219,8 +247,12 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
     history["emergency"] = emergency["engaged"]
     peaks = safety.Peaks(root).update(account_id, summary["positions"], state["marks"], now)
     costs = practice_config["costs"]
+    side_cost_bps = parse(costs["slippage_bps"]) + parse(costs["fee_bps"])
+    round_trip_pct = format(side_cost_bps * 2 / 100, "f")            # both sides, as % (35 bps a side -> 0.7)
     # Profit % is measured after the estimated cost of selling (slippage + fee), so "+14%" means about +14% kept.
-    monitor = {**desk_config["monitor"], "exit_cost_bps": format(parse(costs["slippage_bps"]) + parse(costs["fee_bps"]), "f")}
+    monitor = {**desk_config["monitor"], "exit_cost_bps": format(side_cost_bps, "f")}
+    plan_book = plans.Plans(root)
+    position_plans = plan_book.load(account_id)
     by_symbol = {c["symbol"]: c for c in coins}
     cases = []
 
@@ -238,14 +270,42 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
             continue                                   # the Position Monitor never sells your own trades
         coin = by_symbol.get(symbol)
         dataset = datasets.get(symbol)
+        plan = position_plans.get(symbol)
+        if plan is not None and plan.get("opened_at") != position["opened_at"]:
+            plan = None
+        mark = state["marks"].get(symbol)
+        if plan is not None and mark is not None and not plan["breakeven_done"] and monitor.get("breakeven_at_r"):
+            r = plans.r_multiple(plan, mark["price"])
+            if r is not None and r >= parse(monitor["breakeven_at_r"]):
+                plan["breakeven_done"] = True            # from now on the stop sits at break-even (plus costs)
         reasons = agents.position_monitor(symbol, position, dataset["bars"] if dataset else [],
-                                          state["marks"].get(symbol), now, monitor,
-                                          peak=peaks.get(symbol), emergency=emergency["engaged"])
+                                          mark, now, monitor, peak=peaks.get(symbol),
+                                          emergency=emergency["engaged"], plan=plan)
+        if not reasons and agents.partial_due(plan, mark):
+            case = new_case("trim", symbol, coin)
+            case["signatures"].append({"agent": "position_monitor", "decision": "close", "reasons": ["partial_profit"],
+                                       "summary": f"Up {plan['partial_at_r']}x the planned risk: selling "
+                                                  f"{format(parse(plan['partial_fraction']) * 100, '.0f')}% and letting the rest run."})
+            if not coin or not coin["ok"]:
+                case["signatures"].append({"agent": "executor", "decision": "waiting", "reasons": ["no_fresh_price"],
+                                           "summary": "No fresh price this cycle; will try again next cycle."})
+                case["outcome"] = "waiting"
+            else:
+                bid = coin.get("bid") or coin["price"]
+                dollars = format((parse(position["quantity"]) * parse(bid) * parse(plan["partial_fraction"]))
+                                 .quantize(parse("0.01")), "f")
+                state = _execute(store, practice_config, case, "sell", (symbol, bid), now, dollars=dollars) or state
+                if case["outcome"] == "executed":
+                    plan["partial_done"] = plan["breakeven_done"] = True
+            cases.append(case)
+            files.append(case)
+            continue
         if not reasons:
             continue
         case = new_case("exit", symbol, coin)
         case["signatures"].append({"agent": "position_monitor", "decision": "close", "reasons": reasons,
-                                   "summary": "Asked to close: " + ", ".join(reasons) + "."})
+                                   "summary": "Asked to close: " + ", ".join(reasons) + "."
+                                   + (f" Plan: stop {plan['stop_pct']}% (${plan['risk_dollars']} at risk)." if plan else "")})
         if not coin or not coin["ok"]:
             case["signatures"].append({"agent": "executor", "decision": "waiting", "reasons": ["no_fresh_price"],
                                        "summary": "No fresh price this cycle; will try again next cycle."})
@@ -291,6 +351,18 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
         verdict = research["verdict"] if idea == "signal" else GOOD["risk_review"]
         risk = agents.risk_manager(symbol, verdict, summary, history, now,
                                    {**desk_config["risk"], "min_dollars_above_floor": desk_config["min_dollars_above_floor"]})
+        sizing = desk_config.get("sizing")
+        sized = None
+        if sizing is not None:
+            sized = plans.size_entry(dataset["bars"], summary.get("equity") or "0", sizing, round_trip_pct,
+                                     desk_config["order_dollars"])
+            if "skip" in sized:
+                risk = {**risk, "decision": "veto", "reasons": [*(risk["reasons"] if risk["decision"] == "veto" else []),
+                                                                sized["skip"]],
+                        "summary": "Trade would be too small to beat its own costs."}
+            elif risk["decision"] == "approve":
+                risk["summary"] += (f" Plan: stop {format(sized['stop_pct'].quantize(parse('0.01')), 'f')}% below cost, "
+                                    f"${sized['dollars']} trade, about ${sized['risk_dollars']} at risk.")
         risk["stage"] = "account_check"
         case["signatures"].append(risk)
         if any(s["decision"] == "veto" for s in case["signatures"]):
@@ -300,16 +372,22 @@ def run_desk(coins, datasets, *, store, practice_config, desk_config, signal_con
                                        "summary": "Every agent approved, but automatic practice trades are switched off."})
             case["outcome"] = "approved_not_executed"
         else:
-            _execute(store, practice_config, case, "buy", (symbol, desk_config["order_dollars"], coin.get("ask") or coin["price"]), now)
+            dollars = sized["dollars"] if sized else desk_config["order_dollars"]
+            _execute(store, practice_config, case, "buy", (symbol, dollars, coin.get("ask") or coin["price"]), now)
             if case["outcome"] == "executed":
                 history["entries_today"] += 1
                 state = store.load(practice_config)
                 summary = practice_book.summary(state, practice_config, now)
+                if sized and symbol in state["positions"]:
+                    position_plans[symbol] = plans.new_plan(state["positions"][symbol], sized, desk_config["monitor"],
+                                                            case["case_id"], idea, round_trip_pct)
+                    case["plan"] = position_plans[symbol]
         cases.append(case)
         files.append(case)
 
     state = store.load(practice_config)
     summary = practice_book.summary(state, practice_config, now)
+    plan_book.save(account_id, position_plans, state["positions"])
     return {"auto_practice_trades": desk_config["auto_practice_trades"], "emergency_stop": emergency,
             "agents_pnl_today": history["agents_pnl_today"],
             "cases": [{"case_id": c["case_id"], "kind": c["kind"], "symbol": c["symbol"], "outcome": c["outcome"],

@@ -148,6 +148,11 @@ def verify_momentum(bars, interval_minutes, now, config, momentum):
         fast_line, slow_line = ema_series(closes, fast), ema_series(closes, slow)
         if fast_line[-1] is None or slow_line[-1] is None or not fast_line[-1] > slow_line[-1]:
             reasons.append("uptrend_not_confirmed")
+        # Don't chase: if the price is already far above its slow trend line, the burst is probably spent.
+        stretch_limit = momentum.get("max_stretch_pct")
+        if stretch_limit is not None and slow_line[-1] and slow_line[-1] > 0:
+            if (closes[-1] - slow_line[-1]) / slow_line[-1] * 100 > Decimal(stretch_limit):
+                reasons.append("too_stretched")
     if reasons:
         return {"agent": "verifier", "decision": "veto", "reasons": reasons,
                 "summary": "Momentum check from raw bars failed: " + ", ".join(reasons) + "."}
