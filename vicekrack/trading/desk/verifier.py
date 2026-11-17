@@ -116,3 +116,41 @@ def verify(bars, interval_minutes, strategy_findings, signal_config, now, config
     return {"agent": "verifier", "decision": "approve", "reasons": ["recomputed_" + n for n in confirmed],
             "summary": f"Rechecked from raw prices: {', '.join(confirmed)} confirmed on the last closed bar; "
                        f"data fresh, no missing bars, no spike."}
+
+
+def verify_momentum(bars, interval_minutes, now, config, momentum):
+    """The Verifier's own check of a MOMENTUM idea (no textbook signal; the scanner's pick). From raw bars:
+    fresh data, no holes, no single-bar spike (as above), plus: the close is at least
+    `momentum["min_rise_15m_pct"]` above the close 15 bars ago, and its own EMA(fast) is above EMA(slow)
+    on the last bar (an uptrend, not just one jump). Any failure is a veto."""
+    reasons = []
+    width = timedelta(minutes=interval_minutes)
+    if (_time(now) - (_time(bars[-1]["start_utc"]) + width)).total_seconds() > config["max_bar_age_seconds"]:
+        reasons.append("data_too_old")
+    window = bars[-config["gap_check_bars"]:]
+    for before, after in zip(window, window[1:]):
+        if _time(after["start_utc"]) - _time(before["start_utc"]) != width:
+            reasons.append("missing_bars")
+            break
+    fast, slow = momentum["ema_fast"], momentum["ema_slow"]
+    with localcontext() as context:
+        _ctx(context)
+        closes = [Decimal(b["close"]) for b in bars]
+        last_open = Decimal(bars[-1]["open"])
+        move = abs(closes[-1] - last_open) / last_open * 100 if last_open else Decimal(0)
+        if move > Decimal(config["max_last_bar_move_pct"]):
+            reasons.append("last_bar_spike")
+        rise = None
+        if len(closes) > 15 and closes[-16] > 0:
+            rise = (closes[-1] - closes[-16]) / closes[-16] * 100
+        if rise is None or rise < Decimal(momentum["min_rise_15m_pct"]):
+            reasons.append("rise_not_confirmed")
+        fast_line, slow_line = ema_series(closes, fast), ema_series(closes, slow)
+        if fast_line[-1] is None or slow_line[-1] is None or not fast_line[-1] > slow_line[-1]:
+            reasons.append("uptrend_not_confirmed")
+    if reasons:
+        return {"agent": "verifier", "decision": "veto", "reasons": reasons,
+                "summary": "Momentum check from raw bars failed: " + ", ".join(reasons) + "."}
+    return {"agent": "verifier", "decision": "approve", "reasons": ["momentum_recomputed"],
+            "summary": f"Recomputed from raw bars: +{format(rise.quantize(Decimal('0.01')), 'f')}% in 15 bars and "
+                       f"EMA({fast}) above EMA({slow}) on the last bar."}

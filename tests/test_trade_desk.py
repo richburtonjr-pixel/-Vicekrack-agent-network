@@ -67,6 +67,7 @@ class TradeDeskTests(unittest.TestCase):
         path = self.root / "config/trading-desk.json"
         config = json.loads(path.read_text(encoding="utf-8"))
         config["monitor"].pop("profit_trail", None)
+        config["monitor"].update(ema_fast=3, ema_slow=5)            # the quick trend exit these fake-market tests use
         path.write_text(json.dumps(config), encoding="utf-8")
 
     def test_a_big_winner_is_kept_when_its_trend_wiggles(self):
@@ -193,10 +194,12 @@ class TradeDeskTests(unittest.TestCase):
             (dict(practice=self.practice(status="halted", guard="halted")), "account_stopped"),
             (dict(practice=self.practice(dollars_above_floor="9.99")), "too_close_to_floor"),
             (dict(practice=self.practice(positions={"BTCUSD": {}})), "already_holding"),
-            (dict(practice=self.practice(positions={"ETHUSD": {}, "SOLUSD": {"opened_by": "agents"}})), "agent_position_limit"),
-            (dict(history=self.history(entries_today=10)), "daily_entry_limit"),
+            (dict(practice=self.practice(positions={f"C{i}USD": {"opened_by": "agents"}
+                                                    for i in range(self.desk_config["risk"]["max_agent_positions"])})),
+             "agent_position_limit"),
+            (dict(history=self.history(entries_today=self.desk_config["risk"]["max_entries_per_day"])), "daily_entry_limit"),
             (dict(history=self.history(last_exit_at={"BTCUSD": "2026-11-12T04:50:00Z"})), "reentry_wait"),
-            (dict(history=self.history(losing_streak=3, last_loss_at="2026-11-12T04:00:00Z")), "losing_streak_pause"),
+            (dict(history=self.history(losing_streak=3, last_loss_at="2026-11-12T04:45:00Z")), "losing_streak_pause"),
             (dict(verdict="insufficient_for_future_paper_evaluation"), "research_incomplete"),
         ]
         for kwargs, reason in cases:
@@ -206,7 +209,7 @@ class TradeDeskTests(unittest.TestCase):
 
     # ------------------------------------------------------------------ position monitor
     def test_position_monitor_rules(self):
-        cfg = self.desk_config["monitor"]
+        cfg = {"stop_loss_pct": "2", "max_hold_minutes": 60, "ema_fast": 3, "ema_slow": 5}    # the rules, not the shipped numbers
         position = {"quantity": "1", "cost_basis": "100", "opened_at": "2026-11-12T04:00:00Z"}
         rising = self.bars(step=1.0)
         hold = agents.position_monitor("BTCUSD", position, rising, {"price": "99.00", "at": "x"},
@@ -240,7 +243,7 @@ class TradeDeskTests(unittest.TestCase):
         from vicekrack.trading.errors import TradingError
         path = self.root / "config/trading-desk.json"
         good = json.loads(path.read_text())
-        for change in (lambda c: c["monitor"].update(stop_loss_pct="0"), lambda c: c["monitor"].update(ema_fast=9),
+        for change in (lambda c: c["monitor"].update(stop_loss_pct="0"), lambda c: c["monitor"].update(ema_fast=c["monitor"]["ema_slow"]),
                        lambda c: c.update(auto_practice_trades="yes"), lambda c: c["risk"].update(max_entries_per_day=0)):
             bad = deepcopy(good)
             change(bad)
