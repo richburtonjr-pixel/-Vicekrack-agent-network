@@ -3,7 +3,8 @@
 python -m vicekrack mobile-setup        PIN, daily cap, private Tailscale address, turn on the front door
 python -m vicekrack mobile-save-key     save the xAI key in Windows Credential Manager
 python -m vicekrack mobile-pair         show a 6-digit code to pair a phone (10 minutes)
-python -m vicekrack mobile-start        start the HQ (Studio, with the saved key) AND the mobile server
+python -m vicekrack mobile-start        start the HQ (Studio, with the saved key), the Trading Watch AND the mobile server
+                                        (add --no-watch to leave the Trading Watch off)
 python -m vicekrack mobile-serve        the mobile server only (the HQ must already be running)
 python -m vicekrack mobile-phones       list paired phones   |   mobile-unpair-all   unpair every phone
 python -m vicekrack mobile-status       settings (no secrets) and the last phone actions
@@ -151,7 +152,63 @@ def _hq_running(hq_port):
         return False
 
 
-def start(store, port, hq_port, demo=False):
+WATCH_LOG_LIMIT = 5 * 1024 * 1024
+
+
+def keep_watch_running(stopping, state, *, root=None, popen=subprocess.Popen, say=None, clock=time.monotonic):
+    """Keep the Trading Watch (python -m vicekrack watch-run) running for as long as ViceKrack runs, so the agents
+    keep checking the market without a separate window. It never gives up: if the watch stops it is started again
+    (5 seconds later, or 2 minutes later if it stopped right after starting, e.g. because a separate
+    "Start Trading Watch" window already holds the one-watch-at-a-time lock). Its lines go to
+    runtime/trading/watch/watch.log. Practice money only: the watch's own rules (every agent approves, the $80
+    shutdown) are unchanged."""
+    say = say or _say
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    log_path = base / "runtime" / "trading" / "watch" / "watch.log"
+    command = [sys.executable, "-m", "vicekrack", "watch-run"]
+    starts = 0
+    while not stopping.is_set():
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            if log_path.is_file() and log_path.stat().st_size > WATCH_LOG_LIMIT:
+                log_path.replace(log_path.with_suffix(".old.log"))
+            if starts == 0:
+                # Same as the "Start Trading Watch" window: open the $100 practice account if there isn't one yet.
+                if popen([sys.executable, "-m", "vicekrack", "practice-status"], cwd=str(base),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait() != 0:
+                    popen([sys.executable, "-m", "vicekrack", "practice-start"], cwd=str(base),
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+            with log_path.open("ab") as log:
+                began = clock()
+                state["watch"] = popen(command, cwd=str(base), stdout=log, stderr=subprocess.STDOUT)
+                if starts == 0:
+                    say("AI agents' Trading Watch started (practice money only). Its log: runtime/trading/watch/watch.log")
+                starts += 1
+                code = state["watch"].wait()
+        except OSError:
+            code, began = None, clock()
+        if stopping.is_set():
+            return starts
+        quick = clock() - began < 60
+        say("The Trading Watch stopped" + (" right after starting (another watch window may be open)" if quick else "")
+            + "; starting it again in " + ("2 minutes" if quick else "5 seconds") + "…")
+        stopping.wait(120 if quick else 5)
+    return starts
+
+
+def _start_watch(stopping, state, enabled):
+    if enabled:
+        threading.Thread(target=keep_watch_running, args=(stopping, state), daemon=True).start()
+
+
+def _stop(state):
+    for name in ("process", "watch"):
+        child = state.get(name)
+        if child is not None and child.poll() is None:
+            child.terminate()
+
+
+def start(store, port, hq_port, demo=False, watch=True):
     """Start the HQ (Video Studio on) and keep it running, then run the mobile server in this window."""
     env = dict(os.environ)
     if not demo:
@@ -164,13 +221,18 @@ def start(store, port, hq_port, demo=False):
             env["XAI_API_KEY"] = key
         elif not env.get("XAI_API_KEY"):
             _say("No saved xAI key: paid actions will be refused until you run \u201cSave my xAI key\u201d.")
+    stopping = threading.Event()
+    state = {"process": None, "watch": None}
     if _hq_running(hq_port):
         _say(f"Using the ViceKrack HQ that is already running on port {hq_port}.")
-        return serve(store, port, hq_port)
+        _start_watch(stopping, state, watch)
+        try:
+            return serve(store, port, hq_port)
+        finally:
+            stopping.set()
+            _stop(state)
     command = [sys.executable, "-m", "vicekrack", "hq-serve", "--studio-demo" if demo else "--studio",
                "--port", str(hq_port)]
-    stopping = threading.Event()
-    state = {"process": None}
 
     def keep_hq_running():
         restarts = []
@@ -188,12 +250,12 @@ def start(store, port, hq_port, demo=False):
             stopping.wait(5)
 
     threading.Thread(target=keep_hq_running, daemon=True).start()
+    _start_watch(stopping, state, watch)
     try:
         return serve(store, port, hq_port)
     finally:
         stopping.set()
-        if state["process"] and state["process"].poll() is None:
-            state["process"].terminate()
+        _stop(state)
 
 
 def main(argv=None, root=None):
@@ -206,6 +268,7 @@ def main(argv=None, root=None):
             command.add_argument("--hq-port", type=int, default=HQ_PORT)
         if name == "mobile-start":
             command.add_argument("--demo", action="store_true", help="start the HQ with mock providers (no credits)")
+            command.add_argument("--no-watch", action="store_true", help="don't start the Trading Watch")
     for name in ("mobile-pair", "mobile-save-key", "mobile-phones", "mobile-unpair-all", "mobile-status"):
         commands.add_parser(name)
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -218,7 +281,7 @@ def main(argv=None, root=None):
         if args.command == "mobile-serve":
             return serve(store, args.port, args.hq_port)
         if args.command == "mobile-start":
-            return start(store, args.port, args.hq_port, demo=args.demo)
+            return start(store, args.port, args.hq_port, demo=args.demo, watch=not args.no_watch)
         if args.command == "mobile-save-key":
             from .winkey import save_key
             save_key(getpass.getpass("Paste your xAI API key (it stays hidden) and press Enter: "))

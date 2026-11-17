@@ -27,12 +27,19 @@ see, and checks the fuse. Then it hands the floor to the [trade desk](trade-desk
 
 ## Running it on the PC
 
-Double-click **`scripts\windows\Start Trading Watch.bat`**. It opens the practice account if
-there isn't one yet, then starts the loop. Keep the window open (minimizing is fine):
+**The easy way (one click, or zero):** **`Start ViceKrack (PC + Phone).bat`** now starts the Trading
+Watch too, in the background, alongside the HQ and the phone app. If the watch ever stops, it's
+started again by itself (5 seconds later, or 2 minutes later if it stopped right away). Its lines go
+to `runtime\trading\watch\watch.log`. Run **`Turn on auto-start.bat`** once and all of it starts
+whenever you sign in to Windows, so the agents run 24/7 while the PC is on.
 
-- While it's open, Windows is asked **not to sleep** (the screen can still turn off).
-- Close the window to stop. The PC can sleep again.
-- If the PC restarts, double-click it again. (Auto-start can come later.)
+- While ViceKrack runs, Windows is asked **not to sleep** (the screen can still turn off).
+- Close the ViceKrack window to stop everything. The PC can sleep again.
+- To start ViceKrack without the watch: `python -m vicekrack mobile-start --no-watch`.
+
+**The old way still works:** **`Start Trading Watch.bat`** runs the watch in its own window. Only one
+watch can run at a time, so if both are open the background one just waits and takes over when the
+window is closed.
 
 Commands, if you ever want them:
 
