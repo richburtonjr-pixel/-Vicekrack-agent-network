@@ -6,6 +6,7 @@ python -m vicekrack watch-status     the last saved cycle
 python -m vicekrack desk-cases       recent trade desk case files (who approved, who vetoed, why)
 python -m vicekrack desk-emergency status|engage|release   the agents' Emergency Stop
 python -m vicekrack desk-trail-test  replay closed agent trades under other profit-trail settings
+python -m vicekrack watch-scorecard  early-or-late scorecard: what happened after each scanner pick
 """
 
 import argparse
@@ -17,7 +18,7 @@ from ..desk.desk import CaseFiles
 from .cycle import WatchFolder, load_watch_config, run_cycle
 from .runner import run_loop  # noqa: E402
 
-COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases", "desk-emergency", "desk-trail-test"}
+COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases", "desk-emergency", "desk-trail-test", "watch-scorecard"}
 
 
 def parser():
@@ -33,6 +34,7 @@ def parser():
     emergency.add_argument("action", choices=["status", "engage", "release"])
     emergency.add_argument("--reason", default=None)
     commands.add_parser("desk-trail-test", help="Replay closed agent trades under other profit-trail settings")
+    commands.add_parser("watch-scorecard", help="Early-or-late scorecard for the scanner's picks")
     return root
 
 
@@ -60,6 +62,9 @@ def main(argv=None, root=None):
             from ..desk.safety import EmergencySwitch
             switch = EmergencySwitch(root)
             output = switch.state() if args.action == "status" else switch.set(args.action == "engage", "pc", args.reason)
+        elif args.command == "watch-scorecard":
+            from .scorecard import Scorecard
+            output = Scorecard(root).summary()
         elif args.command == "desk-trail-test":
             output = trail_test(root)
         elif args.command == "desk-cases":

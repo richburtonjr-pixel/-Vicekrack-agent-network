@@ -748,6 +748,35 @@ async function deskScreen() {
           })) : h("p", { class: "muted" }, "The agents haven't placed a practice trade on this account yet.")))));
 }
 
+/* ---------- early-or-late scorecard (autonomous step 3) ---------- */
+function scorecardCard(sc) {
+  if (!sc) { return null; }
+  const v = sc.verdicts || {}, n = sc.closed_picks;
+  const pct = (x) => n ? Math.round((x / n) * 100) + "%" : "—";
+  const change = (x) => x === null || x === undefined ? "—" : (Number(x) > 0 ? "+" : "") + x + "%";
+  const bar = h("div", { class: "vt-alloc", role: "img", "aria-label": "Early " + pct(v.early || 0) + ", mixed " + pct(v.mixed || 0) + ", late " + pct(v.late || 0) });
+  for (const [key, color] of [["early", "#0A9D58"], ["mixed", "#C9CED6"], ["late", "#E5484D"]]) {
+    if (n && v[key]) { const seg = h("i"); seg.style.width = (v[key] / n) * 100 + "%"; seg.style.background = color; bar.append(seg); }
+  }
+  const SIG = { streak: "Steady climb", volume_spike: "Volume spike", accelerating: "Speeding up" };
+  return h("section", { class: "vt-card" },
+    h("div", { class: "vt-head" }, h("h2", {}, "Early or late?"), h("span", { class: "muted small" }, n + " picks scored · " + sc.open_picks + " being followed")),
+    h("p", { class: "muted" }, "Every coin the scanner flags is followed for 24 hours. Early = it rose " + sc.settings.early_gain_pct
+      + "%+ after the pick. Late = the move was already over."),
+    n ? [bar,
+      h("div", { class: "vt-legend" }, h("span", {}, "Early " + pct(v.early || 0)), h("span", {}, "Mixed " + pct(v.mixed || 0)), h("span", {}, "Late " + pct(v.late || 0)),
+        h("span", {}, "Became a top-" + sc.settings.top_n + " gainer " + pct(sc.became_top_gainer))),
+      h("div", { class: "vt-grid2" },
+        h("div", { class: "vt-who" }, h("strong", {}, "Picks, average"), ["1h", "4h", "24h"].map((k) =>
+          h("div", { class: "vt-row" }, h("span", {}, k + " later"), h("span", { class: "val " + (Number(sc.average_change_pct[k]) >= 0 ? "up" : "down") }, change(sc.average_change_pct[k]))))),
+        h("div", { class: "vt-who" }, h("strong", {}, "Bitcoin, same times"), ["1h", "4h", "24h"].map((k) =>
+          h("div", { class: "vt-row" }, h("span", {}, k + " later"), h("span", { class: "val" }, change(sc.benchmark_average_change_pct[k])))))),
+      Object.keys(sc.by_signal || {}).length ? h("div", {}, Object.entries(sc.by_signal).map(([s, g]) =>
+        h("div", { class: "vt-row" }, h("span", {}, SIG[s] || words(s)), h("span", { class: "val" }, g.early + " of " + g.picks + " early · best +" + g.average_max_gain_pct + "% avg")))) : null]
+      : h("p", { class: "muted" }, "The first results appear 24 hours after the scanner's first picks."),
+    h("p", { class: "muted small" }, "A few days of picks prove nothing. Look for a pattern over weeks."));
+}
+
 /* ---------- Results / Performance (stage 4) ---------- */
 function curveChart(curve, start, floor) {
   const values = curve.map((c) => Number(c.balance));
@@ -801,7 +830,7 @@ async function resultsScreen() {
   if (r.status === 401) { notPaired(); return; }
   if (!r.ok) { offline(problem(r)); return; }
   const d = r.body;
-  if (d.needs_start || !d.account) { show(h("h1", { class: "vt-title" }, "Results"), startCard(d)); return; }
+  if (d.needs_start || !d.account) { show(h("h1", { class: "vt-title" }, "Results"), startCard(d), scorecardCard(d.scorecard)); return; }
   const a = d.account, all = d.scores.all, start = Number(a.starting_cash), equity = Number(a.equity);
   const change = equity - start;
   const winRate = all.win_rate_pct === null ? "—" : Math.round(Number(all.win_rate_pct)) + "%";
@@ -831,6 +860,7 @@ async function resultsScreen() {
             h("span", { class: "who" }, h("strong", {}, baseOf(c.symbol)), h("span", { class: "muted" }, c.trades + " sale" + (c.trades === 1 ? "" : "s"))),
             h("span", { class: "num" }, h("strong", { class: toneOf(Number(c.pnl)) }, signed(c.pnl))))))
             : h("p", { class: "muted pad" }, "No closed trades yet. Results appear after the first sale.")),
+        scorecardCard(d.scorecard),
         h("p", { class: "muted small" }, "Practice results on pretend money. They don't predict real trading."))));
 }
 

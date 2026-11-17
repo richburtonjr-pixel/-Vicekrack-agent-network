@@ -204,6 +204,13 @@ def run_cycle(config, *, root=None, now=None, transport=urllib_transport, clock=
         radar.update(ok=True, candidates=candidates, stats=stats)
     except TradingError as error:
         radar["error"] = error.code
+    scorecard_update = None
+    if radar["ok"]:
+        try:                                     # measuring only: a scorecard problem never stops the cycle
+            from .scorecard import Scorecard
+            scorecard_update = Scorecard(root).update(radar["candidates"], market, now, now_epoch)
+        except (OSError, ValueError, TypeError, KeyError, ArithmeticError):
+            scorecard_update = {"error": "scorecard_unavailable"}
 
     practice = {"state": None, "guard": None, "error": None}
     desk = {"cases": [], "performance": None, "error": None}
@@ -263,7 +270,7 @@ def run_cycle(config, *, root=None, now=None, transport=urllib_transport, clock=
     status = {"contract": "watch_status", "version": "2.0", "notice": NOTICE, "simulated": True,
               "trades_placed": any(c["outcome"] == "executed" for c in desk["cases"]), "cycle_at": now,
               "provider": config["provider"], "interval": config["interval"], "cycle_seconds": config["cycle_seconds"],
-              "radar": radar, "coins": coins, "practice": practice, "desk": desk}
+              "radar": radar, "coins": coins, "practice": practice, "desk": desk, "scorecard": scorecard_update}
     folder.write_atomic(folder.status_path, json.dumps(status, indent=2, ensure_ascii=False, allow_nan=False))
     folder.append_log({"at": now, "radar_ok": radar["ok"], "radar_error": radar["error"],
                        "candidates": [c["symbol"] for c in radar["candidates"]],
