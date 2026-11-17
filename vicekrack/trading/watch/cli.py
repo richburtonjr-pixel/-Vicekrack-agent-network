@@ -4,6 +4,7 @@ python -m vicekrack watch-once       one cycle now (fetch prices, research, run 
 python -m vicekrack watch-run        keep going every 5 minutes until the window is closed
 python -m vicekrack watch-status     the last saved cycle
 python -m vicekrack desk-cases       recent trade desk case files (who approved, who vetoed, why)
+python -m vicekrack desk-emergency status|engage|release   the agents' Emergency Stop
 """
 
 import argparse
@@ -13,9 +14,9 @@ import sys
 from ..errors import TradingError
 from ..desk.desk import CaseFiles
 from .cycle import WatchFolder, load_watch_config, run_cycle
-from .runner import run_loop
+from .runner import run_loop  # noqa: E402
 
-COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases"}
+COMMANDS = {"watch-once", "watch-run", "watch-status", "desk-cases", "desk-emergency"}
 
 
 def parser():
@@ -27,13 +28,20 @@ def parser():
     commands.add_parser("watch-status", help="Show the last saved cycle")
     cases = commands.add_parser("desk-cases", help="Recent trade desk case files")
     cases.add_argument("--limit", type=int, default=20)
+    emergency = commands.add_parser("desk-emergency", help="Show, engage or release the agents' Emergency Stop")
+    emergency.add_argument("action", choices=["status", "engage", "release"])
+    emergency.add_argument("--reason", default=None)
     return root
 
 
 def main(argv=None, root=None):
     args = parser().parse_args(sys.argv[1:] if argv is None else argv)
     try:
-        if args.command == "desk-cases":
+        if args.command == "desk-emergency":
+            from ..desk.safety import EmergencySwitch
+            switch = EmergencySwitch(root)
+            output = switch.state() if args.action == "status" else switch.set(args.action == "engage", "pc", args.reason)
+        elif args.command == "desk-cases":
             output = {"cases": CaseFiles(root).recent(max(1, min(args.limit, 200)))}
         elif args.command == "watch-status":
             output = WatchFolder(root).status() or {"status": "no_cycles_yet"}

@@ -302,7 +302,7 @@ async function homeScreen() {
   left.push(chart, movers());
   right.push(activityCard(body));
   if (!markets.ok) { right.push(note("Kraken prices couldn't load right now. They refresh by themselves.")); }
-  show(flashNote(), watchBanner(body), h("div", { class: "vt-cols" }, h("div", {}, left), h("div", {}, right)));
+  show(flashNote(), emergencyBanner(body.emergency_stop), watchBanner(body), h("div", { class: "vt-cols" }, h("div", {}, left), h("div", {}, right)));
 }
 function flashNote() { const text = VT.flash; VT.flash = null; return text ? note(text) : null; }
 
@@ -559,6 +559,51 @@ async function portfolioScreen() {
       h("div", {}, shutdownCard(a), historyCard(trades))));
 }
 
+/* ---------- Emergency Stop (autonomous-trading step 1) ---------- */
+function emergencyBanner(state) {
+  if (!state || !state.engaged) { return null; }
+  return h("section", { class: "vt-banner bad", role: "alert" }, h("span", { class: "dot" }),
+    h("div", {}, h("strong", {}, "Emergency Stop is ON"),
+      h("span", { class: "muted" }, "The agents can't buy, and they sell what they hold on their next check. Your own trades still work. "
+        + (state.at ? "Turned on " + ago(state.at) + "." : ""))));
+}
+function emergencyCard(state) {
+  const on = Boolean(state && state.engaged);
+  const error = h("p", { class: "vt-error", role: "alert", hidden: true });
+  const button = h("button", { type: "button", class: on ? "vt-ghost" : "vt-stop" }, on ? "Turn Emergency Stop off" : "Emergency Stop");
+  button.addEventListener("click", async () => {
+    const sure = on ? window.confirm("Turn the Emergency Stop off? The agents can start buying again on their next check.")
+      : window.confirm("Stop the agents now? They buy nothing and sell every coin they hold within about a minute. Your own coins are not touched.");
+    if (!sure) { return; }
+    button.disabled = true;
+    const r = await post("/m/api/trade/emergency", on ? { engaged: false, confirm: "release-emergency-stop" } : { engaged: true });
+    button.disabled = false;
+    if (!r.ok) { error.textContent = problem(r); error.hidden = false; return; }
+    VT.flash = on ? "Emergency Stop is off. The agents are back to normal." : "Emergency Stop is on. The agents are selling their coins.";
+    route(true);
+  });
+  return h("section", { class: "vt-card" + (on ? " vt-stopcard" : "") },
+    h("div", { class: "vt-head" }, h("h2", {}, "Emergency Stop"), h("span", { class: "vt-tag " + (on ? "red" : "green") }, on ? "ON" : "Off")),
+    h("p", { class: "muted" }, on ? "The agents are frozen and selling what they hold. Turn it off when you're ready for them to trade again."
+      : "One tap freezes the agents and sells every coin they hold. Your own trades aren't touched."),
+    button, error);
+}
+function limitsCard(l) {
+  if (!l) { return null; }
+  const row = (label, value) => h("div", { class: "vt-row" }, h("span", {}, label), h("span", { class: "val" }, value));
+  return h("section", { class: "vt-card" }, h("h2", {}, "Safety limits"),
+    row("Per agent trade", usd(l.order_dollars)),
+    row("Coins held at once", "up to " + l.max_agent_positions),
+    row("Buys per day", "up to " + l.max_entries_per_day),
+    l.max_daily_loss_dollars ? row("Daily loss stop", "stops buying at −" + cents(l.max_daily_loss_dollars).replace("−", "")) : null,
+    row("Stop-loss", "sell at −" + l.stop_loss_pct + "%"),
+    l.take_profit_pct ? row("Take-profit", "sell at +" + l.take_profit_pct + "%") : null,
+    l.trailing_stop_pct ? row("Trailing stop", l.trailing_stop_pct + "% below the high") : null,
+    row("Longest hold", l.max_hold_minutes + " min"),
+    row("After " + l.pause_after_losses + " losses in a row", "pause " + Math.round(l.pause_minutes / 60) + " hr"),
+    h("p", { class: "muted small" }, "Plus the $80 shutdown on the whole account. Change these in config/trading-desk.json on the PC."));
+}
+
 /* ---------- AI Trading Desk (stage 3) ---------- */
 const FLOW = ["market_scout", "trend_agent", "strategy_agent", "risk_review", "verifier", "executor"];
 const SHORT = { market_scout: "Scout", trend_agent: "Trend", strategy_agent: "Strategy", risk_review: "Risk", verifier: "Verifier",
@@ -602,7 +647,7 @@ function decisionCard(c) {
     return h("div", { class: "vt-stepline" }, avatar(s.agent, true),
       h("div", { class: "what" }, h("strong", {}, NAMES[s.agent] || words(s.agent)),
         s.summary ? h("span", { class: "muted" }, s.summary) : null,
-        (s.reasons || []).length ? h("span", { class: "muted small" }, "Why: " + s.reasons.join(", ")) : null),
+        (s.reasons || []).length ? h("span", { class: "muted small" }, "Why: " + s.reasons.map(words).join(", ")) : null),
       h("span", { class: "vt-tag " + tag[1] }, tag[0]));
   }));
   return h("details", { class: "vt-case" },
@@ -630,8 +675,9 @@ async function deskScreen() {
       h("span", { class: "who" }, h("strong", {}, baseOf(m.symbol)), h("span", { class: "muted" }, m.error ? "Price problem" : m.verdict_text || "Not researched yet")),
       h("span", { class: "num" }, h("strong", {}, usd(m.price)), h("span", { class: "vt-tag " + (good ? "green" : "") }, good ? "Looks good" : "Wait")));
   });
-  show(h("div", { class: "vt-head" }, h("h1", { class: "vt-title" }, "AI Desk"),
+  show(flashNote(), h("div", { class: "vt-head" }, h("h1", { class: "vt-title" }, "AI Desk"),
       h("span", { class: "vt-tag " + (w.auto_practice_trades ? "green" : "blue") }, w.auto_practice_trades ? "Auto trades on" : "Auto trades off")),
+    emergencyBanner(d.emergency_stop),
     VT.account ? watchBanner(VT.account) : null,
     w.desk_error ? note("The desk had a problem last cycle: " + words(w.desk_error)) : null,
     h("div", { class: "vt-stats" },
@@ -641,6 +687,7 @@ async function deskScreen() {
     h("p", { class: "muted small" }, "Counts cover the recent ideas shown below (today and yesterday)."),
     h("div", { class: "vt-cols" },
       h("div", {},
+        emergencyCard(d.emergency_stop),
         flowStrip(),
         h("section", {}, h("div", { class: "vt-head" }, h("h2", {}, "The eight agents"), h("span", { class: "muted" }, "live from your PC")),
           h("div", { class: "vt-agents" }, (d.agents || []).map(agentCard)))),
@@ -650,6 +697,7 @@ async function deskScreen() {
             : h("p", { class: "muted" }, "No trade ideas today or yesterday. An idea only opens when research says a coin looks good.")),
         h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "Coins researched"), h("span", { class: "muted" }, w.last_cycle_at ? ago(w.last_cycle_at) : "")),
           researched.length ? h("div", {}, researched) : h("p", { class: "muted pad" }, "Nothing researched yet. The agents start when the watch runs.")),
+        limitsCard(d.limits),
         h("section", { class: "vt-card" }, h("h2", {}, "Trades the agents placed"),
           agentTrades.length ? h("div", { class: "vt-feed" }, agentTrades.slice(0, 10).map((x) => {
             const pnl = x.realized_pnl === null || x.realized_pnl === undefined ? null : Number(x.realized_pnl);

@@ -86,7 +86,9 @@ class TradeApi:
     def account(self):
         store = PracticeStore(self.root)
         watch = WatchFolder(self.root).status() or {}
+        from ..trading.desk.safety import EmergencySwitch
         base = {"contract": "trade_account", "simulated": True, "notice": book.NOTICE,
+                "emergency_stop": EmergencySwitch(self.root).state(),
                 "watch": {"last_cycle_at": watch.get("cycle_at"), "cycle_seconds": watch.get("cycle_seconds"),
                           "radar": {k: (watch.get("radar") or {}).get(k) for k in ("ok", "error", "candidates", "stats")}}}
         try:
@@ -123,7 +125,16 @@ class TradeApi:
         snap = floor_snapshot(root=self.root, now=datetime.fromtimestamp(self.clock(), tz=timezone.utc))
         researched = [{k: m.get(k) for k in ("symbol", "price", "price_at", "error", "verdict", "verdict_text")}
                       for m in snap["markets"]]
+        from ..trading.desk.desk import load_desk_config
+        from ..trading.desk.safety import EmergencySwitch
+        try:
+            desk_config = load_desk_config(**({"root": self.root} if self.root is not None else {}))
+            limits = {"order_dollars": desk_config["order_dollars"], **desk_config["risk"], **desk_config["monitor"],
+                      "auto_practice_trades": desk_config["auto_practice_trades"]}
+        except TradingError:
+            limits = None
         return {"contract": "trade_desk", "simulated": True, "notice": book.NOTICE, "watch": snap["watch"],
+                "emergency_stop": EmergencySwitch(self.root).state(), "limits": limits,
                 "agents": snap["agents"], "decisions": snap["decisions"], "researched": researched,
                 "performance": snap["performance"]}
 
@@ -196,6 +207,18 @@ class TradeApi:
         with self._lock:
             self._market = (0.0, self._market[1])        # next market read is fresh
         return result
+
+    def emergency(self, document):
+        """Turn the agents' Emergency Stop on or off. On: the agents buy nothing and, on the next watch cycle,
+        sell every coin they hold. Your own coins and trades are untouched."""
+        from ..trading.desk.safety import EmergencySwitch
+        engaged = document.get("engaged")
+        if not isinstance(engaged, bool) or set(document) - {"engaged", "confirm"}:
+            raise NetworkError("invalid_request", "Send engaged: true or false.")
+        if not engaged and document.get("confirm") != "release-emergency-stop":
+            raise TradingError("release_not_confirmed", "Confirm turning the Emergency Stop off.")
+        state = EmergencySwitch(self.root).set(engaged, "phone", "Pressed in the app" if engaged else None)
+        return {"contract": "trade_emergency", "simulated": True, "emergency_stop": state}
 
     def restart(self, document):
         if document.get("confirm") != RESTART_PHRASE or set(document) - {"confirm"}:

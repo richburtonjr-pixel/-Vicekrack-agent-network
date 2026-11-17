@@ -56,7 +56,7 @@ class TradingAppScript(unittest.TestCase):
         paths = set(re.findall(r'"(/m/api/[a-z/]+)', self.script))
         self.assertEqual(paths, {"/m/api/session", "/m/api/trade/account", "/m/api/trade/markets",
                                  "/m/api/trade/coin", "/m/api/trade/order", "/m/api/trade/restart",
-                                 "/m/api/trade/desk", "/m/api/trade/results"})
+                                 "/m/api/trade/desk", "/m/api/trade/results", "/m/api/trade/emergency"})
         code = self.script.replace('"http://www.w3.org/2000/svg"', "")   # the SVG namespace is not a request
         for outside in ("kraken.com", "alpaca.markets", "http://", "https://"):
             self.assertNotIn(outside, code)            # never talks to a broker or exchange directly
@@ -142,11 +142,38 @@ class TradingResults(TradingDesk):
         self.assertEqual(PracticeStore(self.root).load(load_config(root=self.root)), before)
 
 
+class EmergencyButton(TradingDesk):
+    """POST /m/api/trade/emergency: on with one tap, off only with the confirm phrase."""
+
+    def test_engage_and_release(self):
+        from vicekrack.errors import NetworkError
+        from vicekrack.trading.errors import TradingError
+        self.assertFalse(self.api.desk()["emergency_stop"]["engaged"])
+        self.assertTrue(self.api.emergency({"engaged": True})["emergency_stop"]["engaged"])
+        self.assertTrue(self.api.account()["emergency_stop"]["engaged"])
+        with self.assertRaises(TradingError):
+            self.api.emergency({"engaged": False})             # turning it off needs the confirm phrase
+        self.assertFalse(self.api.emergency({"engaged": False, "confirm": "release-emergency-stop"})["emergency_stop"]["engaged"])
+        with self.assertRaises(NetworkError):
+            self.api.emergency({"engaged": "yes"})
+
+    def test_desk_shows_the_safety_limits(self):
+        limits = self.api.desk()["limits"]
+        self.assertEqual((limits["max_daily_loss_dollars"], limits["take_profit_pct"], limits["trailing_stop_pct"]),
+                         ("5.00", "3", "1.5"))
+
+
+for _name in [n for n in dir(TradingDesk) if n.startswith("test_")]:
+    setattr(EmergencyButton, _name, None)
+
+
 class TradingDeskGateway(MobileBase):
     def test_needs_a_paired_phone(self):
         for path in ("/m/api/trade/desk", "/m/api/trade/results"):
             status, _, body = self.gw.respond("GET", path, self.remote())
             self.assertEqual(status, 401, path)
+        status, _, _ = self.gw.respond("POST", "/m/api/trade/emergency", self.remote(), b'{"engaged": true}')
+        self.assertIn(status, (401, 403))                     # refused before anything is switched
 
 
 if __name__ == "__main__":
