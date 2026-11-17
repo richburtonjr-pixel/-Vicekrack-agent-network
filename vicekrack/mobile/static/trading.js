@@ -659,17 +659,90 @@ async function deskScreen() {
           })) : h("p", { class: "muted" }, "The agents haven't placed a practice trade on this account yet.")))));
 }
 
-/* ---------- sections arriving in the next stages ---------- */
-const SOON = {
-  performance: ["Results", "Stage 4", ["Balance over time (equity chart)", "Win rate, drawdown and fees", "You vs the agents"],
-    "#trade/desk", "Until then, the scoreboard is in the Command Center's Agent desk."],
-};
-function soonScreen(key) {
-  const [title, stage, items, link, text] = SOON[key];
-  show(h("h1", { class: "vt-title" }, title),
-    h("section", { class: "vt-card vt-soon" }, h("div", { class: "vt-head" }, h("h2", {}, "Coming next"), h("span", { class: "vt-tag blue" }, stage)),
-      h("ul", {}, items.map((i) => h("li", {}, i)))),
-    h("p", { class: "muted" }, text), h("a", { class: "vt-ghost", href: "/" + link, role: "button" }, "Open the Command Center"));
+/* ---------- Results / Performance (stage 4) ---------- */
+function curveChart(curve, start, floor) {
+  const values = curve.map((c) => Number(c.balance));
+  const label = (c) => c.event === "start" ? "Started" : c.event === "now" ? "Now (with open coins)"
+    : "Sold " + baseOf(c.symbol) + " " + signed(c.pnl) + " · " + (c.by === "you" ? "you" : "agents");
+  const readout = h("p", { class: "vt-readout" }, usd(values[values.length - 1]));
+  const sub = h("p", { class: "vt-readout-sub muted" }, label(curve[curve.length - 1]));
+  if (values.length < 2) { return h("section", { class: "vt-chart-card" }, readout, h("div", { class: "vt-chart-empty" }, "The chart starts after the first sale.")); }
+  const W = 600, H = 200, top = 12, bottom = 188;
+  const low = Math.min(...values, floor), high = Math.max(...values, start), span = high - low || 1;
+  const x = (i) => (i / (values.length - 1)) * W;
+  const y = (v) => bottom - ((v - low) / span) * (bottom - top);
+  let path = "M0 " + y(values[0]).toFixed(1);
+  for (let i = 1; i < values.length; i++) { path += " L" + x(i).toFixed(1) + " " + y(values[i - 1]).toFixed(1) + " L" + x(i).toFixed(1) + " " + y(values[i]).toFixed(1); }
+  const dir = values[values.length - 1] >= start ? "up" : "down";
+  const svg = s("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", class: "vt-chart", role: "img",
+    "aria-label": "Locked-in balance after each sale. Touch or hover to see each point." });
+  svg.append(s("line", { x1: 0, x2: W, y1: y(start), y2: y(start), class: "base", "vector-effect": "non-scaling-stroke" }),
+    s("line", { x1: 0, x2: W, y1: y(floor), y2: y(floor), class: "floorline", "vector-effect": "non-scaling-stroke" }),
+    s("path", { d: path + " L" + W + " " + H + " L0 " + H + " Z", class: "area " + dir }),
+    s("path", { d: path, class: "line " + dir, "vector-effect": "non-scaling-stroke" }));
+  const dot = s("circle", { r: 5, cx: -20, cy: -20, class: "dot " + dir, "vector-effect": "non-scaling-stroke" });
+  svg.append(dot);
+  const reset = () => { dot.setAttribute("cx", -20); readout.textContent = usd(values[values.length - 1]); sub.textContent = label(curve[curve.length - 1]); };
+  const scrub = (event) => {
+    const box = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(values.length - 1, Math.round(((event.clientX - box.left) / box.width) * (values.length - 1))));
+    dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(values[i]));
+    readout.textContent = usd(values[i]);
+    sub.textContent = label(curve[i]) + " · " + new Date(curve[i].at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  };
+  svg.addEventListener("pointermove", scrub); svg.addEventListener("pointerdown", scrub);
+  svg.addEventListener("pointerleave", reset); svg.addEventListener("pointercancel", reset);
+  return h("section", { class: "vt-chart-card" }, h("div", { class: "vt-head" }, h("h2", {}, "Balance over time"), h("span", { class: "muted small" }, values.length - 2 + " sales")),
+    readout, sub, svg,
+    h("div", { class: "vt-legend" }, h("span", {}, h("i", { class: "key start" }), cents(start) + " start"), h("span", {}, h("i", { class: "key floor" }), cents(floor) + " shutdown")),
+    h("p", { class: "muted small" }, "Each step is a sale (profit or loss after fees). The last point is today's balance including coins you still hold."));
+}
+function scoreTile(value, label, tone) { return h("div", { class: "vt-stat" }, h("b", { class: tone || "" }, value), h("span", {}, label)); }
+function toneOf(n) { return n > 0 ? "up" : n < 0 ? "down" : ""; }
+function whoColumn(title, sc, fee) {
+  const pnl = Number(sc.realized_pnl);
+  return h("div", { class: "vt-who" }, h("strong", {}, title),
+    h("div", { class: "vt-row" }, h("span", {}, "Closed trades"), h("span", { class: "val" }, String(sc.closed_trades))),
+    h("div", { class: "vt-row" }, h("span", {}, "Win rate"), h("span", { class: "val" }, sc.win_rate_pct === null ? "—" : Math.round(Number(sc.win_rate_pct)) + "%")),
+    h("div", { class: "vt-row" }, h("span", {}, "P&L"), h("span", { class: "val " + toneOf(pnl) }, signed(pnl))),
+    h("div", { class: "vt-row" }, h("span", {}, "Fees"), h("span", { class: "val" }, cents(fee))));
+}
+async function resultsScreen() {
+  const r = await call("/m/api/trade/results");
+  if (r.status === 401) { notPaired(); return; }
+  if (!r.ok) { offline(problem(r)); return; }
+  const d = r.body;
+  if (d.needs_start || !d.account) { show(h("h1", { class: "vt-title" }, "Results"), startCard(d)); return; }
+  const a = d.account, all = d.scores.all, start = Number(a.starting_cash), equity = Number(a.equity);
+  const change = equity - start;
+  const winRate = all.win_rate_pct === null ? "—" : Math.round(Number(all.win_rate_pct)) + "%";
+  show(h("h1", { class: "vt-title" }, "Results"),
+    h("section", { class: "vt-hero" }, h("p", { class: "vt-label" }, "Since you started with " + cents(start)),
+      h("p", { class: "vt-big " + toneOf(change) }, isFinite(change) ? signed(change) : "—"),
+      h("p", { class: "vt-pnl muted" }, isFinite(change) ? (change >= 0 ? "+" : "−") + Math.abs((change / start) * 100).toFixed(2) + "% · balance " + usd(equity) : "")),
+    a.status === "halted" ? note("The $80 shutdown tripped " + ago(a.halt && a.halt.at) + ". These results stop there.") : null,
+    h("div", { class: "vt-cols" },
+      h("div", {},
+        curveChart(d.curve || [], start, Number(a.shutdown_floor)),
+        h("div", { class: "vt-stats vt-stats6" },
+          scoreTile(winRate, "Win rate · " + all.wins + "W " + all.losses + "L"),
+          scoreTile(String(all.closed_trades), "Closed trades"),
+          scoreTile(signed(all.realized_pnl), "Locked-in profit", toneOf(Number(all.realized_pnl))),
+          scoreTile(Number(d.drawdown.dollars) ? "−" + cents(d.drawdown.dollars).replace("−", "") : "$0.00", "Biggest drop · " + Number(d.drawdown.pct).toFixed(1) + "%", Number(d.drawdown.dollars) ? "down" : ""),
+          scoreTile(cents(d.fees.total), "Fees paid"),
+          scoreTile(compact(d.volume), "Traded · " + d.fills + " fills")),
+        h("section", { class: "vt-card" }, h("h2", {}, "Best and worst"),
+          h("div", { class: "vt-row" }, h("span", {}, "Best trade"), h("span", { class: "val " + toneOf(Number(all.best)) }, all.best === null ? "—" : signed(all.best))),
+          h("div", { class: "vt-row" }, h("span", {}, "Worst trade"), h("span", { class: "val " + toneOf(Number(all.worst)) }, all.worst === null ? "—" : signed(all.worst))))),
+      h("div", {},
+        h("section", { class: "vt-card" }, h("h2", {}, "You vs the agents"),
+          h("div", { class: "vt-grid2" }, whoColumn("You", d.scores.you, d.fees.you), whoColumn("Agents", d.scores.agents, d.fees.agents))),
+        h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "By coin"), h("span", { class: "muted" }, "closed trades")),
+          (d.coins || []).length ? h("div", {}, d.coins.map((c) => h("a", { class: "vt-coin", href: "#market/coin/" + c.symbol }, badge(baseOf(c.symbol)),
+            h("span", { class: "who" }, h("strong", {}, baseOf(c.symbol)), h("span", { class: "muted" }, c.trades + " sale" + (c.trades === 1 ? "" : "s"))),
+            h("span", { class: "num" }, h("strong", { class: toneOf(Number(c.pnl)) }, signed(c.pnl))))))
+            : h("p", { class: "muted pad" }, "No closed trades yet. Results appear after the first sale.")),
+        h("p", { class: "muted small" }, "Practice results on pretend money. They don't predict real trading."))));
 }
 
 /* ---------- router ---------- */
@@ -688,14 +761,15 @@ async function route(force) {
   } else if (tab === "market") {
     await marketScreen(rest[0] || "all");
     VT.timer = setInterval(() => { if (!quiet()) { marketScreen(); } }, 20000);
+  } else if (tab === "performance") {
+    await resultsScreen();
+    VT.timer = setInterval(() => { if (!quiet()) { resultsScreen(); } }, 30000);
   } else if (tab === "desk") {
     await deskScreen();
     VT.timer = setInterval(() => { if (!quiet()) { deskScreen(); } }, 30000);
   } else if (tab === "portfolio") {
     await portfolioScreen();
     VT.timer = setInterval(() => { if (!quiet()) { portfolioScreen(); } }, 20000);
-  } else if (SOON[tab]) {
-    soonScreen(tab);
   } else {
     await homeScreen();
     VT.timer = setInterval(() => { if (!quiet()) { homeScreen(); } }, 20000);

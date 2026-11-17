@@ -127,6 +127,64 @@ class TradeApi:
                 "agents": snap["agents"], "decisions": snap["decisions"], "researched": researched,
                 "performance": snap["performance"]}
 
+    def results(self):
+        """Performance of the current practice account, worked out from its own ledger (read-only, no network).
+
+        The PC does not keep a minute-by-minute balance history, so the chart is the LOCKED-IN balance: the
+        starting cash plus every closed trade's profit or loss (fees included), one point per sale, ending with
+        today's balance including open coins. Drawdown is measured on those points."""
+        base = {"contract": "trade_results", "simulated": True, "notice": book.NOTICE}
+        store = PracticeStore(self.root)
+        try:
+            config = load_config(**({"root": self.root} if self.root is not None else {}))
+            state = store.load(config)
+        except TradingError as error:
+            return {**base, "account": None, "needs_start": error.code in ("practice_not_started", "practice_config_changed"),
+                    "problem": error.as_dict()}
+        summary = book.summary(state, config, utc_now())
+        lines = [l for l in store.ledger(100000) if l.get("account_id") == state["account_id"]]
+        fills = [l for l in lines if l.get("kind") == "fill"]
+        start = book.parse(state["starting_cash"])
+        balance, peak, worst_drop, worst_at = start, start, book.to_decimal("0"), None
+        curve = [{"at": state.get("created_at") or (lines[0]["at"] if lines else summary["updated_at"]),
+                  "balance": book.fmt(start), "event": "start"}]
+        for line in fills:
+            if line.get("realized_pnl") is None:
+                continue
+            balance += book.parse(line["realized_pnl"], "signed_decimal")
+            curve.append({"at": line["at"], "balance": book.fmt(balance), "event": "sell", "symbol": line["symbol"],
+                          "by": line.get("by"), "pnl": line["realized_pnl"]})
+        if summary.get("equity") is not None:
+            curve.append({"at": summary["updated_at"], "balance": summary["equity"], "event": "now"})
+        for point in curve:
+            value = book.parse(point["balance"], "signed_decimal")
+            peak = max(peak, value)
+            drop = peak - value
+            if drop > worst_drop:
+                worst_drop, worst_at = drop, point["at"]
+        fees, volume, coins = {"you": book.to_decimal("0"), "agents": book.to_decimal("0")}, book.to_decimal("0"), {}
+        for line in fills:
+            who = "you" if line.get("by") == "you" else "agents"
+            fees[who] += book.parse(line["fee"])
+            volume += book.parse(line["notional"])
+            if line.get("realized_pnl") is not None:
+                coin = coins.setdefault(line["symbol"], {"symbol": line["symbol"], "trades": 0, "pnl": book.to_decimal("0")})
+                coin["trades"] += 1
+                coin["pnl"] += book.parse(line["realized_pnl"], "signed_decimal")
+        scores = {"all": performance(lines, state["account_id"], summary)}
+        for who in ("you", "agents"):
+            scores[who] = performance([l for l in lines if l.get("by") == who], state["account_id"], summary)
+        halts = [l for l in lines if l.get("kind") == "halt"]
+        return {**base, "needs_start": False, "account": {k: summary.get(k) for k in (
+                    "status", "starting_cash", "cash", "equity", "shutdown_floor", "realized_pnl", "halt", "updated_at")},
+                "curve": curve, "scores": scores,
+                "drawdown": {"dollars": book.fmt(worst_drop), "pct": book.fmt(worst_drop * 100 / peak) if peak else "0",
+                             "at": worst_at, "measured_on": "locked_in_balance"},
+                "fees": {"you": book.fmt(fees["you"]), "agents": book.fmt(fees["agents"]), "total": book.fmt(fees["you"] + fees["agents"])},
+                "volume": book.fmt(volume), "fills": len(fills), "halts": len(halts),
+                "coins": sorted(({**c, "pnl": book.fmt(c["pnl"])} for c in coins.values()),
+                                key=lambda c: book.parse(c["pnl"], "signed_decimal"), reverse=True)}
+
     # ------------------------------------------------------------ actions
     def order(self, document):
         if set(document) - {"symbol", "side", "amount", "request_id"}:
