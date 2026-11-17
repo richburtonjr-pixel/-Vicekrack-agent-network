@@ -616,11 +616,31 @@ function limitsCard(l) {
     row("Buys per day", "up to " + l.max_entries_per_day),
     l.max_daily_loss_dollars ? row("Daily loss stop", "stops buying at −" + cents(l.max_daily_loss_dollars).replace("−", "")) : null,
     row("Stop-loss", "sell at −" + l.stop_loss_pct + "%"),
-    l.take_profit_pct ? row("Take-profit", "sell at +" + l.take_profit_pct + "%") : null,
-    l.trailing_stop_pct ? row("Trailing stop", l.trailing_stop_pct + "% below the high") : null,
-    row("Longest hold", l.max_hold_minutes + " min"),
+    row("Take-profit", "none: winners keep running"),
+    l.profit_trail ? l.profit_trail.tiers.map((tier) => row("Profit trail from +" + tier.from_profit_pct + "%",
+      "sell after giving back " + tier.giveback_points + " pts")) : null,
+    row("Longest hold", l.max_hold_minutes + " min, unless the profit trail is on"),
     row("After " + l.pause_after_losses + " losses in a row", "pause " + Math.round(l.pause_minutes / 60) + " hr"),
+    l.profit_trail ? h("p", { class: "muted small" }, profitExample(l.profit_trail)) : null,
     h("p", { class: "muted small" }, "Plus the $80 shutdown on the whole account. Change these in config/trading-desk.json on the PC."));
+}
+function profitExample(trail) {
+  const pts = (best) => { let g = null; for (const t of trail.tiers) { if (best >= Number(t.from_profit_pct)) { g = Number(t.giveback_points); } } return g; };
+  const lock = (best) => Math.max(best - pts(best), Number(trail.min_lock_profit_pct || 0));
+  return "Example: best profit +20% → sells at +" + lock(20) + "%. Best +30% → +" + lock(30) + "%. Points of profit, after estimated selling costs. "
+    + "A fast drop can fill a little lower.";
+}
+function trailTestCard(test) {
+  if (!test) { return null; }
+  const label = { current: "Current setting", tight: "Tighter", loose: "Looser", fixed_3pct_take_profit: "Fixed +3% take-profit",
+                  no_trail_hold_to_end: "No trail (hold)" };
+  return h("section", { class: "vt-card" }, h("div", { class: "vt-head" }, h("h2", {}, "Which profit setting works best?"),
+      h("span", { class: "muted small" }, test.closed_positions + " closed trades")),
+    test.closed_positions ? h("div", {}, test.results.map((r) => h("div", { class: "vt-row" }, h("span", {}, label[r.name] || words(r.name)),
+      h("span", { class: "val " + (Number(r.average_profit_pct) > 0 ? "up" : Number(r.average_profit_pct) < 0 ? "down" : "") },
+        r.average_profit_pct === null ? "—" : (Number(r.average_profit_pct) > 0 ? "+" : "") + r.average_profit_pct + "% avg"))))
+      : h("p", { class: "muted" }, "Fills in as the agents close trades: each closed trade is replayed under every setting."),
+    h("p", { class: "muted small" }, "Replays real paper prices. A few trades prove nothing; look again after a few weeks."));
 }
 
 /* ---------- AI Trading Desk (stage 3) ---------- */
@@ -718,6 +738,7 @@ async function deskScreen() {
         h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "Coins researched"), h("span", { class: "muted" }, w.last_cycle_at ? ago(w.last_cycle_at) : "")),
           researched.length ? h("div", {}, researched) : h("p", { class: "muted pad" }, "Nothing researched yet. The agents start when the watch runs.")),
         limitsCard(d.limits),
+        trailTestCard(d.trail_test),
         h("section", { class: "vt-card" }, h("h2", {}, "Trades the agents placed"),
           agentTrades.length ? h("div", { class: "vt-feed" }, agentTrades.slice(0, 10).map((x) => {
             const pnl = x.realized_pnl === null || x.realized_pnl === undefined ? null : Number(x.realized_pnl);

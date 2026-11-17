@@ -63,7 +63,20 @@ class TradeDeskTests(unittest.TestCase):
         self.assertEqual((fill["by"], fill["notional"] <= "25"), ("agents", True))
         self.assertGreater(float(fill["price"]), float(next(c for c in status["coins"] if c["symbol"] == "SOLUSD")["bid"]))
 
+    def without_profit_trail(self):
+        path = self.root / "config/trading-desk.json"
+        config = json.loads(path.read_text(encoding="utf-8"))
+        config["monitor"].pop("profit_trail", None)
+        path.write_text(json.dumps(config), encoding="utf-8")
+
+    def test_a_big_winner_is_kept_when_its_trend_wiggles(self):
+        # By minute 651 SOL is about +16%: the profit trail is on (locked near +10%), so the trend exit waits.
+        self.cycle(ENTRY)
+        self.cycle(EXIT)
+        self.assertIn("SOLUSD", self.store.load(self.practice_config)["positions"])
+
     def test_position_monitor_closes_and_performance_reviewer_reports(self):
+        self.without_profit_trail()                       # the plain trend exit, as before the profit trail
         self.cycle(ENTRY)
         status = self.cycle(EXIT)
         case = self.cases(EXIT)[-1]
