@@ -7,7 +7,7 @@
  * Text is always inserted as text, never parsed as HTML. */
 "use strict";
 
-const VT = { csrf: null, timer: null, route: null, markets: null, account: null, filter: "all", query: "", shown: 60,
+const VT = { csrf: null, timer: null, route: null, markets: null, account: null, filter: "all", query: "", shown: 60, history: "all",
              range: "1D", homeRange: "1D", flash: null };
 const MOVER_MIN_VOLUME = 1000000;        // movers list skips coins with under $1M traded in 24h (thin, jumpy prices)
 const NAMES = { market_scout: "Market Scout", trend_agent: "Trend Agent", strategy_agent: "Strategy Agent", verifier: "Verifier",
@@ -457,10 +457,110 @@ function orderSheet(symbol, side, t, holding) {
   input.focus();
 }
 
+/* ---------- Portfolio (stage 2) ---------- */
+const SLICE = ["#166FE5", "#0A9D58", "#7C3AED", "#F59E0B", "#DB2777", "#0891B2", "#65A30D", "#EA580C"];
+function shutdownCard(a) {
+  const equity = Number(a.equity), start = Number(a.starting_cash), floor = Number(a.shutdown_floor);
+  const halted = a.status === "halted";
+  const room = isFinite(equity) ? Math.max(0, Math.min(100, ((equity - floor) / (start - floor)) * 100)) : 0;
+  const fill = h("i");
+  fill.style.width = (halted ? 0 : room) + "%";
+  const state = halted ? ["Tripped", "red"] : a.guard === "unverified" ? ["Buys paused", "amber"] : room < 40 ? ["Getting close", "amber"] : ["Safe", "green"];
+  const h_ = a.halt || {};
+  return h("section", { class: "vt-card" },
+    h("div", { class: "vt-head" }, h("h2", {}, "$80 shutdown"), h("span", { class: "vt-tag " + state[1] }, state[0])),
+    halted
+      ? h("p", {}, "Your balance hit " + usd(h_.equity_at_trigger) + " " + ago(h_.at) + ", so everything was sold and trading stopped. Cash left: "
+          + usd(h_.cash_after_closing) + ".")
+      : h("p", { class: "vt-big vt-mid" }, usd(a.dollars_above_floor), h("span", { class: "muted" }, " above the line")),
+    h("div", { class: "vt-gauge" }, h("div", { class: "vt-fuse" + (halted ? " tripped" : room < 40 ? " low" : ""), role: "img",
+        "aria-label": halted ? "Shutdown tripped" : Math.round(room) + "% of the way from the shutdown to the starting balance" }, fill),
+      h("div", { class: "vt-fuse-labels muted small" }, h("span", {}, cents(floor) + " shutdown"), h("span", {}, cents(start) + " start"))),
+    a.guard === "unverified" && !halted ? h("p", { class: "muted" }, "Some prices are over 10 minutes old, so new buys wait until they update.") : null,
+    h("p", { class: "muted small" }, "If your balance falls to " + cents(floor) + ", the PC sells everything and stops all trading. Fast drops can land a little below "
+      + cents(floor) + ". It's a trigger, not a guaranteed limit."));
+}
+function allocation(a, holdings) {
+  const cash = Number(a.cash);
+  const parts = holdings.filter((x) => Number(x.value) > 0).map((x, i) => ({ label: baseOf(x.symbol), value: Number(x.value), color: SLICE[i % SLICE.length] }));
+  parts.push({ label: "Cash", value: isFinite(cash) ? cash : 0, color: "#C9CED6" });
+  const total = parts.reduce((sum, x) => sum + x.value, 0);
+  if (!(total > 0)) { return null; }
+  const bar = h("div", { class: "vt-alloc", role: "img", "aria-label": parts.map((x) => x.label + " " + Math.round((x.value / total) * 100) + "%").join(", ") });
+  for (const x of parts) { const seg = h("i"); seg.style.width = (x.value / total) * 100 + "%"; seg.style.background = x.color; bar.append(seg); }
+  return h("section", { class: "vt-card" }, h("h2", {}, "Where your money is"), bar,
+    h("div", { class: "vt-legend" }, parts.map((x) => { const dot = h("i"); dot.style.background = x.color;
+      return h("span", {}, dot, x.label + " " + Math.round((x.value / total) * 100) + "%"); })));
+}
+function holdingRows(holdings) {
+  if (!holdings.length) {
+    return h("section", { class: "vt-card" }, h("h2", {}, "Holdings"), h("p", { class: "muted" }, "You don't own any coins right now. It's all cash."),
+      h("a", { class: "vt-ghost", href: "#market", role: "button" }, "Browse the market"));
+  }
+  return h("section", { class: "vt-card flush" }, h("div", { class: "pad vt-head" }, h("h2", {}, "Holdings"), h("span", { class: "muted" }, holdings.length + " coin" + (holdings.length === 1 ? "" : "s"))),
+    h("div", {}, holdings.map((x) => {
+      const value = Number(x.value), cost = Number(x.cost_basis);
+      const pnl = isFinite(value) ? value - cost : null;
+      return h("a", { class: "vt-coin", href: "#market/coin/" + x.symbol }, badge(baseOf(x.symbol)),
+        h("span", { class: "who" }, h("strong", {}, baseOf(x.symbol)),
+          h("span", { class: "muted" }, (x.opened_by === "you" ? "You" : "Agents") + " · " + ago(x.opened_at))),
+        h("span", { class: "num" }, h("strong", {}, usd(x.value)),
+          pnl === null ? h("span", { class: "muted small" }, "no price yet")
+            : h("span", { class: "vt-chg " + (pnl > 0 ? "up" : pnl < 0 ? "down" : "flat") }, signed(pnl) + " · " + (cost ? ((pnl >= 0 ? "+" : "−") + Math.abs((pnl / cost) * 100).toFixed(1) + "%") : ""))));
+    })),
+    h("p", { class: "muted small pad" }, "Values use the last price your PC recorded. Tap a coin for the live price."));
+}
+function historyCard(trades) {
+  const who = VT.history || "all";
+  const list = trades.filter((x) => who === "all" || x.kind === "halt" || x.by === who);
+  const chips = [["all", "All"], ["you", "You"], ["agents", "Agents"]].map(([key, label]) =>
+    h("button", { type: "button", class: "vt-chip" + (who === key ? " on" : ""), "aria-pressed": String(who === key),
+      onclick: () => { VT.history = key; route(true); } }, label));
+  const rows = list.map((x) => {
+    if (x.kind === "halt") {
+      return h("div", { class: "vt-trade halt" }, h("span", { class: "vt-side red" }, "!"),
+        h("span", { class: "who" }, h("strong", {}, "$80 shutdown tripped"), h("span", { class: "muted" }, new Date(x.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }))),
+        h("span", { class: "num" }, h("strong", {}, usd(x.equity_at_trigger)), h("span", { class: "muted small" }, "balance at trigger")));
+    }
+    const buy = x.side === "buy", pnl = x.realized_pnl === null || x.realized_pnl === undefined ? null : Number(x.realized_pnl);
+    return h("div", { class: "vt-trade" }, h("span", { class: "vt-side " + (buy ? "green" : "dark") }, buy ? "B" : "S"),
+      h("span", { class: "who" }, h("strong", {}, (buy ? "Bought " : "Sold ") + baseOf(x.symbol)),
+        h("span", { class: "muted" }, new Date(x.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+          + " · " + (x.by === "you" ? "You" : "Agents") + " · " + qty(x.quantity) + " @ " + usd(x.fill_price || x.price))),
+      h("span", { class: "num" }, h("strong", {}, usd(x.notional)),
+        pnl === null ? h("span", { class: "muted small" }, "fee " + usd(x.fee))
+          : h("span", { class: "small " + (pnl > 0 ? "up" : pnl < 0 ? "down" : "flat") }, signed(pnl) + (pnl < 0 ? " loss" : " profit"))));
+  });
+  return h("section", { class: "vt-card" }, h("div", { class: "vt-head" }, h("h2", {}, "Trade history"), h("span", { class: "muted" }, "last " + trades.length)),
+    h("div", { class: "vt-chips" }, chips),
+    rows.length ? h("div", { class: "vt-feed" }, rows) : h("p", { class: "muted" }, who === "all" ? "No trades yet." : "No trades by " + (who === "you" ? "you" : "the agents") + " yet."));
+}
+async function portfolioScreen() {
+  const r = await call("/m/api/trade/account");
+  if (r.status === 401) { notPaired(); return; }
+  if (!r.ok) { offline(problem(r)); return; }
+  VT.account = r.body;
+  const body = r.body;
+  if (body.needs_start || !body.account) { show(h("h1", { class: "vt-title" }, "Portfolio"), startCard(body)); return; }
+  const a = body.account, holdings = body.holdings || [], trades = body.trades || [];
+  const equity = Number(a.equity), start = Number(a.starting_cash), pnl = equity - start, realized = Number(a.realized_pnl);
+  const invested = holdings.reduce((sum, x) => sum + (Number(x.value) || 0), 0);
+  show(flashNote(), h("h1", { class: "vt-title" }, "Portfolio"),
+    h("div", { class: "vt-cols" },
+      h("div", {},
+        h("section", { class: "vt-hero" }, h("p", { class: "vt-label" }, "Practice balance"),
+          h("p", { class: "vt-big" }, usd(a.equity)),
+          isFinite(pnl) ? h("p", { class: "vt-pnl " + (pnl >= 0 ? "up" : "down") }, signed(pnl) + " (" + (pnl >= 0 ? "+" : "−") + Math.abs((pnl / start) * 100).toFixed(2) + "%) all time") : null),
+        h("div", { class: "vt-stats" },
+          h("div", { class: "vt-stat" }, h("b", {}, usd(a.cash)), h("span", {}, "Cash")),
+          h("div", { class: "vt-stat" }, h("b", {}, usd(invested)), h("span", {}, "In coins")),
+          h("div", { class: "vt-stat" }, h("b", { class: realized > 0 ? "up" : realized < 0 ? "down" : "" }, isFinite(realized) ? signed(realized) : "—"), h("span", {}, "From closed trades"))),
+        allocation(a, holdings), holdingRows(holdings)),
+      h("div", {}, shutdownCard(a), historyCard(trades))));
+}
+
 /* ---------- sections arriving in the next stages ---------- */
 const SOON = {
-  portfolio: ["Portfolio", "Stage 2", ["Practice balance and cash", "Every holding with profit/loss", "Full trade history", "The $80 shutdown gauge"],
-    "#trade", "Until then, holdings and trades are in the Command Center's Trade tab."],
   desk: ["AI Trading Desk", "Stage 3", ["All eight agents and what each did last", "Coins they researched", "Approvals, vetoes and why", "Simulated trades they placed"],
     "#trade/desk", "Until then, the agents' case files are in the Command Center's Agent desk."],
   performance: ["Results", "Stage 4", ["Balance over time (equity chart)", "Win rate, drawdown and fees", "You vs the agents"],
@@ -490,6 +590,9 @@ async function route(force) {
   } else if (tab === "market") {
     await marketScreen(rest[0] || "all");
     VT.timer = setInterval(() => { if (!quiet()) { marketScreen(); } }, 20000);
+  } else if (tab === "portfolio") {
+    await portfolioScreen();
+    VT.timer = setInterval(() => { if (!quiet()) { portfolioScreen(); } }, 20000);
   } else if (SOON[tab]) {
     soonScreen(tab);
   } else {

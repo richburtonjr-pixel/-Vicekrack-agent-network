@@ -64,6 +64,12 @@ class TradingAppScript(unittest.TestCase):
         body = self.script.split('post("/m/api/trade/order",')[1][:60]
         self.assertEqual(body.strip().split("}")[0], "{ symbol, side, amount ")
 
+    def test_portfolio_is_built_from_the_account_read(self):
+        self.assertIn('tab === "portfolio"', self.script)
+        screen = self.script.split("async function portfolioScreen")[1].split("\n}\n")[0]
+        self.assertIn('call("/m/api/trade/account")', screen)
+        self.assertNotIn("post(", screen)                     # looking at the portfolio never trades
+
     def test_no_made_up_numbers(self):
         self.assertNotIn("Math.random", self.script)
 
