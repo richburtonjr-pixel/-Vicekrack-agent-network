@@ -178,6 +178,9 @@ def tickers(catalog, transport=urllib_transport, symbols=None):
         out[coin["symbol"]] = {"symbol": coin["symbol"], "base": coin["base"], "name": coin["name"], "pair": coin["pair"],
                                "last": last, "ask": ask, "bid": bid, "open_today": opened, "change_today_pct": change,
                                "high_24h": high, "low_24h": low, "volume_24h_usd": volume_usd,
+                               # base-coin volume since 00:00 UTC and over the last 24 h (the scanner's volume spike check)
+                               "volume_today_base": row["v"][0] if isinstance(row["v"][0], str) and NUMBER.match(row["v"][0]) else None,
+                               "volume_24h_base": volume,
                                "tradeable": to_price(last) is not None and to_price(ask) is not None
                                and to_price(bid) is not None}
     return out
