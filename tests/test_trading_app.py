@@ -29,10 +29,23 @@ class TradingAppFiles(MobileBase):
 
     def test_installable_as_its_own_home_screen_app(self):
         manifest = json.loads((STATIC / "trading.webmanifest").read_text())
-        self.assertEqual((manifest["display"], manifest["start_url"]), ("standalone", "/trading#home"))
+        self.assertEqual((manifest["display"], manifest["start_url"]), ("standalone", "/#home"))
         html = (STATIC / "trading.html").read_text()
         self.assertIn('href="/trading.webmanifest"', html)
         self.assertIn('name="apple-mobile-web-app-capable"', html)
+
+    def test_the_app_is_the_front_door_and_only_the_embed_page_can_be_framed(self):
+        status, headers, body = self.gw.respond("GET", "/", self.remote())
+        self.assertEqual(status, 200)
+        self.assertIn(b"vt-tabs", body)                                       # the ViceKrack app
+        self.assertIn("frame-src 'self'", headers["Content-Security-Policy"])
+        status, headers, body = self.gw.respond("GET", "/command/embed", self.remote())
+        self.assertEqual((status, headers["X-Frame-Options"]), (200, "SAMEORIGIN"))
+        self.assertIn("frame-ancestors 'self'", headers["Content-Security-Policy"])
+        for path in ("/", "/command", "/static/trading.js"):
+            _, headers, _ = self.gw.respond("GET", path, self.remote())
+            self.assertEqual(headers["X-Frame-Options"], "DENY", path)
+            self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"], path)
 
     def test_practice_mode_always_shown(self):
         html = (STATIC / "trading.html").read_text()

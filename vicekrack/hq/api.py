@@ -53,7 +53,9 @@ from .scene import scene_from_view
 from .sessions import SESSION, session_document, session_items
 
 STATIC = Path(__file__).resolve().parent / "static"
-FILES = {"/": ("index.html", "text/html; charset=utf-8"),
+FILES = {"/": ("moved.html", "text/html; charset=utf-8"),        # ViceKrack's front door is now the app (port 8770)
+         "/classic": ("index.html", "text/html; charset=utf-8"),   # the 3D / classic headquarters, kept as it was
+         "/static/moved.css": ("moved.css", "text/css; charset=utf-8"),
          "/static/styles.css": ("styles.css", "text/css; charset=utf-8"),
          "/static/hq-core.js": ("hq-core.js", "text/javascript; charset=utf-8"),
          "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),

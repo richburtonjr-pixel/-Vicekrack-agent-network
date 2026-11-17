@@ -244,6 +244,11 @@ class ApiTests(EventBase):
                         {"origin": "null"}, {"sec-fetch-site": "cross-site"}, {"host": ""}):
             self.assertEqual(get("/api/timelines", headers)[0], 403, headers)
         self.assertEqual(get("/", {"host": f"localhost:{PORT}", "origin": f"http://localhost:{PORT}"})[0], 200)
+        moved = get("/", {"host": f"localhost:{PORT}"})
+        self.assertIn(b"127.0.0.1:8770", moved[2])                               # the front door points to the app
+        classic = get("/classic", {"host": f"localhost:{PORT}"})
+        self.assertEqual(classic[0], 200)
+        self.assertIn(b"/static/app.js", classic[2])                             # the 3D/classic HQ is still there
         self.assertEqual(get("/api/status", {"sec-fetch-site": "same-origin"})[0], 200)
 
     def test_paths_and_ids_are_allowlisted(self):
