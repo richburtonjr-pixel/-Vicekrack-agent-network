@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 
 from ..money import fmt
-from . import profit_trail
+from . import plans, profit_trail
 from .verifier import ema_series
 
 
@@ -61,6 +61,9 @@ def risk_manager(symbol, research_verdict, practice, history, now, config):
     last_exit = history["last_exit_at"].get(symbol)
     if last_exit and _minutes_between(last_exit, now) < config["reentry_wait_minutes"]:
         reasons.append("reentry_wait")
+    last_loss_here = (history.get("last_loss_at_by_symbol") or {}).get(symbol)
+    if last_loss_here and _minutes_between(last_loss_here, now) < config.get("loss_cooldown_minutes", 0):
+        reasons.append("lost_on_this_coin_recently")
     limit = config.get("max_daily_loss_dollars")
     if limit is not None and Decimal(history.get("agents_pnl_today") or "0") <= -Decimal(limit):
         reasons.append("daily_loss_limit")
@@ -74,17 +77,28 @@ def risk_manager(symbol, research_verdict, practice, history, now, config):
             "summary": f"Research complete; guard ok with ${fmt(Decimal(room))} above the floor; limits respected."}
 
 
-def position_monitor(symbol, position, bars, mark, now, config, peak=None, emergency=False):
-    """Return exit reasons for one open position ([] = keep holding). `peak`: highest price seen since buying."""
+def position_monitor(symbol, position, bars, mark, now, config, peak=None, emergency=False, plan=None):
+    """Return exit reasons for one open position ([] = keep holding). `peak`: highest price seen since buying.
+    `plan`: the position's trade plan (plans.py): its own stop, break-even and time-stop rules. Positions bought
+    before plans existed fall back to the plain `stop_loss_pct`.
+
+    Risk events act at once: the Emergency Stop, the stop (or the break-even stop), the profit trail. The calmer
+    exits wait: the time stop and the trend exit never fire before `min_hold_minutes`, the trend exit reads
+    `trend_bar_minutes`-minute bars, and while the profit trail is active (let_winners_run) neither applies."""
     reasons = ["emergency_stop"] if emergency else []
     with localcontext() as context:
         _ctx(context)
         quantity = Decimal(position["quantity"])
         cost_each = Decimal(position["cost_basis"]) / quantity
-        stop = cost_each * (1 - Decimal(config["stop_loss_pct"]) / 100)
         price = Decimal(mark["price"]) if mark is not None else None
-        if price is not None and price <= stop:
-            reasons.append("stop_loss")
+        if plan is not None:
+            stop = Decimal(plan["breakeven_price"] if plan.get("breakeven_done") else plan["stop_price"])
+            if price is not None and price <= stop:
+                reasons.append("breakeven_stop" if plan.get("breakeven_done") else "stop_loss")
+        else:
+            stop = cost_each * (1 - Decimal(config["stop_loss_pct"]) / 100)
+            if price is not None and price <= stop:
+                reasons.append("stop_loss")
         trail = config.get("profit_trail")
         trail_active = False
         if trail is not None and price is not None:
@@ -94,14 +108,29 @@ def position_monitor(symbol, position, bars, mark, now, config, peak=None, emerg
             if state["sell"]:
                 reasons.append("profit_trail")
         winners_run = trail_active and trail.get("let_winners_run", True)
-        if not winners_run and _minutes_between(position["opened_at"], now) >= config["max_hold_minutes"]:
-            reasons.append("held_too_long")
-        if bars and not winners_run:
-            closes = [Decimal(b["close"]) for b in bars]
+        held = _minutes_between(position["opened_at"], now)
+        settled = held >= config.get("min_hold_minutes", 0)
+        if not winners_run and held >= config["max_hold_minutes"]:
+            if plan is None:
+                reasons.append("held_too_long")
+            elif price is not None and plans.r_multiple(plan, price) < Decimal(config.get("time_stop_min_r", "1000")):
+                reasons.append("time_stop")
+        if bars and not winners_run and settled:
+            minutes = config.get("trend_bar_minutes", 1)
+            closes = plans.resample(bars, minutes) if minutes > 1 else [Decimal(b["close"]) for b in bars]
             fast, slow = ema_series(closes, config["ema_fast"]), ema_series(closes, config["ema_slow"])
-            if fast[-1] is not None and slow[-1] is not None and fast[-1] < slow[-1]:
+            if fast and fast[-1] is not None and slow[-1] is not None and fast[-1] < slow[-1]:
                 reasons.append("trend_turned_down")
     return reasons
+
+
+def partial_due(plan, mark):
+    """True when the plan's one-time partial profit is due (price at or above partial_at_r x risk)."""
+    if plan is None or mark is None or plan.get("partial_done") or not plan.get("partial_at_r") \
+            or not plan.get("partial_fraction"):
+        return False
+    r = plans.r_multiple(plan, mark["price"])
+    return r is not None and r >= Decimal(plan["partial_at_r"])
 
 
 def performance(ledger_lines, account_id, practice):
