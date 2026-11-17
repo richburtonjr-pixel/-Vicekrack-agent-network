@@ -31,45 +31,61 @@ from ..money import parse
 from ..practice import account as practice_book
 from ..providers.kraken import interval_minutes
 from . import agents
-from . import profit_trail, safety
+from . import profit_trail, safety, settings
 from .verifier import verify
 
 GOOD = {"market_scout": "data_available", "trend_agent": "trend_assessed",
         "strategy_agent": "active_research_signal", "risk_review": "sufficient_for_future_paper_evaluation"}
 
 
-def load_desk_config(path="config/trading-desk.json", root=ROOT):
+def _check(config):
+    """Raise ValueError (or KeyError/TypeError...) if a desk config is not usable."""
+    if config["config_version"] != "1.0" or not isinstance(config["auto_practice_trades"], bool):
+        raise ValueError
+    parse(config["order_dollars"], "money")
+    parse(config["min_dollars_above_floor"], "money")
+    for section, keys in (("verifier", ("max_bar_age_seconds", "gap_check_bars")),
+                          ("risk", ("max_agent_positions", "max_entries_per_day", "reentry_wait_minutes",
+                                    "pause_after_losses", "pause_minutes")),
+                          ("monitor", ("max_hold_minutes", "ema_fast", "ema_slow"))):
+        for key in keys:
+            value = config[section][key]
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError
+    parse(config["verifier"]["max_last_bar_move_pct"])
+    stop = parse(config["monitor"]["stop_loss_pct"])
+    if not 0 < stop < 50 or config["monitor"]["ema_fast"] >= config["monitor"]["ema_slow"]:
+        raise ValueError
+    if "take_profit_pct" in config["monitor"] or "trailing_stop_pct" in config["monitor"]:
+        raise ValueError                                    # replaced by profit_trail (no fixed take-profit)
+    if "profit_trail" in config["monitor"]:                 # optional; leave out to switch it off
+        profit_trail.validate(config["monitor"]["profit_trail"])
+    if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
+        raise ValueError
+
+
+def load_desk_config(path="config/trading-desk.json", root=ROOT, dashboard=True):
+    """The desk settings file, with the limits changed in the app laid on top (see settings.py).
+
+    If the app's changes would make the settings unusable they are ignored as a whole and the file's settings
+    are used; `_dashboard_overrides_ignored` then says so."""
     root = Path(root).resolve()
     target = (root / path).resolve()
     try:
         if not target.is_relative_to(root):
             raise ValueError
         config = json.loads(target.read_text(encoding="utf-8-sig"))
-        if config["config_version"] != "1.0" or not isinstance(config["auto_practice_trades"], bool):
-            raise ValueError
-        parse(config["order_dollars"], "money")
-        parse(config["min_dollars_above_floor"], "money")
-        for section, keys in (("verifier", ("max_bar_age_seconds", "gap_check_bars")),
-                              ("risk", ("max_agent_positions", "max_entries_per_day", "reentry_wait_minutes",
-                                        "pause_after_losses", "pause_minutes")),
-                              ("monitor", ("max_hold_minutes", "ema_fast", "ema_slow"))):
-            for key in keys:
-                value = config[section][key]
-                if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                    raise ValueError
-        parse(config["verifier"]["max_last_bar_move_pct"])
-        stop = parse(config["monitor"]["stop_loss_pct"])
-        if not 0 < stop < 50 or config["monitor"]["ema_fast"] >= config["monitor"]["ema_slow"]:
-            raise ValueError
-        if "take_profit_pct" in config["monitor"] or "trailing_stop_pct" in config["monitor"]:
-            raise ValueError                                    # replaced by profit_trail (no fixed take-profit)
-        if "profit_trail" in config["monitor"]:                 # optional; leave out to switch it off
-            profit_trail.validate(config["monitor"]["profit_trail"])
-        if "max_daily_loss_dollars" in config["risk"] and not parse(config["risk"]["max_daily_loss_dollars"], "money") > 0:
-            raise ValueError
+        _check(config)
     except (OSError, ValueError, UnicodeError, KeyError, TypeError, AttributeError, TradingError):
         raise TradingError("invalid_desk_config", "The trade desk settings are invalid.") from None
-    return config
+    if not dashboard:
+        return config
+    merged = settings.overlay(config, settings.load_overrides(root))
+    try:
+        _check(merged)
+        return merged
+    except (ValueError, KeyError, TypeError, AttributeError, TradingError, IndexError):
+        return {**config, "_dashboard_overrides": {}, "_dashboard_overrides_ignored": True}
 
 
 class CaseFiles:
