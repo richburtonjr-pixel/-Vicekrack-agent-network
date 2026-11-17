@@ -403,6 +403,8 @@ class Gateway:
                 return _json(200, self.trade.markets())
             if name == "account" and not query:
                 return _json(200, self.trade.account())
+            if name == "desk" and not query:
+                return _json(200, self.trade.desk())
             if name == "coin" and len(query) <= 120:
                 return _json(200, self.trade.coin(query))
             return _error(404, "not_found", "No such page.")

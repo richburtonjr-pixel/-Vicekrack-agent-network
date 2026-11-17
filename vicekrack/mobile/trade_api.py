@@ -115,6 +115,18 @@ class TradeApi:
         return {**base, "account": summary, "holdings": holdings, "trades": list(reversed(trades)),
                 "cases": list(reversed(cases)), "scores": scores, "needs_start": False}
 
+    def desk(self):
+        """The AI Trading Desk, read-only: the same eight-agent board and case files the HQ Trading Floor shows,
+        built from files the watch already wrote (no network, no trading). Charts are left out to keep it light."""
+        from datetime import datetime, timezone
+        from ..hq.floor import floor_snapshot
+        snap = floor_snapshot(root=self.root, now=datetime.fromtimestamp(self.clock(), tz=timezone.utc))
+        researched = [{k: m.get(k) for k in ("symbol", "price", "price_at", "error", "verdict", "verdict_text")}
+                      for m in snap["markets"]]
+        return {"contract": "trade_desk", "simulated": True, "notice": book.NOTICE, "watch": snap["watch"],
+                "agents": snap["agents"], "decisions": snap["decisions"], "researched": researched,
+                "performance": snap["performance"]}
+
     # ------------------------------------------------------------ actions
     def order(self, document):
         if set(document) - {"symbol", "side", "amount", "request_id"}:
