@@ -149,7 +149,12 @@ class TradeApi:
         The PC does not keep a minute-by-minute balance history, so the chart is the LOCKED-IN balance: the
         starting cash plus every closed trade's profit or loss (fees included), one point per sale, ending with
         today's balance including open coins. Drawdown is measured on those points."""
-        base = {"contract": "trade_results", "simulated": True, "notice": book.NOTICE}
+        try:
+            from ..trading.watch.scorecard import Scorecard
+            scorecard = Scorecard(self.root).summary()
+        except (OSError, ValueError, ArithmeticError):
+            scorecard = None
+        base = {"contract": "trade_results", "simulated": True, "notice": book.NOTICE, "scorecard": scorecard}
         store = PracticeStore(self.root)
         try:
             config = load_config(**({"root": self.root} if self.root is not None else {}))
