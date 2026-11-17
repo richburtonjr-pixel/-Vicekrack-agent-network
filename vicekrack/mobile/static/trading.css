@@ -200,9 +200,14 @@ a.vt-ghost, a.vt-primary { display: flex; align-items: center; justify-content: 
 .vt-stepline .what { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14.5px; }
 @media (min-width: 640px) { .vt-agents { grid-template-columns: 1fr 1fr; } }
 
-/* ---------- placeholder sections ---------- */
-.vt-soon ul { margin: 0; padding-left: 20px; color: var(--soft); }
-.vt-soon li { margin: 4px 0; }
+/* ---------- results ---------- */
+.vt-chart .floorline { stroke: var(--down); stroke-width: 1; stroke-dasharray: 2 5; opacity: 0.6; }
+.vt-legend .key { width: 16px; height: 0; border-radius: 0; border-top: 2px dashed #C9CED6; }
+.vt-legend .key.floor { border-top-color: var(--down); }
+.vt-stats6 { grid-template-columns: repeat(2, 1fr); }
+.vt-who { display: flex; flex-direction: column; gap: 6px; background: var(--card-2); border-radius: var(--radius-sm); padding: 14px; font-size: 14px; }
+.vt-who .vt-row { font-size: 14px; }
+@media (min-width: 640px) { .vt-stats6 { grid-template-columns: repeat(3, 1fr); } }
 
 /* ---------- bottom tabs ---------- */
 .vt-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: space-around;

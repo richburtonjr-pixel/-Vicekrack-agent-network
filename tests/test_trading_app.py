@@ -56,7 +56,7 @@ class TradingAppScript(unittest.TestCase):
         paths = set(re.findall(r'"(/m/api/[a-z/]+)', self.script))
         self.assertEqual(paths, {"/m/api/session", "/m/api/trade/account", "/m/api/trade/markets",
                                  "/m/api/trade/coin", "/m/api/trade/order", "/m/api/trade/restart",
-                                 "/m/api/trade/desk"})
+                                 "/m/api/trade/desk", "/m/api/trade/results"})
         code = self.script.replace('"http://www.w3.org/2000/svg"', "")   # the SVG namespace is not a request
         for outside in ("kraken.com", "alpaca.markets", "http://", "https://"):
             self.assertNotIn(outside, code)            # never talks to a broker or exchange directly
@@ -116,10 +116,37 @@ class TradingDesk(unittest.TestCase):
         self.assertEqual(PracticeStore(self.root).load(load_config(root=self.root)), before)
 
 
+class TradingResults(TradingDesk):
+    """GET /m/api/trade/results: worked out from the practice ledger only."""
+
+    def test_curve_matches_the_ledger(self):
+        res = self.api.results()
+        self.assertEqual(res["contract"], "trade_results")
+        sells = [p for p in res["curve"] if p["event"] == "sell"]
+        self.assertEqual(len(sells), res["scores"]["all"]["closed_trades"])
+        self.assertEqual(res["curve"][0]["event"], "start")
+        from decimal import Decimal
+        locked = Decimal(res["curve"][0]["balance"]) + sum(Decimal(p["pnl"]) for p in sells)
+        self.assertEqual(locked - Decimal(res["account"]["starting_cash"]), Decimal(res["account"]["realized_pnl"]))
+
+    def test_fees_and_drawdown_are_plain_numbers(self):
+        from decimal import Decimal
+        res = self.api.results()
+        self.assertEqual(Decimal(res["fees"]["total"]), Decimal(res["fees"]["you"]) + Decimal(res["fees"]["agents"]))
+        self.assertGreaterEqual(Decimal(res["drawdown"]["dollars"]), 0)
+
+    def test_reading_results_never_trades(self):
+        from vicekrack.trading.practice.store import PracticeStore, load_config
+        before = PracticeStore(self.root).load(load_config(root=self.root))
+        self.api.results()
+        self.assertEqual(PracticeStore(self.root).load(load_config(root=self.root)), before)
+
+
 class TradingDeskGateway(MobileBase):
     def test_needs_a_paired_phone(self):
-        status, _, body = self.gw.respond("GET", "/m/api/trade/desk", self.remote())
-        self.assertEqual(status, 401)
+        for path in ("/m/api/trade/desk", "/m/api/trade/results"):
+            status, _, body = self.gw.respond("GET", path, self.remote())
+            self.assertEqual(status, 401, path)
 
 
 if __name__ == "__main__":
