@@ -1,0 +1,2 @@
+# Optional: broker connectors (paper only). Installed by "Check IBKR Paper.bat".
+ib_async==2.1.0
