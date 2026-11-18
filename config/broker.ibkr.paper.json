@@ -1,0 +1,18 @@
+{
+  "config_version": "1.0",
+  "mode": "ibkr_paper",
+  "description": "Interactive Brokers PAPER connector. ViceKrack talks to IB Gateway (or TWS) running on this PC, logged in to your PAPER account, using ib_async. Paper ports only: 4002 (IB Gateway paper) or 7497 (TWS paper); the live ports 4001/7496 are always refused, and every account IBKR reports must be a paper account (starts with DU). No API keys are stored: your IBKR login stays inside IBKR's program. client_id 2 is the trading loop's connection (the tutorial uses 2 for the bot and 3 for order placement). Kill switch on = no new orders (checks and cancels still work).",
+  "connection": {
+    "host": "127.0.0.1",
+    "port": 4002,
+    "client_id": 2,
+    "timeout_seconds": 10
+  },
+  "kill_switch": {
+    "engaged": false
+  },
+  "limits": {
+    "max_quantity": 500,
+    "max_order_dollars": "2500.00"
+  }
+}

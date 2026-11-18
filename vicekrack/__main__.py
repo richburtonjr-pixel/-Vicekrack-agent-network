@@ -110,6 +110,10 @@ def main():
         from .trading.indicators.cli import main as indicator_main
         return indicator_main()
 
+    if len(sys.argv) > 1 and sys.argv[1] in {"brokers-list", "ibkr-paper-check"}:
+        from .trading.brokers.cli import main as brokers_main
+        return brokers_main()
+
     if len(sys.argv) > 1 and sys.argv[1].startswith("broker-paper-"):
         from .trading.broker.cli import main as broker_main
         return broker_main()
